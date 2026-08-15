@@ -67,7 +67,7 @@ export async function executeTurn(input: {
   }
   const isNewSession = !thread.sessions[targetAgentId];
   const profile = isNewSession
-    ? await context.stores.profiles.get(targetAgentId)
+    ? ((await context.stores.profiles.get(targetAgentId)) ?? undefined)
     : undefined;
   const systemPrompt = buildSystemPrompt({ profile, evidenceRefs: refs });
 

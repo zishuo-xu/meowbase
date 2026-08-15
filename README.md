@@ -25,7 +25,14 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 架构
 
 三层:模型(推理)→ Agent CLI(工具)→ 平台(路由/线程/记忆/技能/审批)。
-本仓库当前进度:M1 骨架(线程消息 + @mention 路由 + ClaudeAdapter + WebSocket 流式)。
+本仓库当前进度:M2 持久身份+共享记忆(Profile 注入、证据库 #learn/#confirm/#ev_)。
+
+## 消息协议(M2)
+
+- `#learn <标题>` —— 请求沉淀本轮回复为证据,系统会给出确认提示
+- `#confirm ev_xxxxxxxx` —— 确认沉淀
+- `#ev_xxxxxxxx` —— 在消息中引用历史证据,注入 agent 上下文
+- 三个 agent 有内置身份(墨墨/闪闪/团团),新会话自动注入
 
 ## 测试
 

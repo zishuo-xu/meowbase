@@ -8,7 +8,8 @@ const CONFIRM_PATTERN = /#confirm\s+(ev_[a-f0-9]{8})\b/;
 
 export function parseConfirmCommand(content: string): { id: string } | null {
   const match = content.match(CONFIRM_PATTERN);
-  return match?.[1] ? { id: match[1] } : null;
+  const id = match?.[1];
+  return id ? { id } : null;
 }
 
 const LEARN_PATTERN = /#learn\s+(.+)$/;
@@ -16,7 +17,7 @@ const LEARN_PATTERN = /#learn\s+(.+)$/;
 export function parseLearnCommand(content: string): { title: string } | null {
   const match = content.match(LEARN_PATTERN);
   if (!match) return null;
-  const title = match[1].trim();
+  const title = match[1]?.trim() ?? '';
   return title ? { title } : null;
 }
 

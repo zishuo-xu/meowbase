@@ -169,7 +169,7 @@ export class RedisProfileStore implements ProfileStore {
     const raw = await this.redis.hgetall(profileKey(agentId));
     if (!raw.agentId) return null;
     return {
-      agentId: raw.agentId,
+      agentId: raw.agentId as AgentId,
       name: raw.name ?? '',
       personality: raw.personality ?? '',
       role: raw.role ?? '',

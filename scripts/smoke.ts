@@ -5,7 +5,13 @@ import type { AddressInfo } from 'node:net';
 import { buildServer } from '../packages/api/src/http/server.js';
 import { loadConfig } from '../packages/api/src/config.js';
 import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
-import { createMessageStore, createThreadStore } from '../packages/api/src/stores/factories.js';
+import {
+  createEvidenceStore,
+  createMessageStore,
+  createProfileStore,
+  createThreadStore,
+} from '../packages/api/src/stores/factories.js';
+import { ensureSeededProfiles } from '../packages/api/src/stores/seeds.js';
 import { ClaudeAdapter } from '../packages/api/src/providers/claude.js';
 import { createAgentRegistry } from '../packages/api/src/providers/registry.js';
 
@@ -13,9 +19,17 @@ const config = loadConfig();
 const redis = createRedisClient(config.redisUrl);
 await assertStorageReady(redis);
 
+const stores = {
+  threads: createThreadStore(redis),
+  messages: createMessageStore(redis),
+  profiles: createProfileStore(redis),
+  evidence: createEvidenceStore(redis),
+};
+await ensureSeededProfiles(stores.profiles);
+
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-smoke-'));
 const app = await buildServer({
-  stores: { threads: createThreadStore(redis), messages: createMessageStore(redis) },
+  stores,
   registry: createAgentRegistry([new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs })]),
   workdirBase,
 });
@@ -35,7 +49,7 @@ try {
   const msgRes = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ content: '@claude 请用一句话介绍你自己' }),
+    body: JSON.stringify({ content: '@claude 请用一句话介绍你自己\n#learn 冒烟测试结论' }),
   });
   const message = (await msgRes.json()) as {
     content: string;
@@ -55,6 +69,11 @@ try {
   if (!message.sessionId) {
     throw new Error('冒烟失败: 未拿到 sessionId');
   }
+
+  const evidenceRes = await fetch(`${baseUrl}/api/evidence?threadId=${thread.id}`);
+  const evidence = (await evidenceRes.json()) as { title: string }[];
+  console.log('evidence drafts:', evidence.length);
+  if (evidence.length < 1) throw new Error('冒烟失败: 未生成证据 draft');
   console.log('✅ 冒烟通过');
 } finally {
   await app.close();

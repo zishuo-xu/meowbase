@@ -58,10 +58,12 @@ describe('Redis Profile/Evidence 存储', () => {
 
   it('evidence draft → confirm', async () => {
     if (!redis) return;
+    // 用唯一 threadId,避免历史测试数据污染断言
+    const threadId = `t-${Date.now()}`;
     const evidence = createEvidenceStore(redis);
-    const draft = await evidence.createDraft({ threadId: 't', kind: 'fact', title: 'x', content: 'y' });
+    const draft = await evidence.createDraft({ threadId, kind: 'fact', title: 'x', content: 'y' });
     const confirmed = await evidence.confirm(draft.id);
     expect(confirmed?.status).toBe('confirmed');
-    expect((await evidence.list('t')).length).toBe(1);
+    expect((await evidence.list(threadId)).length).toBe(1);
   });
 });
