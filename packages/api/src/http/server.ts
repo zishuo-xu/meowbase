@@ -9,6 +9,7 @@ import type {
   EvidenceStore,
   MessageStore,
   ProfileStore,
+  SkillStore,
   ThreadStore,
 } from '../stores/ports.js';
 import { executeTurn } from '../router/execute-turn.js';
@@ -19,6 +20,7 @@ export interface ApiDeps {
     messages: MessageStore;
     profiles: ProfileStore;
     evidence: EvidenceStore;
+    skills: SkillStore;
   };
   registry: AgentRegistry;
   workdirBase: string;
@@ -50,6 +52,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const { threadId } = request.query as { threadId?: string };
     return deps.stores.evidence.list(threadId);
   });
+
+  app.get('/api/skills', async () => deps.stores.skills.list());
 
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };

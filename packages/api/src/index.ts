@@ -6,6 +6,7 @@ import {
   createEvidenceStore,
   createMessageStore,
   createProfileStore,
+  createSkillStore,
   createThreadStore,
 } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
@@ -23,6 +24,7 @@ const stores = {
   messages: createMessageStore(redis),
   profiles: createProfileStore(redis),
   evidence: createEvidenceStore(redis),
+  skills: createSkillStore(config.skillsDir),
 };
 await ensureSeededProfiles(stores.profiles);
 

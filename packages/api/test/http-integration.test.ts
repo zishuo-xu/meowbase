@@ -31,7 +31,9 @@ let baseUrl = '';
 let server: Awaited<ReturnType<typeof buildServer>>;
 
 beforeAll(async () => {
-  const stores = createMemoryStores();
+  const stores = createMemoryStores([
+    { id: 'tdd', name: '测试驱动开发', description: 'd', triggers: ['tdd'], prompt: '红绿重构' },
+  ]);
   await ensureSeededProfiles(stores.profiles);
   server = await buildServer({
     stores,
@@ -143,5 +145,12 @@ describe('HTTP 集成', () => {
     const evidence = (await evidenceRes.json()) as { status: string; title: string }[];
     expect(evidence.length).toBe(1);
     expect(evidence[0]?.status).toBe('draft');
+  });
+
+  it('GET /api/skills 返回技能清单', async () => {
+    const res = await fetch(`${baseUrl}/api/skills`);
+    const skills = (await res.json()) as { id: string; name: string }[];
+    expect(skills.length).toBeGreaterThan(0);
+    expect(skills.map((s) => s.id)).toContain('tdd');
   });
 });

@@ -9,6 +9,7 @@ import {
   createEvidenceStore,
   createMessageStore,
   createProfileStore,
+  createSkillStore,
   createThreadStore,
 } from '../packages/api/src/stores/factories.js';
 import { ensureSeededProfiles } from '../packages/api/src/stores/seeds.js';
@@ -24,6 +25,7 @@ const stores = {
   messages: createMessageStore(redis),
   profiles: createProfileStore(redis),
   evidence: createEvidenceStore(redis),
+  skills: createSkillStore(join(process.cwd(), 'skills')),
 };
 await ensureSeededProfiles(stores.profiles);
 
