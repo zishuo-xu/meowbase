@@ -1,8 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { generateEvidenceId } from '@meowbase/shared';
-import type { AgentId, AgentProfile, EvidenceEntry, Message, Thread } from '@meowbase/shared';
-import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from './ports.js';
+import type {
+  AgentId,
+  AgentProfile,
+  EvidenceEntry,
+  Message,
+  Skill,
+  Thread,
+} from '@meowbase/shared';
+import type {
+  EvidenceStore,
+  MessageStore,
+  ProfileStore,
+  SkillStore,
+  ThreadStore,
+} from './ports.js';
 
 export class InMemoryThreadStore implements ThreadStore {
   private readonly threads = new Map<string, Thread>();
@@ -144,5 +157,21 @@ export class InMemoryEvidenceStore implements EvidenceStore {
   async list(threadId?: string): Promise<EvidenceEntry[]> {
     const all = [...this.entries.values()];
     return threadId ? all.filter((e) => e.threadId === threadId) : all;
+  }
+}
+
+export class InMemorySkillStore implements SkillStore {
+  private readonly skills = new Map<string, Skill>();
+
+  constructor(skills: Skill[] = []) {
+    for (const skill of skills) this.skills.set(skill.id, skill);
+  }
+
+  async list(): Promise<Skill[]> {
+    return [...this.skills.values()];
+  }
+
+  async get(id: string): Promise<Skill | null> {
+    return this.skills.get(id) ?? null;
   }
 }

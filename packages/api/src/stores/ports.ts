@@ -4,6 +4,7 @@ import type {
   EvidenceEntry,
   EvidenceKind,
   Message,
+  Skill,
   Thread,
 } from '@meowbase/shared';
 
@@ -55,4 +56,9 @@ export interface EvidenceStore {
   confirm(id: string): Promise<EvidenceEntry | null>;
   get(id: string): Promise<EvidenceEntry | null>;
   list(threadId?: string): Promise<EvidenceEntry[]>;
+}
+
+export interface SkillStore {
+  list(): Promise<Skill[]>;
+  get(id: string): Promise<Skill | null>;
 }

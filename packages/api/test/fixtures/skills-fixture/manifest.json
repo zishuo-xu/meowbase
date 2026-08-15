@@ -1,0 +1,11 @@
+{
+  "skills": [
+    {
+      "id": "tdd",
+      "name": "测试驱动开发",
+      "description": "先写失败测试再实现",
+      "triggers": ["tdd", "测试驱动"],
+      "promptFile": "tdd.md"
+    }
+  ]
+}

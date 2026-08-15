@@ -4,6 +4,7 @@ export interface Config {
   claudeBin: string;
   workdirBase: string;
   agentTimeoutMs: number;
+  skillsDir: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -13,5 +14,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     claudeBin: env.CLAUDE_BIN ?? 'claude',
     workdirBase: env.WORKDIR_BASE ?? './work',
     agentTimeoutMs: Number(env.AGENT_TIMEOUT_MS ?? 300_000),
+    skillsDir: env.SKILLS_DIR ?? './skills',
   };
 }

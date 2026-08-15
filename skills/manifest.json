@@ -1,0 +1,25 @@
+{
+  "skills": [
+    {
+      "id": "tdd",
+      "name": "测试驱动开发",
+      "description": "先写失败测试,再实现,再重构",
+      "triggers": ["tdd", "测试驱动"],
+      "promptFile": "tdd.md"
+    },
+    {
+      "id": "review",
+      "name": "代码审查",
+      "description": "按清单系统化审查代码",
+      "triggers": ["review", "审查", "代码评审"],
+      "promptFile": "review.md"
+    },
+    {
+      "id": "debug",
+      "name": "系统化调试",
+      "description": "按流程定位并修复问题",
+      "triggers": ["debug", "调试", "bug"],
+      "promptFile": "debug.md"
+    }
+  ]
+}
