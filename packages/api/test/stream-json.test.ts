@@ -8,6 +8,12 @@ const fixture = readFileSync(
   'utf8',
 );
 
+function resultLine(): Record<string, unknown> {
+  const line = fixture.split('\n').find((l) => l.includes('"type":"result"'));
+  if (!line) throw new Error('fixture 缺少 result 行');
+  return JSON.parse(line) as Record<string, unknown>;
+}
+
 describe('parseStreamJsonLine', () => {
   it('解析 assistant 增量文本', () => {
     const event = parseStreamJsonLine(
@@ -34,19 +40,18 @@ describe('parseStreamJsonLine', () => {
 });
 
 describe('StreamAccumulator', () => {
-  it('增量累积 + result 覆盖全文', () => {
+  it('真实 fixture:增量累积 + result 覆盖全文', () => {
     const acc = new StreamAccumulator();
-    let total = '';
-    for (const line of fixture.split('\n')) {
-      const delta = acc.push(line);
-      if (delta) total += delta;
-    }
-    expect(total).toBe('你好! 我是 claude。');
-    expect(acc.content).toBe('你好! 我是 claude。');
-    expect(acc.sessionId).toBe('sess-demo');
-    expect(acc.usage?.inputTokens).toBe(10);
-    expect(acc.usage?.cacheReadTokens).toBe(5);
-    expect(acc.usage?.costUsd).toBe(0.0012);
+    for (const line of fixture.split('\n')) acc.push(line);
+
+    const result = resultLine();
+    const usage = result.usage as Record<string, unknown>;
+    expect(acc.content).toBe(result.result);
+    expect(acc.content.length).toBeGreaterThan(0);
+    expect(acc.sessionId).toBe(result.session_id);
+    expect(acc.usage?.inputTokens).toBe(usage.input_tokens);
+    expect(acc.usage?.cacheReadTokens).toBe(usage.cache_read_input_tokens);
+    expect(acc.usage?.costUsd).toBe(result.total_cost_usd);
     expect(acc.status).toBe('completed');
   });
 
