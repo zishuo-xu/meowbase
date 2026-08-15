@@ -1,7 +1,8 @@
-import type { AgentProfile, EvidenceEntry } from './types.js';
+import type { AgentProfile, EvidenceEntry, Skill } from './types.js';
 
 export function buildSystemPrompt(input: {
   profile?: AgentProfile;
+  skills?: Skill[];
   evidenceRefs: EvidenceEntry[];
 }): string | undefined {
   const parts: string[] = [];
@@ -10,6 +11,10 @@ export function buildSystemPrompt(input: {
     parts.push(
       `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。`,
     );
+  }
+  if (input.skills && input.skills.length > 0) {
+    const lines = input.skills.map((s) => `[技能:${s.name}] ${s.prompt}`);
+    parts.push(`本轮请遵循以下技能:\n${lines.join('\n\n')}`);
   }
   if (input.evidenceRefs.length > 0) {
     const lines = input.evidenceRefs.map(
