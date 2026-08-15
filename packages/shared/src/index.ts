@@ -21,3 +21,5 @@ export {
   parseLearnCommand,
 } from './commands.js';
 export { buildSystemPrompt } from './system-prompt.js';
+export type { Skill } from './types.js';
+export { matchSkills } from './skills.js';

@@ -62,3 +62,11 @@ export interface EvidenceEntry {
   status: EvidenceStatus;
   createdAt: string;
 }
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  triggers: string[];
+  prompt: string;
+}
