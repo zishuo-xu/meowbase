@@ -47,3 +47,40 @@ describe('内存存储', () => {
     expect(patched.usage?.inputTokens).toBe(5);
   });
 });
+
+describe('内存 Profile/Evidence 存储', () => {
+  it('profile 创建/读取/列表', async () => {
+    const { profiles } = createMemoryStores();
+    const created = await profiles.create({
+      agentId: 'claude', name: '墨墨', personality: 'x', role: '写手', expertise: ['TS'],
+    });
+    expect(created.name).toBe('墨墨');
+    expect(created.createdAt).toBeTruthy();
+    expect(await profiles.get('claude')).toEqual(created);
+    expect(await profiles.get('不存在')).toBeNull();
+    expect((await profiles.list()).length).toBe(1);
+  });
+
+  it('draft 创建后 confirm 转正;重复 confirm 返回 null', async () => {
+    const { evidence } = createMemoryStores();
+    const draft = await evidence.createDraft({
+      threadId: 't1', kind: 'fact', title: '标题', content: '内容',
+    });
+    expect(draft.id).toMatch(/^ev_[a-f0-9]{8}$/);
+    expect(draft.status).toBe('draft');
+
+    const confirmed = await evidence.confirm(draft.id);
+    expect(confirmed?.status).toBe('confirmed');
+    expect(await evidence.confirm(draft.id)).toBeNull();
+    expect(await evidence.confirm('ev_00000000')).toBeNull();
+  });
+
+  it('list 可按线程过滤', async () => {
+    const { evidence } = createMemoryStores();
+    await evidence.createDraft({ threadId: 't1', kind: 'fact', title: 'a', content: 'a' });
+    await evidence.createDraft({ threadId: 't2', kind: 'lesson', title: 'b', content: 'b' });
+    expect((await evidence.list('t1')).length).toBe(1);
+    expect((await evidence.list()).length).toBe(2);
+    expect((await evidence.get('不存在的id'))).toBeNull();
+  });
+});

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import type { AgentId, Message, Thread } from '@meowbase/shared';
-import type { MessageStore, ThreadStore } from './ports.js';
+import { generateEvidenceId } from '@meowbase/shared';
+import type { AgentId, AgentProfile, EvidenceEntry, Message, Thread } from '@meowbase/shared';
+import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from './ports.js';
 
 export class InMemoryThreadStore implements ThreadStore {
   private readonly threads = new Map<string, Thread>();
@@ -85,5 +86,63 @@ export class InMemoryMessageStore implements MessageStore {
     const updated = { ...existing, ...patch };
     list[index] = updated;
     return updated;
+  }
+}
+
+export class InMemoryProfileStore implements ProfileStore {
+  private readonly profiles = new Map<string, AgentProfile>();
+
+  async create(profile: Omit<AgentProfile, 'createdAt'>): Promise<AgentProfile> {
+    const record: AgentProfile = { ...profile, createdAt: new Date().toISOString() };
+    this.profiles.set(record.agentId, record);
+    return record;
+  }
+
+  async get(agentId: string): Promise<AgentProfile | null> {
+    return this.profiles.get(agentId) ?? null;
+  }
+
+  async list(): Promise<AgentProfile[]> {
+    return [...this.profiles.values()];
+  }
+}
+
+export class InMemoryEvidenceStore implements EvidenceStore {
+  private readonly entries = new Map<string, EvidenceEntry>();
+
+  async createDraft(input: {
+    threadId: string;
+    kind: EvidenceEntry['kind'];
+    title: string;
+    content: string;
+  }): Promise<EvidenceEntry> {
+    const entry: EvidenceEntry = {
+      id: generateEvidenceId(),
+      threadId: input.threadId,
+      kind: input.kind,
+      title: input.title,
+      content: input.content,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+    };
+    this.entries.set(entry.id, entry);
+    return entry;
+  }
+
+  async confirm(id: string): Promise<EvidenceEntry | null> {
+    const entry = this.entries.get(id);
+    if (!entry || entry.status !== 'draft') return null;
+    const updated: EvidenceEntry = { ...entry, status: 'confirmed' };
+    this.entries.set(id, updated);
+    return updated;
+  }
+
+  async get(id: string): Promise<EvidenceEntry | null> {
+    return this.entries.get(id) ?? null;
+  }
+
+  async list(threadId?: string): Promise<EvidenceEntry[]> {
+    const all = [...this.entries.values()];
+    return threadId ? all.filter((e) => e.threadId === threadId) : all;
   }
 }

@@ -1,4 +1,11 @@
-import type { AgentId, Message, Thread } from '@meowbase/shared';
+import type {
+  AgentId,
+  AgentProfile,
+  EvidenceEntry,
+  EvidenceKind,
+  Message,
+  Thread,
+} from '@meowbase/shared';
 
 export interface ThreadStore {
   create(input: {
@@ -30,4 +37,22 @@ export interface MessageStore {
     messageId: string,
     patch: Partial<Omit<Message, 'id' | 'threadId' | 'createdAt'>>,
   ): Promise<Message>;
+}
+
+export interface ProfileStore {
+  create(profile: Omit<AgentProfile, 'createdAt'>): Promise<AgentProfile>;
+  get(agentId: AgentId): Promise<AgentProfile | null>;
+  list(): Promise<AgentProfile[]>;
+}
+
+export interface EvidenceStore {
+  createDraft(input: {
+    threadId: string;
+    kind: EvidenceKind;
+    title: string;
+    content: string;
+  }): Promise<EvidenceEntry>;
+  confirm(id: string): Promise<EvidenceEntry | null>;
+  get(id: string): Promise<EvidenceEntry | null>;
+  list(threadId?: string): Promise<EvidenceEntry[]>;
 }

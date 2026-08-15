@@ -1,7 +1,13 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Redis } from 'ioredis';
 import { createRedisClient } from '../src/redis.js';
-import { createMessageStore, createThreadStore } from '../src/stores/factories.js';
+import {
+  createEvidenceStore,
+  createMessageStore,
+  createProfileStore,
+  createThreadStore,
+} from '../src/stores/factories.js';
+import { ensureSeededProfiles } from '../src/stores/seeds.js';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
 let redis: Redis | null = null;
@@ -37,5 +43,25 @@ describe('Redis 存储', () => {
     const patched = await messages.patch(thread.id, m.id, { content: 'y', status: 'completed' });
     expect(patched.content).toBe('y');
     expect((await messages.list(thread.id)).length).toBe(1);
+  });
+});
+
+describe('Redis Profile/Evidence 存储', () => {
+  it('profile 读写 + 种子幂等', async () => {
+    if (!redis) return;
+    const profiles = createProfileStore(redis);
+    await ensureSeededProfiles(profiles);
+    await ensureSeededProfiles(profiles);
+    expect((await profiles.list()).length).toBe(3);
+    expect((await profiles.get('claude'))?.name).toBe('墨墨');
+  });
+
+  it('evidence draft → confirm', async () => {
+    if (!redis) return;
+    const evidence = createEvidenceStore(redis);
+    const draft = await evidence.createDraft({ threadId: 't', kind: 'fact', title: 'x', content: 'y' });
+    const confirmed = await evidence.confirm(draft.id);
+    expect(confirmed?.status).toBe('confirmed');
+    expect((await evidence.list('t')).length).toBe(1);
   });
 });

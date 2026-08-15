@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Redis } from 'ioredis';
-import type { AgentId, Message, Thread } from '@meowbase/shared';
-import type { MessageStore, ThreadStore } from './ports.js';
+import { generateEvidenceId } from '@meowbase/shared';
+import type {
+  AgentId,
+  AgentProfile,
+  EvidenceEntry,
+  Message,
+  Thread,
+} from '@meowbase/shared';
+import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from './ports.js';
 
 function threadKey(id: string): string {
   return `thread:${id}`;
@@ -127,5 +134,131 @@ export class RedisMessageStore implements MessageStore {
     all[index] = updated;
     await this.redis.set(messageKey(threadId), JSON.stringify(all));
     return updated;
+  }
+}
+
+function profileKey(agentId: string): string {
+  return `profile:${agentId}`;
+}
+
+function evidenceKey(id: string): string {
+  return `evidence:${id}`;
+}
+
+export class RedisProfileStore implements ProfileStore {
+  constructor(private readonly redis: Redis) {}
+
+  async create(profile: Omit<AgentProfile, 'createdAt'>): Promise<AgentProfile> {
+    const record: AgentProfile = { ...profile, createdAt: new Date().toISOString() };
+    await this.redis
+      .multi()
+      .hset(profileKey(record.agentId), {
+        agentId: record.agentId,
+        name: record.name,
+        personality: record.personality,
+        role: record.role,
+        expertise: JSON.stringify(record.expertise),
+        createdAt: record.createdAt,
+      })
+      .sadd('profile:index', record.agentId)
+      .exec();
+    return record;
+  }
+
+  private async hydrate(agentId: string): Promise<AgentProfile | null> {
+    const raw = await this.redis.hgetall(profileKey(agentId));
+    if (!raw.agentId) return null;
+    return {
+      agentId: raw.agentId,
+      name: raw.name ?? '',
+      personality: raw.personality ?? '',
+      role: raw.role ?? '',
+      expertise: JSON.parse(raw.expertise ?? '[]') as string[],
+      createdAt: raw.createdAt ?? '',
+    };
+  }
+
+  async get(agentId: string): Promise<AgentProfile | null> {
+    return this.hydrate(agentId);
+  }
+
+  async list(): Promise<AgentProfile[]> {
+    const ids = await this.redis.smembers('profile:index');
+    const profiles: AgentProfile[] = [];
+    for (const id of ids) {
+      const profile = await this.hydrate(id);
+      if (profile) profiles.push(profile);
+    }
+    return profiles;
+  }
+}
+
+export class RedisEvidenceStore implements EvidenceStore {
+  constructor(private readonly redis: Redis) {}
+
+  private async hydrate(id: string): Promise<EvidenceEntry | null> {
+    const raw = await this.redis.hgetall(evidenceKey(id));
+    if (!raw.id) return null;
+    return {
+      id: raw.id,
+      threadId: raw.threadId ?? '',
+      kind: (raw.kind as EvidenceEntry['kind']) ?? 'fact',
+      title: raw.title ?? '',
+      content: raw.content ?? '',
+      status: (raw.status as EvidenceEntry['status']) ?? 'draft',
+      createdAt: raw.createdAt ?? '',
+    };
+  }
+
+  async createDraft(input: {
+    threadId: string;
+    kind: EvidenceEntry['kind'];
+    title: string;
+    content: string;
+  }): Promise<EvidenceEntry> {
+    const entry: EvidenceEntry = {
+      id: generateEvidenceId(),
+      threadId: input.threadId,
+      kind: input.kind,
+      title: input.title,
+      content: input.content,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+    };
+    await this.redis
+      .multi()
+      .hset(evidenceKey(entry.id), {
+        id: entry.id,
+        threadId: entry.threadId,
+        kind: entry.kind,
+        title: entry.title,
+        content: entry.content,
+        status: entry.status,
+        createdAt: entry.createdAt,
+      })
+      .sadd('evidence:index', entry.id)
+      .exec();
+    return entry;
+  }
+
+  async confirm(id: string): Promise<EvidenceEntry | null> {
+    const entry = await this.hydrate(id);
+    if (!entry || entry.status !== 'draft') return null;
+    await this.redis.hset(evidenceKey(id), 'status', 'confirmed');
+    return this.hydrate(id);
+  }
+
+  async get(id: string): Promise<EvidenceEntry | null> {
+    return this.hydrate(id);
+  }
+
+  async list(threadId?: string): Promise<EvidenceEntry[]> {
+    const ids = await this.redis.smembers('evidence:index');
+    const entries: EvidenceEntry[] = [];
+    for (const id of ids) {
+      const entry = await this.hydrate(id);
+      if (entry && (!threadId || entry.threadId === threadId)) entries.push(entry);
+    }
+    return entries;
   }
 }
