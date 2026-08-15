@@ -20,3 +20,4 @@ export {
   parseEvidenceRefs,
   parseLearnCommand,
 } from './commands.js';
+export { buildSystemPrompt } from './system-prompt.js';
