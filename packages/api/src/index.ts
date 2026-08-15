@@ -1,1 +1,27 @@
-// 占位入口:Task 9 会替换为完整的服务启动代码
+import { mkdirSync } from 'node:fs';
+import { buildServer } from './http/server.js';
+import { loadConfig } from './config.js';
+import { assertStorageReady, createRedisClient } from './redis.js';
+import { createMessageStore, createThreadStore } from './stores/factories.js';
+import { ClaudeAdapter } from './providers/claude.js';
+import { createAgentRegistry } from './providers/registry.js';
+
+const config = loadConfig();
+mkdirSync(config.workdirBase, { recursive: true });
+
+const redis = createRedisClient(config.redisUrl);
+await assertStorageReady(redis);
+
+const app = await buildServer({
+  stores: {
+    threads: createThreadStore(redis),
+    messages: createMessageStore(redis),
+  },
+  registry: createAgentRegistry([
+    new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
+  ]),
+  workdirBase: config.workdirBase,
+});
+
+await app.listen({ port: config.port, host: '0.0.0.0' });
+console.log(`meowbase api 已启动: http://localhost:${config.port}`);
