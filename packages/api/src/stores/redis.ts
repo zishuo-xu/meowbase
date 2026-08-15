@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type Redis from 'ioredis';
+import { join } from 'node:path';
+import { Redis } from 'ioredis';
 import type { AgentId, Message, Thread } from '@meowbase/shared';
 import type { MessageStore, ThreadStore } from './ports.js';
 
@@ -14,13 +15,17 @@ function messageKey(threadId: string): string {
 export class RedisThreadStore implements ThreadStore {
   constructor(private readonly redis: Redis) {}
 
-  async create(input: { title: string; primaryAgentId: AgentId }): Promise<Thread> {
+  async create(input: {
+    title: string;
+    primaryAgentId: AgentId;
+    workdirBase?: string;
+  }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
       id,
       title: input.title,
       primaryAgentId: input.primaryAgentId,
-      workdir: `work/${id}`,
+      workdir: join(input.workdirBase ?? 'work', id),
       sessions: {},
       createdAt: new Date().toISOString(),
     };
@@ -116,8 +121,9 @@ export class RedisMessageStore implements MessageStore {
   ): Promise<Message> {
     const all = await this.readAll(threadId);
     const index = all.findIndex((m) => m.id === messageId);
-    if (index < 0) throw new Error(`消息不存在: ${messageId}`);
-    const updated = { ...all[index], ...patch };
+    const existing = all[index];
+    if (!existing) throw new Error(`消息不存在: ${messageId}`);
+    const updated = { ...existing, ...patch };
     all[index] = updated;
     await this.redis.set(messageKey(threadId), JSON.stringify(all));
     return updated;

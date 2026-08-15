@@ -1,4 +1,4 @@
-import type Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import type { MessageStore, ThreadStore } from './ports.js';
 import { InMemoryMessageStore, InMemoryThreadStore } from './memory.js';
 import { RedisMessageStore, RedisThreadStore } from './redis.js';

@@ -1,9 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import websocket, { type SocketStream } from '@fastify/websocket';
+import websocket, { type WebSocket } from '@fastify/websocket';
 import type { AgentId } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
 import type { MessageStore, ThreadStore } from '../stores/ports.js';
@@ -27,8 +26,9 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const thread = await deps.stores.threads.create({
       title: body?.title?.trim() || '新线程',
       primaryAgentId: body?.primaryAgentId ?? 'claude',
+      workdirBase: deps.workdirBase,
     });
-    mkdirSync(join(deps.workdirBase, thread.id), { recursive: true });
+    mkdirSync(thread.workdir, { recursive: true });
     return reply.code(201).send(thread);
   });
 
@@ -60,7 +60,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return reply.code(200).send(message);
   });
 
-  app.get('/api/ws', { websocket: true }, (socket: SocketStream, request) => {
+  app.get('/api/ws', { websocket: true }, (socket: WebSocket, request) => {
     const { threadId } = request.query as { threadId?: string };
     if (!threadId) {
       socket.close();

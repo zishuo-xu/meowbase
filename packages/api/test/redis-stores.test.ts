@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { createRedisClient } from '../src/redis.js';
 import { createMessageStore, createThreadStore } from '../src/stores/factories.js';
 

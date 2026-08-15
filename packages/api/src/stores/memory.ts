@@ -1,17 +1,22 @@
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import type { AgentId, Message, Thread } from '@meowbase/shared';
 import type { MessageStore, ThreadStore } from './ports.js';
 
 export class InMemoryThreadStore implements ThreadStore {
   private readonly threads = new Map<string, Thread>();
 
-  async create(input: { title: string; primaryAgentId: AgentId }): Promise<Thread> {
+  async create(input: {
+    title: string;
+    primaryAgentId: AgentId;
+    workdirBase?: string;
+  }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
       id,
       title: input.title,
       primaryAgentId: input.primaryAgentId,
-      workdir: `work/${id}`,
+      workdir: join(input.workdirBase ?? 'work', id),
       sessions: {},
       createdAt: new Date().toISOString(),
     };
@@ -75,8 +80,9 @@ export class InMemoryMessageStore implements MessageStore {
   ): Promise<Message> {
     const list = this.listRaw(threadId);
     const index = list.findIndex((m) => m.id === messageId);
-    if (index < 0) throw new Error(`消息不存在: ${messageId}`);
-    const updated = { ...list[index], ...patch };
+    const existing = list[index];
+    if (!existing) throw new Error(`消息不存在: ${messageId}`);
+    const updated = { ...existing, ...patch };
     list[index] = updated;
     return updated;
   }
