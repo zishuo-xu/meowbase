@@ -2,7 +2,13 @@ import { mkdirSync } from 'node:fs';
 import { buildServer } from './http/server.js';
 import { loadConfig } from './config.js';
 import { assertStorageReady, createRedisClient } from './redis.js';
-import { createMessageStore, createThreadStore } from './stores/factories.js';
+import {
+  createEvidenceStore,
+  createMessageStore,
+  createProfileStore,
+  createThreadStore,
+} from './stores/factories.js';
+import { ensureSeededProfiles } from './stores/seeds.js';
 import { ClaudeAdapter } from './providers/claude.js';
 import { createAgentRegistry } from './providers/registry.js';
 
@@ -12,11 +18,16 @@ mkdirSync(config.workdirBase, { recursive: true });
 const redis = createRedisClient(config.redisUrl);
 await assertStorageReady(redis);
 
+const stores = {
+  threads: createThreadStore(redis),
+  messages: createMessageStore(redis),
+  profiles: createProfileStore(redis),
+  evidence: createEvidenceStore(redis),
+};
+await ensureSeededProfiles(stores.profiles);
+
 const app = await buildServer({
-  stores: {
-    threads: createThreadStore(redis),
-    messages: createMessageStore(redis),
-  },
+  stores,
   registry: createAgentRegistry([
     new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
   ]),

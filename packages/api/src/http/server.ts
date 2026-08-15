@@ -5,11 +5,21 @@ import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
 import type { AgentId } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
-import type { MessageStore, ThreadStore } from '../stores/ports.js';
+import type {
+  EvidenceStore,
+  MessageStore,
+  ProfileStore,
+  ThreadStore,
+} from '../stores/ports.js';
 import { executeTurn } from '../router/execute-turn.js';
 
 export interface ApiDeps {
-  stores: { threads: ThreadStore; messages: MessageStore };
+  stores: {
+    threads: ThreadStore;
+    messages: MessageStore;
+    profiles: ProfileStore;
+    evidence: EvidenceStore;
+  };
   registry: AgentRegistry;
   workdirBase: string;
 }
@@ -33,6 +43,13 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get('/api/threads', async () => deps.stores.threads.list());
+
+  app.get('/api/profiles', async () => deps.stores.profiles.list());
+
+  app.get('/api/evidence', async (request) => {
+    const { threadId } = request.query as { threadId?: string };
+    return deps.stores.evidence.list(threadId);
+  });
 
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };

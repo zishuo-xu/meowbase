@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMemoryStores } from '../src/stores/factories.js';
+import { ensureSeededProfiles } from '../src/stores/seeds.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import { buildServer } from '../src/http/server.js';
@@ -30,8 +31,10 @@ let baseUrl = '';
 let server: Awaited<ReturnType<typeof buildServer>>;
 
 beforeAll(async () => {
+  const stores = createMemoryStores();
+  await ensureSeededProfiles(stores.profiles);
   server = await buildServer({
-    stores: createMemoryStores(),
+    stores,
     registry: createAgentRegistry([fakeClaude]),
     workdirBase,
   });
@@ -115,5 +118,30 @@ describe('HTTP 集成', () => {
     expect(events.filter((e) => e.type === 'increment').map((e) => e.delta).join('')).toBe(
       '你好,我是 claude。',
     );
+  });
+
+  it('GET /api/profiles 与 /api/evidence', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'm2' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+
+    // 通过消息协议创建 draft
+    await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '#learn 集成测试结论' }),
+    });
+
+    const profilesRes = await fetch(`${baseUrl}/api/profiles`);
+    const profiles = (await profilesRes.json()) as { name: string }[];
+    expect(profiles.map((p) => p.name)).toEqual(['墨墨', '闪闪', '团团']);
+
+    const evidenceRes = await fetch(`${baseUrl}/api/evidence?threadId=${thread.id}`);
+    const evidence = (await evidenceRes.json()) as { status: string; title: string }[];
+    expect(evidence.length).toBe(1);
+    expect(evidence[0]?.status).toBe('draft');
   });
 });
