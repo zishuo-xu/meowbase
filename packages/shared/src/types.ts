@@ -13,7 +13,7 @@ export interface Thread {
   createdAt: string;
 }
 
-export type MessageRole = 'user' | 'assistant';
+export type MessageRole = 'user' | 'assistant' | 'system';
 
 export type MessageStatus = 'streaming' | 'completed' | 'failed' | 'terminated';
 
@@ -38,5 +38,27 @@ export interface Message {
   sessionId?: string;
   usage?: TokenUsage;
   error?: string;
+  createdAt: string;
+}
+
+export type EvidenceKind = 'fact' | 'lesson' | 'decision';
+export type EvidenceStatus = 'draft' | 'confirmed';
+
+export interface AgentProfile {
+  agentId: AgentId;
+  name: string;
+  personality: string;
+  role: string;
+  expertise: string[];
+  createdAt: string;
+}
+
+export interface EvidenceEntry {
+  id: string;
+  threadId: string;
+  kind: EvidenceKind;
+  title: string;
+  content: string;
+  status: EvidenceStatus;
   createdAt: string;
 }
