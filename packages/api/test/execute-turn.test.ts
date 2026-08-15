@@ -226,3 +226,62 @@ describe('executeTurn 消息协议与注入', () => {
     expect((await stores.evidence.list(thread.id)).length).toBe(0);
   });
 });
+
+describe('executeTurn 技能注入', () => {
+  const reviewSkill = {
+    id: 'review',
+    name: '代码审查',
+    description: 'd',
+    triggers: ['review', '审查'],
+    prompt: '按清单审查:正确性、边界、可读性',
+  };
+
+  it('命中触发词 → systemPrompt 含技能;不命中 → 不含', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    const prompts: (string | undefined)[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.systemPrompt);
+          return { sessionId: 's1', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+
+    // 第一轮:命中 review 触发词
+    await executeTurn({
+      threadId: thread.id, content: '帮我 review 这段代码', context: { stores, registry },
+    });
+    expect(prompts[0]).toContain('[技能:代码审查]');
+    expect(prompts[0]).toContain('按清单审查');
+
+    // 第二轮:无触发词,不注入技能
+    await executeTurn({ threadId: thread.id, content: '继续', context: { stores, registry } });
+    expect(prompts[1]).toBeUndefined();
+  });
+
+  it('多技能命中时全部注入', async () => {
+    const stores = createMemoryStores([
+      reviewSkill,
+      { id: 'debug', name: '系统化调试', description: 'd', triggers: ['debug'], prompt: '先复现再修复' },
+    ]);
+    let received: string | undefined;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          received = input.systemPrompt;
+          return { sessionId: 's1', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id, content: '先 review 再 debug', context: { stores, registry },
+    });
+    expect(received).toContain('[技能:代码审查]');
+    expect(received).toContain('[技能:系统化调试]');
+  });
+});

@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  matchSkills,
   parseConfirmCommand,
   parseEvidenceRefs,
   parseLearnCommand,
@@ -7,7 +8,13 @@ import {
 } from '@meowbase/shared';
 import type { AgentId, EvidenceEntry, Message } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
-import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from '../stores/ports.js';
+import type {
+  EvidenceStore,
+  MessageStore,
+  ProfileStore,
+  SkillStore,
+  ThreadStore,
+} from '../stores/ports.js';
 
 export interface TurnContext {
   stores: {
@@ -15,6 +22,7 @@ export interface TurnContext {
     messages: MessageStore;
     profiles: ProfileStore;
     evidence: EvidenceStore;
+    skills: SkillStore;
   };
   registry: AgentRegistry;
   onIncrement?: (threadId: string, messageId: string, delta: string) => void;
@@ -69,7 +77,12 @@ export async function executeTurn(input: {
   const profile = isNewSession
     ? ((await context.stores.profiles.get(targetAgentId)) ?? undefined)
     : undefined;
-  const systemPrompt = buildSystemPrompt({ profile, evidenceRefs: refs });
+  const matchedSkills = await matchSkills(content, await context.stores.skills.list());
+  const systemPrompt = buildSystemPrompt({
+    profile,
+    skills: matchedSkills,
+    evidenceRefs: refs,
+  });
 
   const assistantMessage = await context.stores.messages.append({
     threadId,
