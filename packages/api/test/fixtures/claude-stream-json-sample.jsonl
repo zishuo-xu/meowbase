@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp","session_id":"sess-demo"}
+{"type":"assistant","message":{"id":"msg_001","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"你好!"}],"stop_reason":null,"usage":{"input_tokens":10,"output_tokens":3}},"session_id":"sess-demo"}
+{"type":"assistant","message":{"id":"msg_001","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":" 我是 claude。"}],"stop_reason":null},"session_id":"sess-demo"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"result":"你好! 我是 claude。","session_id":"sess-demo","total_cost_usd":0.0012,"usage":{"input_tokens":10,"output_tokens":3,"cache_read_input_tokens":5,"cache_creation_input_tokens":2}}
