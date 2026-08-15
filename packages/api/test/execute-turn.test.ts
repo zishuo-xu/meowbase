@@ -103,3 +103,126 @@ describe('executeTurn', () => {
     ).rejects.toThrow('线程不存在');
   });
 });
+
+describe('executeTurn 消息协议与注入', () => {
+  it('#confirm 确认 draft:回执且不调 agent', async () => {
+    const stores = createMemoryStores();
+    let agentCalled = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          agentCalled = true;
+          return { sessionId: '', content: '', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const draft = await stores.evidence.createDraft({
+      threadId: thread.id, kind: 'fact', title: '好结论', content: '内容',
+    });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: `#confirm ${draft.id}`,
+      context: { stores, registry },
+    });
+    expect(agentCalled).toBe(false);
+    expect(final.role).toBe('system');
+    expect(final.content).toContain('✅ 已沉淀:好结论');
+    expect((await stores.evidence.get(draft.id))?.status).toBe('confirmed');
+  });
+
+  it('#confirm 无效 id:回执警告', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', 'x')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id, content: '#confirm ev_00000000', context: { stores, registry },
+    });
+    expect(final.role).toBe('system');
+    expect(final.content).toContain('⚠️');
+  });
+
+  it('#learn 完成轮生成 draft + 建议消息', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '这是重要结论')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id, content: '#learn 团队约定', context: { stores, registry },
+    });
+    const drafts = await stores.evidence.list(thread.id);
+    expect(drafts.length).toBe(1);
+    expect(drafts[0]?.title).toBe('团队约定');
+    expect(drafts[0]?.content).toBe('这是重要结论');
+    expect(drafts[0]?.status).toBe('draft');
+    const messages = await stores.messages.list(thread.id);
+    const suggestion = messages.find((m) => m.role === 'system');
+    expect(suggestion?.content).toContain('💡 建议沉淀为证据:「团队约定」');
+    expect(suggestion?.content).toContain(`#confirm ${drafts[0]?.id}`);
+  });
+
+  it('#ev_ 引用注入 systemPrompt', async () => {
+    const stores = createMemoryStores();
+    let receivedPrompt: string | undefined;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          receivedPrompt = input.systemPrompt;
+          return { sessionId: 'sess-new', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const entry = await stores.evidence.createDraft({
+      threadId: thread.id, kind: 'fact', title: '关键事实', content: '事实内容',
+    });
+    await stores.evidence.confirm(entry.id);
+    await executeTurn({
+      threadId: thread.id, content: `用 #ev_${entry.id.slice(3)}`, context: { stores, registry },
+    });
+    expect(receivedPrompt).toContain('团队记忆');
+    expect(receivedPrompt).toContain('关键事实: 事实内容');
+  });
+
+  it('新会话注入 profile;resume 不注入', async () => {
+    const stores = createMemoryStores();
+    const prompts: (string | undefined)[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.systemPrompt);
+          return { sessionId: 'sess-1', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.profiles.create({
+      agentId: 'claude', name: '墨墨', personality: '沉稳', role: '写手', expertise: ['TS'],
+    });
+    // 第一轮:新会话,应注入
+    await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
+    expect(prompts[0]).toContain('你是 墨墨');
+    // 第二轮:已有 session,不注入
+    await executeTurn({ threadId: thread.id, content: 'hi again', context: { stores, registry } });
+    expect(prompts[1]).toBeUndefined();
+  });
+
+  it('#learn 失败轮不生成 draft', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return { sessionId: '', content: '', status: 'failed', error: 'boom' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id, content: '#learn 不该沉淀', context: { stores, registry },
+    });
+    expect((await stores.evidence.list(thread.id)).length).toBe(0);
+  });
+});

@@ -1,10 +1,21 @@
-import { resolveTargetAgent } from '@meowbase/shared';
-import type { AgentId, Message } from '@meowbase/shared';
+import {
+  buildSystemPrompt,
+  parseConfirmCommand,
+  parseEvidenceRefs,
+  parseLearnCommand,
+  resolveTargetAgent,
+} from '@meowbase/shared';
+import type { AgentId, EvidenceEntry, Message } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
-import type { MessageStore, ThreadStore } from '../stores/ports.js';
+import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from '../stores/ports.js';
 
 export interface TurnContext {
-  stores: { threads: ThreadStore; messages: MessageStore };
+  stores: {
+    threads: ThreadStore;
+    messages: MessageStore;
+    profiles: ProfileStore;
+    evidence: EvidenceStore;
+  };
   registry: AgentRegistry;
   onIncrement?: (threadId: string, messageId: string, delta: string) => void;
 }
@@ -19,17 +30,46 @@ export async function executeTurn(input: {
   const thread = await context.stores.threads.get(threadId);
   if (!thread) throw new Error(`线程不存在: ${threadId}`);
 
+  await context.stores.messages.append({
+    threadId,
+    role: 'user',
+    content,
+    status: 'completed',
+  });
+
+  // #confirm 分支:纯系统操作,不路由给 agent
+  const confirm = parseConfirmCommand(content);
+  if (confirm) {
+    const entry = await context.stores.evidence.confirm(confirm.id);
+    const reply = entry
+      ? `✅ 已沉淀:${entry.title}`
+      : `⚠️ 找不到可确认的证据:${confirm.id}`;
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: reply,
+      status: 'completed',
+    });
+  }
+
   const targetAgentId: AgentId = resolveTargetAgent(content, thread.primaryAgentId);
   const service = context.registry.get(targetAgentId);
   if (!service) throw new Error(`没有可用的 agent: ${targetAgentId}`);
 
-  await context.stores.messages.append({
-    threadId,
-    role: 'user',
-    agentId: targetAgentId,
-    content,
-    status: 'completed',
-  });
+  const learn = parseLearnCommand(content);
+  const refIds = parseEvidenceRefs(content);
+
+  // systemPrompt 组装:引用证据任意轮注入;profile 仅新会话注入
+  const refs: EvidenceEntry[] = [];
+  for (const id of refIds) {
+    const entry = await context.stores.evidence.get(id);
+    if (entry?.status === 'confirmed') refs.push(entry);
+  }
+  const isNewSession = !thread.sessions[targetAgentId];
+  const profile = isNewSession
+    ? await context.stores.profiles.get(targetAgentId)
+    : undefined;
+  const systemPrompt = buildSystemPrompt({ profile, evidenceRefs: refs });
 
   const assistantMessage = await context.stores.messages.append({
     threadId,
@@ -42,6 +82,7 @@ export async function executeTurn(input: {
   let accumulated = '';
   const output = await service.runTurn({
     prompt: content,
+    systemPrompt,
     sessionId: thread.sessions[targetAgentId],
     workdir: thread.workdir,
     onIncrement: (delta) => {
@@ -55,6 +96,22 @@ export async function executeTurn(input: {
 
   if (output.sessionId && thread.sessions[targetAgentId] !== output.sessionId) {
     await context.stores.threads.setSession(threadId, targetAgentId, output.sessionId);
+  }
+
+  // #learn 沉淀:仅 completed 时生成 draft + 建议消息
+  if (learn && output.status === 'completed' && output.content) {
+    const draft = await context.stores.evidence.createDraft({
+      threadId,
+      kind: 'fact',
+      title: learn.title,
+      content: output.content,
+    });
+    await context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: `💡 建议沉淀为证据:「${draft.title}」\n回复 #confirm ${draft.id} 确认`,
+      status: 'completed',
+    });
   }
 
   return context.stores.messages.patch(threadId, assistantMessage.id, {
