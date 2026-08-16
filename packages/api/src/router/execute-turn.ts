@@ -39,6 +39,7 @@ import type {
   ThreadStore,
 } from '../stores/ports.js';
 import { gitAddAll, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
+import { clip, turnLog } from '../services/turn-log.js';
 import type { AgentSpec } from '../config.js';
 import { finalizeActivities, upsertToolActivity } from '../providers/tool-activity.js';
 
@@ -142,6 +143,7 @@ export async function executeTurn(input: {
   // 系统命令分支:纯系统操作,不路由给 agent
   const confirm = parseConfirmCommand(content);
   if (confirm) {
+    turnLog('confirm', { thread: threadId, id: confirm.id });
     const entry = await context.stores.evidence.confirm(confirm.id);
     const reply = entry
       ? `✅ 已沉淀:${entry.title}`
@@ -156,6 +158,7 @@ export async function executeTurn(input: {
 
   const approve = parseApproveCommand(content);
   if (approve) {
+    turnLog('approve', { thread: threadId, id: approve.id });
     const card = await context.stores.approvals.approve(approve.id);
     if (card) {
       try {
@@ -178,6 +181,7 @@ export async function executeTurn(input: {
 
   const reject = parseRejectCommand(content);
   if (reject) {
+    turnLog('reject', { thread: threadId, id: reject.id, reason: clip(reject.reason, 40) });
     const card = await context.stores.approvals.reject(reject.id, reject.reason);
     const reply = card
       ? `⛔ 已打回:${card.id} 理由:${reject.reason || '(未填)'}`
@@ -221,6 +225,11 @@ export async function executeTurn(input: {
         : [...DEFAULT_ROSTER];
   const maxDepth = context.a2aMaxDepth ?? MAX_A2A_DEPTH;
   const targets = parseMentionTargets(content, thread.primaryAgentId, catalog);
+  turnLog('turn start', {
+    thread: threadId,
+    targets: targets.join(','),
+    preview: clip(content),
+  });
   const cleanMessage = stripMentions(content, catalog).trim();
   if (!cleanMessage) {
     return context.stores.messages.append({
@@ -254,6 +263,11 @@ export async function executeTurn(input: {
       r.status === 'fulfilled',
   );
   const lastResult = fulfilled?.value ?? null;
+  for (const result of targetResults) {
+    if (result.status === 'rejected') {
+      turnLog('segment fail', { thread: threadId, error: clip(String(result.reason), 120) });
+    }
+  }
   if (!lastResult) {
     const rejected = targetResults.find(
       (r): r is PromiseRejectedResult => r.status === 'rejected',
@@ -291,6 +305,7 @@ export async function executeTurn(input: {
       await gitAddAll(thread.workdir);
       const diff = await gitDiffHead(thread.workdir);
       if (diff) {
+        turnLog('diff', { thread: threadId, stat: clip(diff.stat, 80) });
         const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;
         await runReviewFixThenCard({
           context,
@@ -306,8 +321,8 @@ export async function executeTurn(input: {
           refs,
         });
       }
-    } catch {
-      // diff 计算失败不阻塞主流程
+    } catch (err) {
+      turnLog('diff fail', { thread: threadId, error: clip(String(err), 120) });
     }
   }
 
@@ -378,6 +393,7 @@ async function runSegment(
     if (lastOutput.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
     if (!handoff) {
+      turnLog('a2a stop', { thread: thread.id, from: currentAgent });
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
       if (inline.length > 0) {
         const labels = inline.map((id) => `@${displayName(id, catalog)}`).join('、');
@@ -412,6 +428,12 @@ async function runSegment(
         status: 'completed',
       }),
     );
+    turnLog('a2a', {
+      thread: thread.id,
+      from: currentAgent,
+      to: handoff.target,
+      task: clip(handoff.task, 60),
+    });
     fromAgent = currentAgent;
     currentAgent = handoff.target;
     currentTask = handoff.task;
@@ -443,6 +465,8 @@ async function runAgentTurn(
   );
 
   context.onStart?.(thread.id, assistantMessage.id, currentAgent);
+  const started = Date.now();
+  turnLog('hop start', { thread: thread.id, agent: currentAgent });
 
   let accumulated = '';
   let thinking = '';
@@ -470,6 +494,15 @@ async function runAgentTurn(
   if (output.sessionId && thread.sessions[currentAgent] !== output.sessionId) {
     await context.stores.threads.setSession(thread.id, currentAgent, output.sessionId);
   }
+
+  turnLog('hop done', {
+    thread: thread.id,
+    agent: currentAgent,
+    status: output.status,
+    tools: activities.filter((a) => a.name !== '思考').length,
+    ms: Date.now() - started,
+    error: output.error ? clip(output.error, 80) : undefined,
+  });
 
   const assistant = await writeQueue(() =>
     context.stores.messages.patch(thread.id, assistantMessage.id, {
@@ -526,6 +559,12 @@ async function runReviewFixThenCard(input: {
       ? input.chainLastAgent
       : undefined;
   const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available, team);
+  turnLog('review start', {
+    thread: threadId,
+    writer: writerAgentId,
+    reviewer: reviewerAgentId,
+    reused: Boolean(chainReviewer),
+  });
   let latestDiff = input.initialDiff;
   let reviewComment = '(无可用审查 agent)';
 
@@ -567,6 +606,7 @@ async function runReviewFixThenCard(input: {
 
     for (let fix = 0; fix < MAX_REVIEW_FIX_ROUNDS; fix++) {
       if (parseReviewVerdict(reviewComment) !== 'revise') break;
+      turnLog('review revise', { thread: threadId, round: fix + 1, writer: writerAgentId });
       await writeQueue(() =>
         context.stores.messages.append({
           threadId,
@@ -628,6 +668,13 @@ async function runReviewFixThenCard(input: {
   }
 
   const revise = parseReviewVerdict(reviewComment) === 'revise';
+  turnLog('card', {
+    thread: threadId,
+    id: card.id,
+    verdict: parseReviewVerdict(reviewComment),
+    auto: autoApplied,
+    stat: clip(latestDiff.stat, 60),
+  });
   await context.stores.messages.append({
     threadId,
     role: 'system',
