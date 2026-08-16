@@ -38,7 +38,7 @@ import type {
   SkillStore,
   ThreadStore,
 } from '../stores/ports.js';
-import { gitAddAll, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
+import { gitAddAll, gitChangedPaths, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
 import { clip, turnLog } from '../services/turn-log.js';
 import type { AgentSpec } from '../config.js';
 import { finalizeActivities, upsertToolActivity } from '../providers/tool-activity.js';
@@ -372,6 +372,13 @@ async function runSegment(
           fromAgent,
           prevContent,
           currentTask,
+          {
+            goal: segment.text,
+            files: await listHandoffFiles(thread.workdir),
+            closeout: isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)
+              ? 'reviewer'
+              : 'default',
+          },
         )
       : currentTask;
 
@@ -390,6 +397,10 @@ async function runSegment(
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
     if (lastOutput.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
+    if (handoff && isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)) {
+      turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'reviewer-closeout' });
+      break;
+    }
     if (!handoff) {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent });
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
@@ -439,6 +450,18 @@ async function runSegment(
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');
   return { lastAssistant, lastOutput, visited, firstAgent };
+}
+
+function isReviewerRole(role?: string): boolean {
+  return Boolean(role && role.includes('审查'));
+}
+
+async function listHandoffFiles(workdir: string): Promise<string[]> {
+  try {
+    return await gitChangedPaths(workdir);
+  } catch {
+    return [];
+  }
 }
 
 async function runAgentTurn(

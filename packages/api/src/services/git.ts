@@ -45,6 +45,15 @@ export async function gitAddAll(dir: string): Promise<void> {
   }
 }
 
+export async function gitChangedPaths(dir: string): Promise<string[]> {
+  await gitAddAll(dir);
+  return (await run(dir, ['diff', 'HEAD', '--name-only', '--', '.']))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((path) => !isApprovalNoisePath(path));
+}
+
 export async function gitDiffHead(dir: string): Promise<{ stat: string; text: string } | null> {
   const names = (await run(dir, ['diff', 'HEAD', '--name-only', '--', '.']))
     .split('\n')

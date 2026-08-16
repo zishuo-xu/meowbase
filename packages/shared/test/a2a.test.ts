@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseA2AHandoff, findInlineA2AMentions } from '../src/a2a.js';
+import { parseA2AHandoff, findInlineA2AMentions, formatA2AHandoffPrompt } from '../src/a2a.js';
 
 describe('parseA2AHandoff', () => {
   it('行首 mention → 解析目标与任务', () => {
@@ -37,6 +37,31 @@ describe('parseA2AHandoff', () => {
     expect(
       parseA2AHandoff('示例:\n```\n@opencode 这不是交接\n```\n@团团 请审查', 'claude'),
     ).toEqual({ target: 'opencode', task: '请审查' });
+  });
+});
+
+describe('formatA2AHandoffPrompt', () => {
+  it('轻量交接包带目标、文件、沙箱和收棒', () => {
+    const prompt = formatA2AHandoffPrompt('墨墨', 'claude', '已写 add.ts\n自检:无测试\n@闪闪 请审查', '请审查 add.ts', {
+      goal: '写一个 add.ts 并保存',
+      files: ['add.ts'],
+      closeout: 'reviewer',
+    });
+    expect(prompt).toContain('【A2A 交接包】');
+    expect(prompt).toContain('用户目标: 写一个 add.ts 并保存');
+    expect(prompt).toContain('改动文件: add.ts');
+    expect(prompt).toContain('当前工作目录');
+    expect(prompt).toContain('【你的任务】');
+    expect(prompt).toContain('请审查 add.ts');
+    expect(prompt).toContain('【收棒】');
+    expect(prompt).toContain('不要再 @');
+    expect(prompt).not.toContain('@闪闪 请审查');
+  });
+
+  it('默认收棒不禁止交下一棒', () => {
+    const prompt = formatA2AHandoffPrompt('墨墨', 'claude', '写完了', '请落地脚本');
+    expect(prompt).toContain('交下一棒');
+    expect(prompt).not.toContain('不要再 @ 任何人');
   });
 });
 

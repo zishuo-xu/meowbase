@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   gitAddAll,
+  gitChangedPaths,
   gitCommit,
   gitDiffHead,
   gitInit,
@@ -27,6 +28,15 @@ describe('git 辅助函数', () => {
 
     await gitCommit(dir, 'baseline');
     expect(await gitDiffHead(dir)).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('gitChangedPaths 列出相对 HEAD 的改动文件,过滤噪声', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-git-paths-'));
+    await gitInit(dir);
+    writeFileSync(join(dir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+    writeFileSync(join(dir, 'tsconfig.tsbuildinfo'), '{"version":"5"}');
+    expect(await gitChangedPaths(dir)).toEqual(['add.ts']);
     rmSync(dir, { recursive: true, force: true });
   });
 

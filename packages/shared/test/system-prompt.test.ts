@@ -98,12 +98,14 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('沙箱里有实现和测试');
   });
 
-  it('闪闪:审完回墨墨,结论写明通过或需修改', () => {
+  it('闪闪:写出结论即停,需修改由平台打回', () => {
     const prompt = buildSystemPrompt({ profile: reviewerProfile, evidenceRefs: [] });
     expect(prompt).toContain('你是 闪闪,审查官');
-    expect(prompt).toContain('@墨墨');
     expect(prompt).toContain('通过');
     expect(prompt).toContain('需修改');
+    expect(prompt).toContain('写出结论即停');
+    expect(prompt).toContain('不要再 @');
+    expect(prompt).not.toContain('另起一行 @墨墨');
     expect(prompt).not.toContain('@团团 请审查');
   });
 

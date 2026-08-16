@@ -844,9 +844,11 @@ describe('executeTurn 多角色协作', () => {
     });
     expect(final.agentId).toBe('opencode');
     // 后角 prompt 包含前角输出
-    expect(opencodePrompts[0]).toContain('【A2A 交接】');
+    expect(opencodePrompts[0]).toContain('【A2A 交接包】');
+    expect(opencodePrompts[0]).toContain('用户目标:');
     expect(opencodePrompts[0]).toContain('代码写完了');
     expect(opencodePrompts[0]).toContain('【你的任务】');
+    expect(opencodePrompts[0]).toContain('【收棒】');
     expect(opencodePrompts[0]).toContain('请审查这段代码');
     const messages = await stores.messages.list(thread.id);
     const assistants = messages.filter((m) => m.role === 'assistant');
@@ -889,6 +891,38 @@ describe('executeTurn 多角色协作', () => {
       expect(prompt).toContain('团队纪律');
       expect(prompt).toMatch(/你是 (墨墨|闪闪)/);
     }
+  });
+
+  it('审查官写出结论后不再跟着 @ 写手往下交', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return { sessionId: 's1', content: '写完了\n@gemini 请审查 add.ts', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          calls.push('gemini');
+          return {
+            sessionId: 's2',
+            content: '## 结论\n通过\n@墨墨 要不要跟进由你安排',
+            status: 'completed',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude 写 add.ts',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    expect(calls).toEqual(['claude', 'gemini']);
   });
 
   it('A2A 防环:已出场角色不再重复接力', async () => {

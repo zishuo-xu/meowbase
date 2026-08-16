@@ -70,15 +70,53 @@ export function findInlineA2AMentions(
   return found;
 }
 
-/** 把上一棒的输出包装成下一棒能读懂的任务信封 */
+export interface A2AHandoffExtras {
+  goal?: string;
+  files?: string[];
+  closeout?: 'reviewer' | 'default';
+}
+
+function stripHandoffLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !LINE_START_ANY.test(line))
+    .join('\n')
+    .trim();
+}
+
+function clipBody(text: string, max = 1800): string {
+  const one = text.trim();
+  if (one.length <= max) return one;
+  return `${one.slice(0, max)}…`;
+}
+
+/** 把上一棒的输出包装成下一棒能读懂的轻量交接包(对齐 clowder 的 thread packet,不建 mailbox) */
 export function formatA2AHandoffPrompt(
   fromName: string,
   fromId: AgentId,
   previousOutput: string,
   task: string,
+  extras: A2AHandoffExtras = {},
 ): string {
-  return (
-    `【A2A 交接】上一棒 ${fromName} (@${fromId}) 的输出:\n${previousOutput}\n\n` +
-    `---\n【你的任务】\n${task}`
-  );
+  const body = clipBody(stripHandoffLines(previousOutput) || previousOutput);
+  const files = (extras.files ?? []).filter(Boolean);
+  const closeout =
+    extras.closeout === 'reviewer'
+      ? '结论必须单独写明「通过」或「需修改」。写完结论即停:不要问人要不要继续,不要再 @ 任何人。需修改由平台打回写手。'
+      : '做完按交接条目交下一棒。不要问人要不要继续。';
+  return [
+    `【A2A 交接包】`,
+    `来自: ${fromName} (@${fromId})`,
+    extras.goal ? `用户目标: ${extras.goal}` : undefined,
+    files.length > 0 ? `改动文件: ${files.join(', ')}` : undefined,
+    `沙箱: 只使用当前工作目录的相对路径,不要审或改平台仓库里的 packages/。`,
+    `上一棒原话:\n${body}`,
+    `---`,
+    `【你的任务】`,
+    task,
+    `【收棒】`,
+    closeout,
+  ]
+    .filter((line): line is string => line != null)
+    .join('\n');
 }
