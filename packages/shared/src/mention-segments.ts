@@ -24,7 +24,9 @@ export function parseMentionSegments(
   const segments: MentionSegment[] = [];
   for (let i = 0; i < mentions.length; i++) {
     const mention = mentions[i];
-    const nextStart = i + 1 < mentions.length ? (mentions[i + 1]?.index ?? content.length) : content.length;
+    if (!mention) continue;
+    const next = mentions[i + 1];
+    const nextStart = next?.index ?? content.length;
     const text = content.slice((mention.index ?? 0) + mention[0].length, nextStart).trim();
     if (text) {
       segments.push({ agentId: mention[1] as AgentId, text });

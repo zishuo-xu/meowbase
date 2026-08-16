@@ -23,7 +23,7 @@ import type {
 } from '../stores/ports.js';
 import { gitAddAll, gitCommit, gitDiffHead } from '../services/git.js';
 
-/** A2A 接力最大链深(借鉴 clowder F046,默认 3 跳) */
+/** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
 
 export interface TurnContext {
@@ -43,6 +43,7 @@ interface SegmentRunResult {
   lastAssistant: Message;
   lastOutput: AgentTurnOutput;
   visited: Set<AgentId>;
+  firstAgent: AgentId;
 }
 
 export async function executeTurn(input: {
@@ -139,7 +140,7 @@ export async function executeTurn(input: {
   }
   if (!lastResult) throw new Error('执行失败:未产生任何输出');
 
-  const { lastAssistant, lastOutput, visited } = lastResult;
+  const { lastAssistant, lastOutput, visited, firstAgent: chainFirstAgent } = lastResult;
 
   // #learn 沉淀:仅 completed 时生成 draft + 建议消息(内容取链上最终输出)
   if (learn && lastOutput.status === 'completed' && lastOutput.content) {
@@ -163,7 +164,8 @@ export async function executeTurn(input: {
       await gitAddAll(thread.workdir);
       const diff = await gitDiffHead(thread.workdir);
       if (diff) {
-        const writerAgentId = lastAssistant.agentId ?? thread.primaryAgentId;
+        // writer 归属链上首个执行者(改动可能由链上任何 agent 产生)
+        const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;
         const reviewerAgentId = selectReviewer(writerAgentId, context.registry.list());
         const card = await context.stores.approvals.create({
           threadId,
@@ -186,7 +188,7 @@ export async function executeTurn(input: {
               evidenceRefs: [],
             });
             const reviewOutput = await reviewerService.runTurn({
-              prompt: `请作为审查官审查以下代码改动,输出:问题列表→建议→结论(通过/需修改)\n\n${diff.stat}\n\n${diff.text}`,
+              prompt: `请作为审查官审查以下代码改动,只审查线程工作目录中本次产生的改动,不要审查平台自身代码,输出:问题列表→建议→结论(通过/需修改)\n\n${diff.stat}\n\n${diff.text}`,
               systemPrompt: reviewerPrompt,
               workdir: thread.workdir,
             });
@@ -222,8 +224,9 @@ async function runSegment(
   let currentAgent: AgentId = segment.agentId;
   let currentTask = segment.text;
   let prevContent = '';
+  let firstAgent: AgentId = segment.agentId;
 
-  for (let hop = 0; hop <= MAX_A2A_DEPTH; hop++) {
+  for (let hop = 0; hop < MAX_A2A_DEPTH; hop++) {
     const service = context.registry.get(currentAgent);
     if (!service) {
       throw new Error(`没有可用的 agent: ${currentAgent}`);
@@ -253,10 +256,9 @@ async function runSegment(
       sessionId: thread.sessions[currentAgent],
       workdir: thread.workdir,
       onIncrement: (delta) => {
+        // 只推送增量到 WS;落库由结束时的一次性 patch 完成,
+        // 避免无锁 read-modify-write 并发覆盖(Redis 版竞态)
         accumulated += delta;
-        void context.stores.messages.patch(thread.id, assistantMessage.id, {
-          content: accumulated,
-        });
         context.onIncrement?.(thread.id, assistantMessage.id, delta);
       },
     });
@@ -290,5 +292,5 @@ async function runSegment(
   }
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');
-  return { lastAssistant, lastOutput, visited };
+  return { lastAssistant, lastOutput, visited, firstAgent };
 }

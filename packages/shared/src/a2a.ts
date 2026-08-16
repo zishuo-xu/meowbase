@@ -19,12 +19,15 @@ export function parseA2AHandoff(
 ): A2AHandoff | null {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i]?.match(MENTION_LINE);
-    const target = match?.[1] as AgentId | undefined;
+    const line = lines[i];
+    if (!line) continue;
+    const match = line.match(MENTION_LINE);
+    if (!match) continue;
+    const target = match[1] as AgentId | undefined;
     if (!target || target === currentAgentId) continue;
     const rest = lines
       .slice(i + 1)
-      .filter((line) => !MENTION_LINE_ANY.test(line))
+      .filter((l) => !MENTION_LINE_ANY.test(l))
       .join('\n')
       .trim();
     const task = [match[2]?.trim(), rest].filter(Boolean).join('\n').trim();
