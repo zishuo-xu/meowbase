@@ -98,6 +98,8 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
             updateMention(e.target.value, e.target.selectionStart);
           }}
           onKeyDown={(e) => {
+            // 输入法组合中(拼音选词)的回车不提交、不触发补全选择
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
             if (menuOpen && filtered.length > 0) {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
