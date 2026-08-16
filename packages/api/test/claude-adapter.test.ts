@@ -53,4 +53,17 @@ describe('ClaudeAdapter 参数', () => {
     delete process.env.RECORD_ARGS_FILE;
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('配置了 model → --model', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-model-'));
+    const recordFile = join(dir, 'args.json');
+    process.env.RECORD_ARGS_FILE = recordFile;
+    const adapter = new ClaudeAdapter({ bin: ARGS_BIN, model: 'sonnet' });
+    await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    const args = JSON.parse(readFileSync(recordFile, 'utf8')) as string[];
+    expect(args).toContain('--model');
+    expect(args[args.indexOf('--model') + 1]).toBe('sonnet');
+    delete process.env.RECORD_ARGS_FILE;
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

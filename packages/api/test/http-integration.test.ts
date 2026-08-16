@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -8,8 +8,10 @@ import { ensureSeededProfiles } from '../src/stores/seeds.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import { buildServer } from '../src/http/server.js';
+import { DEFAULT_AGENTS } from '../src/config.js';
 
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-test-'));
+const FAKE_CLAUDE = join(import.meta.dirname, 'fixtures', 'fake-claude.mjs');
 
 const fakeClaude: AgentService = {
   agentId: 'claude',
@@ -39,6 +41,9 @@ beforeAll(async () => {
     stores,
     registry: createAgentRegistry([fakeClaude]),
     workdirBase,
+    agents: DEFAULT_AGENTS,
+    defaultAgentId: 'claude',
+    a2aMaxDepth: 3,
   });
   await server.listen({ port: 0, host: '127.0.0.1' });
   const address = server.server.address() as AddressInfo;
@@ -122,6 +127,44 @@ describe('HTTP 集成', () => {
     );
   });
 
+  it('GET /api/config 返回 A2A 链深与角色别名', async () => {
+    const res = await fetch(`${baseUrl}/api/config`);
+    expect(res.status).toBe(200);
+    const cfg = (await res.json()) as {
+      a2aMaxDepth: number;
+      defaultAgentId: string;
+      agents: { id: string; name: string; aliases: string[]; model?: string }[];
+    };
+    expect(cfg.a2aMaxDepth).toBe(3);
+    expect(cfg.defaultAgentId).toBe('claude');
+    expect(cfg.agents.map((a) => a.name)).toEqual(['墨墨', '闪闪', '团团']);
+    expect(cfg.agents[0]?.aliases).toContain('墨墨');
+    expect(cfg.agents[0]?.aliases).toContain('claude');
+    expect(cfg.agents[2]?.model).toBe('opencode-go/deepseek-v4-flash');
+  });
+
+  it('POST /api/config/models/verify 探测 CLI', async () => {
+    const missing = await fetch(`${baseUrl}/api/config/models/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bin: 'meowbase-no-such-cli-xyz', model: 'x' }),
+    });
+    expect(missing.status).toBe(200);
+    const bad = (await missing.json()) as { ok: boolean; stage: string };
+    expect(bad.ok).toBe(false);
+    expect(bad.stage).toBe('bin');
+
+    const okRes = await fetch(`${baseUrl}/api/config/models/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bin: FAKE_CLAUDE, model: 'sonnet' }),
+    });
+    expect(okRes.status).toBe(200);
+    const good = (await okRes.json()) as { ok: boolean; preview?: string };
+    expect(good.ok).toBe(true);
+    expect(good.preview).toContain('claude');
+  });
+
   it('GET /api/profiles 与 /api/evidence', async () => {
     const createRes = await fetch(`${baseUrl}/api/threads`, {
       method: 'POST',
@@ -177,5 +220,161 @@ describe('HTTP 集成', () => {
       body: JSON.stringify({ autoApprove: true }),
     });
     expect(missing.status).toBe(404);
+  });
+});
+
+describe('HTTP 团队配置 PATCH', () => {
+  const workdir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-http-'));
+  const configPath = join(workdir, 'meowbase.config.json');
+  let url = '';
+  let app: Awaited<ReturnType<typeof buildServer>>;
+
+  beforeAll(async () => {
+    const stores = createMemoryStores();
+    await ensureSeededProfiles(stores.profiles);
+    app = await buildServer({
+      stores,
+      registry: createAgentRegistry([fakeClaude]),
+      workdirBase: workdir,
+      agents: DEFAULT_AGENTS.map((a) => ({
+        ...a,
+        aliases: [...a.aliases],
+        expertise: [...a.expertise],
+      })),
+      defaultAgentId: 'claude',
+      a2aMaxDepth: 3,
+      configPath,
+    });
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const address = app.server.address() as AddressInfo;
+    url = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(workdir, { recursive: true, force: true });
+  });
+
+  it('PATCH agent 更新名册并落盘', async () => {
+    const res = await fetch(`${url}/api/config/agents/claude`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: '墨墨酱',
+        aliases: ['墨墨酱', 'claude'],
+        role: '架构猫',
+        personality: '更沉稳',
+        expertise: ['架构'],
+        model: 'opus-test',
+        autoApprove: true,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const agent = (await res.json()) as {
+      name: string;
+      role: string;
+      model?: string;
+      autoApprove?: boolean;
+      personality: string;
+    };
+    expect(agent.name).toBe('墨墨酱');
+    expect(agent.role).toBe('架构猫');
+    expect(agent.model).toBe('opus-test');
+    expect(agent.autoApprove).toBe(true);
+    expect(agent.personality).toBe('更沉稳');
+
+    const cfgRes = await fetch(`${url}/api/config`);
+    const cfg = (await cfgRes.json()) as { agents: { id: string; name: string }[] };
+    expect(cfg.agents.find((a) => a.id === 'claude')?.name).toBe('墨墨酱');
+
+    expect(existsSync(configPath)).toBe(true);
+    const file = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      agents: { id: string; name: string }[];
+    };
+    expect(file.agents.find((a) => a.id === 'claude')?.name).toBe('墨墨酱');
+  });
+
+  it('PATCH /api/config 更新链深与默认猫', async () => {
+    const res = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ a2aMaxDepth: 5, defaultAgentId: 'gemini' }),
+    });
+    expect(res.status).toBe(200);
+    const cfg = (await res.json()) as { a2aMaxDepth: number; defaultAgentId: string };
+    expect(cfg.a2aMaxDepth).toBe(5);
+    expect(cfg.defaultAgentId).toBe('gemini');
+  });
+
+  it('PATCH /api/config applyModel 把同一模型配给多只猫', async () => {
+    const res = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        applyModel: {
+          model: 'opencode-go/shared-flash',
+          agentIds: ['claude', 'opencode'],
+          bin: 'opencode',
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const cfg = (await res.json()) as {
+      agents: { id: string; model?: string; bin: string }[];
+    };
+    const claude = cfg.agents.find((a) => a.id === 'claude');
+    const gemini = cfg.agents.find((a) => a.id === 'gemini');
+    const opencode = cfg.agents.find((a) => a.id === 'opencode');
+    expect(claude?.model).toBe('opencode-go/shared-flash');
+    expect(claude?.bin).toBe('opencode');
+    expect(opencode?.model).toBe('opencode-go/shared-flash');
+    expect(gemini?.bin).toBe('gemini');
+  });
+
+  it('PATCH /api/config models 后 agent 可选用目录', async () => {
+    const save = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        models: [
+          { id: 'flash', label: 'Flash', bin: 'opencode', model: 'opencode-go/shared-flash' },
+          { id: 'sonnet', label: 'Sonnet', bin: 'claude', model: 'sonnet' },
+        ],
+      }),
+    });
+    expect(save.status).toBe(200);
+    const pick = await fetch(`${url}/api/config/agents/gemini`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'sonnet' }),
+    });
+    expect(pick.status).toBe(200);
+    const agent = (await pick.json()) as { modelId?: string; bin: string; model?: string };
+    expect(agent.modelId).toBe('sonnet');
+    expect(agent.bin).toBe('claude');
+    expect(agent.model).toBe('sonnet');
+  });
+
+  it('未知 agent / 空名字 / 非法链深返回 4xx', async () => {
+    const missing = await fetch(`${url}/api/config/agents/nope`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'x' }),
+    });
+    expect(missing.status).toBe(404);
+
+    const empty = await fetch(`${url}/api/config/agents/claude`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '   ' }),
+    });
+    expect(empty.status).toBe(400);
+
+    const badDepth = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ a2aMaxDepth: 0 }),
+    });
+    expect(badDepth.status).toBe(400);
   });
 });

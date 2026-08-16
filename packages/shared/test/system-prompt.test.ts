@@ -22,12 +22,29 @@ const evidence: EvidenceEntry = {
 };
 
 describe('buildSystemPrompt', () => {
-  it('仅 profile:拼出身份段', () => {
+  it('仅 profile:拼出身份段与团队交接规则', () => {
     const prompt = buildSystemPrompt({ profile, evidenceRefs: [] });
     expect(prompt).toContain('你是 墨墨,主力写手');
     expect(prompt).toContain('性格:沉稳细致');
     expect(prompt).toContain('擅长:架构设计、TypeScript');
-    expect(prompt).toContain('交接任务');
+    expect(prompt).toContain('团队成员:');
+    expect(prompt).toContain('墨墨(@墨墨/@claude)');
+    expect(prompt).toContain('团团(@团团/@opencode)');
+    expect(prompt).toContain('交接规则');
+    expect(prompt).toContain('行首写');
+    expect(prompt).toContain('何时必须交接');
+    expect(prompt).toContain('不要问');
+    expect(prompt).toContain('@闪闪');
+  });
+
+  it('显式 team 覆盖默认名册', () => {
+    const prompt = buildSystemPrompt({
+      profile,
+      team: [{ agentId: 'claude', name: '小墨', role: '写手' }],
+      evidenceRefs: [],
+    });
+    expect(prompt).toContain('小墨(@小墨/@claude): 写手');
+    expect(prompt).not.toContain('闪闪');
   });
 
   it('仅引用:拼出团队记忆段', () => {

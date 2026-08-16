@@ -6,6 +6,7 @@ export interface StreamEvent {
   type: 'increment';
   messageId: string;
   delta: string;
+  agentId?: string;
 }
 
 export function useThreadStream(threadId: string | null): {

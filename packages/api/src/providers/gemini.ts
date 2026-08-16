@@ -4,11 +4,13 @@ import { GeminiAccumulator } from './gemini-json.js';
 import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class GeminiAdapter implements AgentService {
-  readonly agentId: AgentId = 'gemini';
+  readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { bin?: string; model?: string; timeoutMs?: number } = {},
-  ) {}
+    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+  ) {
+    this.agentId = opts.agentId ?? 'gemini';
+  }
 
   async runTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
     const bin = this.opts.bin ?? process.env.GEMINI_BIN ?? 'gemini';

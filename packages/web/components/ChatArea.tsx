@@ -1,18 +1,24 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import type { MessageDto } from '@/lib/api';
+import type { AgentConfigDto, MessageDto } from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
 import { useThreadStream } from '@/lib/use-thread-stream';
+import { applyStreamIncrement, mergeCanonicalMessages } from '@/lib/stream-messages';
+import { agentName } from '@/lib/persona';
 
 export function ChatArea({
   threadId,
   messages,
+  sending,
+  agents,
   onApprove,
   onReject,
   onConfirmEvidence,
 }: {
   threadId: string;
   messages: MessageDto[];
+  sending?: boolean;
+  agents?: AgentConfigDto[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onConfirmEvidence: (id: string) => void;
@@ -21,20 +27,18 @@ export function ChatArea({
   const [streamed, setStreamed] = useState<MessageDto[]>(messages);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setStreamed(messages), [messages]);
+  useEffect(() => {
+    setStreamed((prev) => mergeCanonicalMessages(messages, prev, threadId));
+  }, [messages, threadId]);
   useEffect(() => {
     if (!lastEvent) return;
-    setStreamed((prev) => {
-      const idx = prev.findIndex((m) => m.id === lastEvent.messageId);
-      if (idx < 0) return prev;
-      const next = [...prev];
-      next[idx] = { ...next[idx], content: next[idx].content + lastEvent.delta };
-      return next;
-    });
-  }, [lastEvent]);
+    setStreamed((prev) => applyStreamIncrement(prev, lastEvent, threadId));
+  }, [lastEvent, threadId]);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [streamed]);
+
+  const waiting = Boolean(sending) && streamed.every((m) => m.status !== 'streaming');
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -43,11 +47,20 @@ export function ChatArea({
           <MessageBubble
             key={m.id}
             message={m}
+            agentName={agentName(m.agentId, agents)}
             onApprove={onApprove}
             onReject={onReject}
             onConfirmEvidence={onConfirmEvidence}
           />
         ))}
+        {waiting && (
+          <div className="px-4 py-2 text-xs text-[var(--ink-soft)]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 ring-1 ring-[var(--border)]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
+              猫们正在干活…
+            </span>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
     </div>

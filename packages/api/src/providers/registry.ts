@@ -6,5 +6,8 @@ export function createAgentRegistry(services: AgentService[]): AgentRegistry {
   return {
     get: (agentId) => byId.get(agentId),
     list: () => [...byId.keys()],
+    register: (service) => {
+      byId.set(service.agentId, service);
+    },
   };
 }

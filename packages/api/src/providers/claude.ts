@@ -4,15 +4,18 @@ import { StreamAccumulator } from './stream-json.js';
 import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class ClaudeAdapter implements AgentService {
-  readonly agentId: AgentId = 'claude';
+  readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { bin?: string; timeoutMs?: number } = {},
-  ) {}
+    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+  ) {
+    this.agentId = opts.agentId ?? 'claude';
+  }
 
   async runTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
     const bin = this.opts.bin ?? process.env.CLAUDE_BIN ?? 'claude';
     const timeoutMs = input.timeoutMs ?? this.opts.timeoutMs ?? 300_000;
+    const model = this.opts.model ?? process.env.CLAUDE_MODEL;
 
     const args = [
       '-p',
@@ -22,6 +25,7 @@ export class ClaudeAdapter implements AgentService {
       '--permission-mode',
       'acceptEdits',
     ];
+    if (model) args.push('--model', model);
     if (input.sessionId) args.push('--resume', input.sessionId);
     if (input.systemPrompt) args.push('--append-system-prompt', input.systemPrompt);
     args.push(input.prompt);

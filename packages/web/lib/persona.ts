@@ -35,3 +35,12 @@ export function getPersona(agentId: string | undefined): Persona {
   if (agentId && agentId in PERSONAS) return PERSONAS[agentId as PersonaId];
   return PERSONAS.user;
 }
+
+export function agentName(
+  agentId: string | undefined,
+  agents?: { id: string; name: string }[],
+): string {
+  const fromConfig = agents?.find((a) => a.id === agentId)?.name;
+  if (fromConfig) return fromConfig;
+  return getPersona(agentId).name;
+}

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { buildServer } from '../packages/api/src/http/server.js';
-import { loadConfig } from '../packages/api/src/config.js';
+import { agentSpec, loadConfig } from '../packages/api/src/config.js';
 import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
 import {
   createApprovalStore,
@@ -34,22 +34,28 @@ const stores = {
 await ensureSeededProfiles(stores.profiles);
 
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-smoke-'));
+const claude = agentSpec(config, 'claude');
+const gemini = agentSpec(config, 'gemini');
+const opencode = agentSpec(config, 'opencode');
 const app = await buildServer({
   stores,
   registry: createAgentRegistry([
-    new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
+    new ClaudeAdapter({ bin: claude.bin, timeoutMs: config.agentTimeoutMs }),
     new GeminiAdapter({
-      bin: config.geminiBin,
-      model: config.geminiModel,
+      bin: gemini.bin,
+      model: gemini.model,
       timeoutMs: config.agentTimeoutMs,
     }),
     new OpenCodeAdapter({
-      bin: config.opencodeBin,
-      model: config.opencodeModel,
+      bin: opencode.bin,
+      model: opencode.model,
       timeoutMs: config.agentTimeoutMs,
     }),
   ]),
   workdirBase,
+  a2aMaxDepth: config.a2aMaxDepth,
+  defaultAgentId: config.defaultAgentId,
+  agents: config.agents,
 });
 await app.listen({ port: 0, host: '127.0.0.1' });
 const address = app.server.address() as AddressInfo;

@@ -48,8 +48,26 @@ export function parseStrayFiles(statusText: string, workPrefix = 'work/'): strin
     .filter((path) => isStrayAgentPath(path, workPrefix));
 }
 
+function isKeptProjectFile(path: string): boolean {
+  const base = path.split('/').pop() ?? path;
+  if (base.startsWith('.')) return true;
+  if (/\.(config|lock)\.(json|ts|mjs|yaml|yml)$/.test(base)) return true;
+  return [
+    'package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'README.md',
+    'AGENTS.md',
+    'biome.json',
+    'tsconfig.json',
+    'tsconfig.base.json',
+    'meowbase.config.json',
+  ].includes(base);
+}
+
 function isStrayAgentPath(path: string, workPrefix: string): boolean {
   if (!path || path.startsWith(workPrefix)) return false;
+  if (isKeptProjectFile(path)) return false;
   const parts = path.split('/');
   if (parts.length === 1) return true;
   // CLI 上溯时可能写到 packages/<pkg>/filename

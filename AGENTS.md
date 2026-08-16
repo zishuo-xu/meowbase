@@ -49,7 +49,7 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 |---|---|
 | `@墨墨 任务` | 单角色执行(自动触发审批流拉审查) |
 | `@墨墨 @团团 问题` | 同题并行(多 @ = 同一消息发给所有目标) |
-| 回复中行首 `@团团 任务` | A2A 接力:agent 之间自动交接(链深 3,防环) |
+| 回复中行首 `@团团 任务` | A2A 接力:中文名与英文 id 等价(`@团团`=`@opencode`);链深默认 3(`A2A_MAX_DEPTH`),防环;句中 @ 不会交接 |
 | `#learn 标题` | 请求沉淀本轮回复为证据(draft) |
 | `#confirm ev_xxx` | 确认证据 |
 | `#ev_xxx` | 引用历史证据注入上下文 |
@@ -84,6 +84,6 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 ## 常见操作
 
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
-- **改 agent 身份**:`packages/api/src/stores/seeds.ts`(墨墨/闪闪/团团);`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
+- **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
 - **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api(claude/gemini 走本机 CLI;opencode 默认 relay:opencode.ai/zen/go,模型 deepseek-v4-flash);费用按 token 计(一次完整流程约 $0.2-0.4)

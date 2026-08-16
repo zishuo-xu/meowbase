@@ -53,11 +53,41 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 - `review` / `审查` / `代码评审` → 代码审查
 - `debug` / `调试` / `bug` → 系统化调试
 
+## 配置(对齐 clowder:基础设施 vs 团队名册)
+
+`.env` / 环境变量只管 Redis、端口、超时。**猫是谁、用哪条 CLI、什么模型**写在仓库根 `meowbase.config.json`(人类改,agent 只读):
+
+```json
+{
+  "a2a": { "maxDepth": 3 },
+  "defaultAgentId": "claude",
+  "agents": [
+    { "id": "opencode", "name": "团团", "aliases": ["团团", "opencode"], "bin": "opencode", "model": "opencode-go/deepseek-v4-flash" }
+  ]
+}
+```
+
+环境变量仍可覆盖单字段:`CLAUDE_BIN` / `GEMINI_BIN` / `OPENCODE_BIN`、`GEMINI_MODEL` / `OPENCODE_MODEL`、`A2A_MAX_DEPTH`。
+`GET /api/config` 返回合并后的名册。改 json 后需重启 API。
+
+## 人怎么下任务,猫怎么交接
+
+对齐 clowder F046:**只有另起一行、行首的 `@名字` 才会路由**。
+
+```
+帮我把加法做成可测的
+@墨墨
+先写失败测试再实现
+```
+
+- 一条消息里多个 `@墨墨 @团团` = **同题并行**(每人收到同一份任务)
+- 猫回复里行首 `@团团 请审查边界条件` = **A2A 接力**:平台把上一棒全文打成「A2A 交接」信封交给团团,并插入 `🤝 接力:墨墨 → 团团`
+- 句中写「请 @团团 看看」**不会交接**,系统会提示改成行首
+- 链深默认 3(可配),已出场的猫不再回来(防环)
+
 ## 多角色协作
 
-- **同题并行**:`@墨墨 @团团 帮我看看这个方案` —— 同一消息并行发给所有目标,各自回答(适合征求意见/评审)
-- **跨模型审查**:`@闪闪` 走 Gemini CLI(身份:审查官);写手改动触发的自动审查默认仍配对 团团(opencode),与现有演示路径一致
-- **A2A 接力**:agent 回复中行首 `@其他角色 任务` → 平台自动交接继续执行(链深 3,防环)
+- **跨模型审查**:`@闪闪` 走 Gemini CLI(身份:审查官);写手改动触发的自动审查默认仍配对 团团(opencode)
 - 分工由猫们自己协调,你不必当"路由器"
 
 ## 消息协议(M2)

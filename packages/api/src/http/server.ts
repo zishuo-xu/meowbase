@@ -14,8 +14,22 @@ import type {
   SkillStore,
   ThreadStore,
 } from '../stores/ports.js';
+import type { AgentPatchInput, AgentSpec, ModelPreset } from '../config.js';
+import {
+  applyAgentPatch,
+  applySharedModel,
+  cloneAgentSpec,
+  cloneModelPreset,
+  isAgentId,
+  normalizeModelCatalog,
+  parseModelCatalog,
+  publicAgentConfig,
+  syncAgentsWithCatalog,
+  writeTeamFile,
+} from '../config.js';
 import { executeTurn } from '../router/execute-turn.js';
 import { gitInit } from '../services/git.js';
+import { verifyModelConnection } from '../providers/verify-model.js';
 
 export interface ApiDeps {
   stores: {
@@ -28,11 +42,76 @@ export interface ApiDeps {
   };
   registry: AgentRegistry;
   workdirBase: string;
+  a2aMaxDepth?: number;
+  defaultAgentId?: AgentId;
+  agents?: AgentSpec[];
+  models?: ModelPreset[];
+  /** 有则 PATCH 后写入该路径 */
+  configPath?: string;
+  persistConfig?: () => void;
+  rebuildAdapter?: (spec: AgentSpec) => void;
+}
+
+interface LiveConfig {
+  a2aMaxDepth: number;
+  defaultAgentId: AgentId;
+  agents: AgentSpec[];
+  models: ModelPreset[];
+}
+
+function parsePatchDepth(raw: unknown): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1 || n > 10) return null;
+  return Math.floor(n);
 }
 
 export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   const emitter = new EventEmitter();
+  const live: LiveConfig = {
+    a2aMaxDepth: deps.a2aMaxDepth ?? 3,
+    defaultAgentId: deps.defaultAgentId ?? 'claude',
+    agents: (deps.agents ?? []).map(cloneAgentSpec),
+    models: (deps.models?.length
+      ? deps.models
+      : normalizeModelCatalog(undefined, deps.agents ?? [])
+    ).map(cloneModelPreset),
+  };
+  live.agents = syncAgentsWithCatalog(live.agents, live.models);
+
+  function persist() {
+    if (deps.persistConfig) {
+      deps.persistConfig();
+      return;
+    }
+    if (deps.configPath) {
+      writeTeamFile(deps.configPath, live);
+    }
+  }
+
+  async function publicConfig() {
+    const profiles = await deps.stores.profiles.list();
+    const autoById = new Map(profiles.map((p) => [p.agentId, p.autoApprove]));
+    const agents =
+      live.agents.length > 0
+        ? live.agents.map((spec) => publicAgentConfig(spec, { autoApprove: autoById.get(spec.id) }))
+        : profiles.map((p) => ({
+            id: p.agentId,
+            name: p.name,
+            role: p.role,
+            aliases: [p.name, p.agentId],
+            bin: p.agentId,
+            personality: p.personality,
+            expertise: p.expertise,
+            ...(typeof p.autoApprove === 'boolean' ? { autoApprove: p.autoApprove } : {}),
+          }));
+    return {
+      a2aMaxDepth: live.a2aMaxDepth,
+      defaultAgentId: live.defaultAgentId,
+      models: live.models,
+      agents,
+    };
+  }
 
   await app.register(cors, { origin: true });
   await app.register(websocket);
@@ -41,7 +120,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const body = request.body as { title?: string; primaryAgentId?: AgentId } | null;
     const thread = await deps.stores.threads.create({
       title: body?.title?.trim() || '新线程',
-      primaryAgentId: body?.primaryAgentId ?? 'claude',
+      primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
       workdirBase: deps.workdirBase,
     });
     mkdirSync(thread.workdir, { recursive: true });
@@ -58,6 +137,111 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/threads', async () => deps.stores.threads.list());
 
   app.get('/api/profiles', async () => deps.stores.profiles.list());
+
+  app.get('/api/config', async () => publicConfig());
+
+  app.post('/api/config/models/verify', async (request, reply) => {
+    const body = request.body as { bin?: string; model?: string; modelId?: string } | null;
+    let bin = body?.bin?.trim() ?? '';
+    let model = body?.model?.trim() ?? '';
+    if (body?.modelId?.trim()) {
+      const preset = live.models.find((m) => m.id === body.modelId?.trim());
+      if (!preset) return reply.code(404).send({ error: `模型目录没有: ${body.modelId}` });
+      bin = bin || preset.bin;
+      model = model || preset.model;
+    }
+    if (!bin) return reply.code(400).send({ error: 'bin 不能为空' });
+    return verifyModelConnection({ bin, model, timeoutMs: 45_000 });
+  });
+
+  app.patch('/api/config', async (request, reply) => {
+    const body = request.body as {
+      a2aMaxDepth?: unknown;
+      defaultAgentId?: unknown;
+      models?: unknown;
+      applyModel?: { model?: unknown; agentIds?: unknown; bin?: unknown };
+    } | null;
+    if (body?.a2aMaxDepth !== undefined) {
+      const depth = parsePatchDepth(body.a2aMaxDepth);
+      if (depth === null) return reply.code(400).send({ error: 'a2aMaxDepth 须为 1–10 的整数' });
+      live.a2aMaxDepth = depth;
+    }
+    if (body?.defaultAgentId !== undefined) {
+      if (typeof body.defaultAgentId !== 'string' || !isAgentId(body.defaultAgentId)) {
+        return reply.code(400).send({ error: 'defaultAgentId 无效' });
+      }
+      live.defaultAgentId = body.defaultAgentId;
+    }
+    if (body?.models !== undefined) {
+      const parsed = parseModelCatalog(body.models);
+      if (!parsed) return reply.code(400).send({ error: 'models 须为 {id,label,bin,model} 数组且 id 不重复' });
+      const prevAgents = live.agents.map(cloneAgentSpec);
+      live.models = parsed.map(cloneModelPreset);
+      live.agents = syncAgentsWithCatalog(live.agents, live.models);
+      for (const next of live.agents) {
+        const prev = prevAgents.find((a) => a.id === next.id);
+        if (prev && (prev.bin !== next.bin || prev.model !== next.model)) {
+          deps.rebuildAdapter?.(next);
+        }
+      }
+    }
+    if (body?.applyModel) {
+      const rawIds = body.applyModel.agentIds;
+      const model = typeof body.applyModel.model === 'string' ? body.applyModel.model.trim() : '';
+      if (!model) return reply.code(400).send({ error: 'applyModel.model 不能为空' });
+      if (!Array.isArray(rawIds) || rawIds.length === 0) {
+        return reply.code(400).send({ error: 'applyModel.agentIds 不能为空' });
+      }
+      const agentIds = rawIds.filter((id): id is AgentId => typeof id === 'string' && isAgentId(id));
+      if (agentIds.length !== rawIds.length) {
+        return reply.code(400).send({ error: 'applyModel.agentIds 含未知 agent' });
+      }
+      const bin =
+        typeof body.applyModel.bin === 'string' && body.applyModel.bin.trim()
+          ? body.applyModel.bin.trim()
+          : undefined;
+      const prevById = new Map(live.agents.map((a) => [a.id, a]));
+      live.agents = applySharedModel(live.agents, { model, agentIds, bin });
+      for (const id of agentIds) {
+        const prev = prevById.get(id);
+        const next = live.agents.find((a) => a.id === id);
+        if (next && prev && (prev.bin !== next.bin || prev.model !== next.model)) {
+          deps.rebuildAdapter?.(next);
+        }
+      }
+    }
+    persist();
+    return publicConfig();
+  });
+
+  app.patch('/api/config/agents/:agentId', async (request, reply) => {
+    const { agentId } = request.params as { agentId: string };
+    if (!isAgentId(agentId)) return reply.code(404).send({ error: `agent 不存在: ${agentId}` });
+    const index = live.agents.findIndex((a) => a.id === agentId);
+    if (index < 0) return reply.code(404).send({ error: `agent 不存在: ${agentId}` });
+    const body = (request.body ?? {}) as AgentPatchInput & { autoApprove?: unknown };
+    if (typeof body.name === 'string' && !body.name.trim()) {
+      return reply.code(400).send({ error: 'name 不能为空' });
+    }
+    if (typeof body.modelId === 'string' && body.modelId.trim()) {
+      const preset = live.models.find((m) => m.id === body.modelId.trim());
+      if (!preset) return reply.code(400).send({ error: `模型目录没有: ${body.modelId}` });
+      body.bin = preset.bin;
+      body.model = preset.model;
+    }
+    const prev = live.agents[index]!;
+    const next = applyAgentPatch(prev, body);
+    live.agents[index] = next;
+    if (typeof body.autoApprove === 'boolean') {
+      await deps.stores.profiles.updateAutoApprove(agentId, body.autoApprove);
+    }
+    if (prev.bin !== next.bin || prev.model !== next.model) {
+      deps.rebuildAdapter?.(next);
+    }
+    persist();
+    const profile = await deps.stores.profiles.get(agentId);
+    return publicAgentConfig(next, { autoApprove: profile?.autoApprove });
+  });
 
   app.patch('/api/profiles/:agentId', async (request, reply) => {
     const { agentId } = request.params as { agentId: string };
@@ -103,8 +287,10 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       context: {
         stores: deps.stores,
         registry: deps.registry,
-        onIncrement: (tid, messageId, delta) => {
-          emitter.emit(`increment:${tid}`, { messageId, delta });
+        a2aMaxDepth: live.a2aMaxDepth,
+        agents: live.agents.length > 0 ? live.agents : deps.agents,
+        onIncrement: (tid, messageId, delta, agentId) => {
+          emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
         },
       },
     });

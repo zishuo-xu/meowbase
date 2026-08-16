@@ -9,13 +9,21 @@ interface MentionCandidate {
   badge: string;
 }
 
-const CANDIDATES: MentionCandidate[] = AGENT_ORDER.map((id) => ({
+const DEFAULT_CANDIDATES: MentionCandidate[] = AGENT_ORDER.map((id) => ({
   id,
   name: getPersona(id).name,
   badge: getPersona(id).badge,
 }));
 
-export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
+export function ChatInput({
+  onSend,
+  sending = false,
+  agents,
+}: {
+  onSend: (content: string) => void;
+  sending?: boolean;
+  agents?: { id: string; name: string }[];
+}) {
   const [value, setValue] = useState('');
   const [cursor, setCursor] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -35,17 +43,23 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
     setActiveIdx(0);
   };
 
+  const candidates: MentionCandidate[] = (agents ?? DEFAULT_CANDIDATES).map((a) => ({
+    id: a.id,
+    name: a.name,
+    badge: getPersona(a.id).badge,
+  }));
+
   const filtered = query
-    ? CANDIDATES.filter(
+    ? candidates.filter(
         (c) =>
           c.id.includes(query.toLowerCase()) || c.name.includes(query),
       )
-    : CANDIDATES;
+    : candidates;
 
   const selectMention = (candidate: MentionCandidate) => {
     const q = getMentionQuery(value, cursor);
     if (!q) return;
-    const inserted = `@${candidate.id} `;
+    const inserted = `@${candidate.name} `;
     const next = value.slice(0, q.start) + inserted + value.slice(cursor);
     setValue(next);
     setMenuOpen(false);
@@ -59,15 +73,15 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
 
   const submit = () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || sending) return;
     onSend(trimmed);
     setValue('');
     setMenuOpen(false);
   };
 
   return (
-    <div className="border-t border-[var(--border)] bg-white/60 p-3">
-      <div className="relative flex items-end gap-2">
+    <div className="border-t border-[var(--border)] bg-[var(--surface-raised)]/80 p-3 backdrop-blur-sm">
+      <div className="relative mx-auto flex max-w-3xl items-end gap-2">
         {menuOpen && filtered.length > 0 && (
           <div className="absolute bottom-full left-0 z-10 mb-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-lg">
             {filtered.map((c, idx) => (
@@ -146,14 +160,16 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
             }
           }}
           rows={2}
-          placeholder="@墨墨 干活吧…(可 @ 多个角色同题并行 / #learn / #confirm / #approve)"
-          className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+          disabled={sending}
+          placeholder="@墨墨 干活吧…(行首 @名字 呼叫 / 猫回复行首 @团团 会自动交接)"
+          className="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-white px-3.5 py-2.5 text-sm shadow-inner outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-60"
         />
         <button
           onClick={submit}
-          className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:bg-[var(--accent-strong)]"
+          disabled={sending}
+          className="rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
         >
-          发送
+          {sending ? '发送中' : '发送'}
         </button>
       </div>
     </div>

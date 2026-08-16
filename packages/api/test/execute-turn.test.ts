@@ -189,7 +189,7 @@ describe('executeTurn 消息协议与注入', () => {
     expect(receivedPrompt).toContain('关键事实: 事实内容');
   });
 
-  it('新会话注入 profile;resume 不注入', async () => {
+  it('新会话注入 profile;resume 仍注入交接规则', async () => {
     const stores = createMemoryStores();
     const prompts: (string | undefined)[] = [];
     const registry = createAgentRegistry([
@@ -208,9 +208,11 @@ describe('executeTurn 消息协议与注入', () => {
     // 第一轮:新会话,应注入
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
     expect(prompts[0]).toContain('你是 墨墨');
-    // 第二轮:已有 session,不注入
+    expect(prompts[0]).toContain('交接规则');
+    // 第二轮:已有 session,不再注入身份,但仍注入团队交接规则
     await executeTurn({ threadId: thread.id, content: 'hi again', context: { stores, registry } });
-    expect(prompts[1]).toBeUndefined();
+    expect(prompts[1]).not.toContain('你是 墨墨');
+    expect(prompts[1]).toContain('交接规则');
   });
 
   it('#learn 失败轮不生成 draft', async () => {
@@ -261,9 +263,10 @@ describe('executeTurn 技能注入', () => {
     expect(prompts[0]).toContain('[技能:代码审查]');
     expect(prompts[0]).toContain('按清单审查');
 
-    // 第二轮:无触发词,不注入技能
+    // 第二轮:无触发词,不注入技能,但仍有交接规则
     await executeTurn({ threadId: thread.id, content: '继续', context: { stores, registry } });
-    expect(prompts[1]).toBeUndefined();
+    expect(prompts[1]).not.toContain('[技能:');
+    expect(prompts[1]).toContain('交接规则');
   });
 
   it('多技能命中时全部注入', async () => {
@@ -494,13 +497,15 @@ describe('executeTurn 多角色协作', () => {
     });
     expect(final.agentId).toBe('opencode');
     // 后角 prompt 包含前角输出
+    expect(opencodePrompts[0]).toContain('【A2A 交接】');
     expect(opencodePrompts[0]).toContain('代码写完了');
+    expect(opencodePrompts[0]).toContain('【你的任务】');
     expect(opencodePrompts[0]).toContain('请审查这段代码');
     const messages = await stores.messages.list(thread.id);
     const assistants = messages.filter((m) => m.role === 'assistant');
     expect(assistants.map((m) => m.agentId)).toEqual(['claude', 'opencode']);
     const note = messages.find((m) => m.role === 'system' && m.content.includes('接力'));
-    expect(note?.content).toContain('@opencode');
+    expect(note?.content).toContain('墨墨 → 团团');
   });
 
   it('A2A 防环:已出场角色不再重复接力', async () => {
@@ -526,5 +531,130 @@ describe('executeTurn 多角色协作', () => {
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
     // claude → opencode → (claude 已出场,停止)
     expect(calls).toEqual(['claude', 'opencode']);
+  });
+
+  it('A2A 中文名接力:@团团 与 @opencode 等价', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return { sessionId: 's1', content: '@团团 请接着做', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls.push('opencode');
+          return { sessionId: 's2', content: '好', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id, content: '@墨墨 开工', context: { stores, registry },
+    });
+    expect(calls).toEqual(['claude', 'opencode']);
+  });
+
+  it('A2A 句中 @ 不交接,留下提示', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return { sessionId: 's1', content: '写完了,请 @团团 审查。', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          throw new Error('不应被叫到');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(1);
+    const hint = messages.find((m) => m.role === 'system' && m.content.includes('句中'));
+    expect(hint?.content).toContain('@团团');
+  });
+
+  it('A2A 链深可配置:maxDepth=1 不接力', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return { sessionId: 's1', content: '@opencode 你来', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls.push('opencode');
+          return { sessionId: 's2', content: '好', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: { stores, registry, a2aMaxDepth: 1 },
+    });
+    expect(calls).toEqual(['claude']);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('接力链已达上限'))).toBe(true);
+  });
+
+  it('systemPrompt 用 config.agents 身份覆盖 Redis profile', async () => {
+    const stores = createMemoryStores();
+    await stores.profiles.create({
+      agentId: 'claude',
+      name: '墨墨',
+      personality: '旧性格',
+      role: '写手',
+      expertise: ['TS'],
+    });
+    let captured: string | undefined;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          captured = input.systemPrompt;
+          return { sessionId: 's', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: {
+        stores,
+        registry,
+        agents: [
+          {
+            id: 'claude',
+            name: '墨墨改',
+            aliases: ['墨墨改', 'claude'],
+            role: '新角色',
+            personality: '新性格',
+            expertise: ['Rust'],
+            bin: 'claude',
+          },
+        ],
+      },
+    });
+    expect(captured).toContain('墨墨改');
+    expect(captured).toContain('新角色');
+    expect(captured).toContain('新性格');
+    expect(captured).toContain('Rust');
   });
 });

@@ -12,13 +12,12 @@ import {
   createThreadStore,
 } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
-import { ClaudeAdapter } from './providers/claude.js';
-import { GeminiAdapter } from './providers/gemini.js';
-import { OpenCodeAdapter } from './providers/opencode.js';
+import { createAdapter } from './providers/factory.js';
 import { createAgentRegistry } from './providers/registry.js';
 
-const config = loadConfig();
 const repoRoot = resolve(import.meta.dirname, '../../../');
+const configPath = resolve(repoRoot, 'meowbase.config.json');
+const config = loadConfig(process.env, { configPath });
 
 // skills 与 work 目录都相对仓库根解析(dev 时 cwd 是包目录)
 const skillsDir = resolve(repoRoot, config.skillsDir);
@@ -38,22 +37,20 @@ const stores = {
 };
 await ensureSeededProfiles(stores.profiles);
 
+const registry = createAgentRegistry(
+  config.agents.map((spec) => createAdapter(spec, config.agentTimeoutMs)),
+);
+
 const app = await buildServer({
   stores,
-  registry: createAgentRegistry([
-    new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
-    new GeminiAdapter({
-      bin: config.geminiBin,
-      model: config.geminiModel,
-      timeoutMs: config.agentTimeoutMs,
-    }),
-    new OpenCodeAdapter({
-      bin: config.opencodeBin,
-      model: config.opencodeModel,
-      timeoutMs: config.agentTimeoutMs,
-    }),
-  ]),
+  registry,
   workdirBase,
+  a2aMaxDepth: config.a2aMaxDepth,
+  defaultAgentId: config.defaultAgentId,
+  agents: config.agents,
+  models: config.models,
+  configPath,
+  rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)),
 });
 
 await app.listen({ port: config.port, host: '0.0.0.0' });

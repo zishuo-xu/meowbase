@@ -7,11 +7,13 @@ import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
 
 export function MessageBubble({
   message,
+  agentName,
   onApprove,
   onReject,
   onConfirmEvidence,
 }: {
   message: MessageDto;
+  agentName?: string;
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
   onConfirmEvidence?: (id: string) => void;
@@ -56,31 +58,37 @@ export function MessageBubble({
 
   const isUser = message.role === 'user';
   const persona = getPersona(isUser ? 'user' : message.agentId);
+  const displayName = isUser ? persona.name : (agentName ?? persona.name);
   return (
     <div className={`flex gap-2 px-4 py-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
         <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ring-2 ring-white/70"
           style={{ background: persona.badge }}
         >
-          {persona.name[0]}
+          {displayName[0]}
         </span>
       )}
       <div
         data-cat-ear={isUser ? undefined : 'true'}
-        className={`max-w-[75%] rounded-2xl border px-4 py-2 text-sm leading-relaxed ${
+        className={`relative max-w-[75%] rounded-2xl border px-4 py-2.5 text-sm leading-relaxed ${
           isUser
-            ? 'rounded-br-md border-[var(--border)] bg-white'
-            : 'rounded-tl-none border-transparent'
+            ? 'rounded-br-md border-[var(--border)] bg-white shadow-sm'
+            : 'rounded-tl-none border-transparent shadow-sm'
         }`}
         style={isUser ? undefined : { background: persona.surface }}
       >
         {!isUser && (
           <div className="mb-0.5 text-xs font-bold" style={{ color: persona.badge }}>
-            {persona.name}
+            {displayName}
           </div>
         )}
-        <div className="whitespace-pre-wrap break-words">{parsed.text}</div>
+        <div className="whitespace-pre-wrap break-words">
+          {parsed.text}
+          {message.status === 'streaming' && (
+            <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
+          )}
+        </div>
       </div>
     </div>
   );

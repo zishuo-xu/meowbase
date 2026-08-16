@@ -4,11 +4,13 @@ import { OpenCodeAccumulator } from './opencode-json.js';
 import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class OpenCodeAdapter implements AgentService {
-  readonly agentId: AgentId = 'opencode';
+  readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { bin?: string; model?: string; timeoutMs?: number } = {},
-  ) {}
+    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+  ) {
+    this.agentId = opts.agentId ?? 'opencode';
+  }
 
   async runTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
     const bin = this.opts.bin ?? process.env.OPENCODE_BIN ?? 'opencode';

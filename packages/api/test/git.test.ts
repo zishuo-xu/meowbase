@@ -52,6 +52,15 @@ describe('git 辅助函数', () => {
     expect(parseStrayFiles(status)).toEqual(['mul.js', 'packages/api/mul.js']);
   });
 
+  it('parseStrayFiles 不碰仓库配置文件', () => {
+    const status = [
+      '?? meowbase.config.json',
+      '?? package.json',
+      '?? mul.js',
+    ].join('\n');
+    expect(parseStrayFiles(status)).toEqual(['mul.js']);
+  });
+
   it('sweepStrayFiles 把散落文件移回沙箱', async () => {
     const root = mkdtempSync(join(tmpdir(), 'meowbase-sweep-'));
     await gitInit(root);

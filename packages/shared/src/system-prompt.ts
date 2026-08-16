@@ -1,7 +1,36 @@
 import type { AgentProfile, EvidenceEntry, Skill } from './types.js';
+import { DEFAULT_ROSTER, type TeamMember } from './catalog.js';
+
+export type { TeamMember };
+
+function rosterLines(team: readonly TeamMember[]): string {
+  return team
+    .map((m) => `- ${m.name}(@${m.name}/@${m.agentId}): ${m.role}`)
+    .join('\n');
+}
+
+export function buildA2AProtocol(
+  team: readonly TeamMember[] = DEFAULT_ROSTER,
+  selfName?: string,
+): string {
+  const others = selfName ? team.filter((m) => m.name !== selfName) : [...team];
+  const peer = others[0];
+  const peerHint = peer ? `@${peer.name}` : '@另一位成员';
+  return (
+    `团队成员:\n${rosterLines(team)}\n` +
+    `分工纪律:人只表达要做什么。要不要交接、交给谁,由你根据角色判断,不要问「要不要交给某某」。\n` +
+    `何时必须交接:\n` +
+    `- 你写完或改完代码后,另起一行 ${peerHint} 请审查(不要自己审自己)\n` +
+    `- 下一步明显属于别人的职责(审查/实现/脚本)时,做完自己这段就交出去\n` +
+    `- 你缺工具、缺第二视角、或遇到做不了的部分时\n` +
+    `何时不要交接:简单问答、自我介绍、纯解释、已经在审别人的产出。\n` +
+    `怎么交(交接规则):必须另起一行,行首写 @名字 或 @id,空格后写具体任务。句中的 @ 不会交接。不要 @ 自己。`
+  );
+}
 
 export function buildSystemPrompt(input: {
   profile?: AgentProfile;
+  team?: readonly TeamMember[];
   skills?: Skill[];
   evidenceRefs: EvidenceEntry[];
 }): string | undefined {
@@ -10,9 +39,12 @@ export function buildSystemPrompt(input: {
     const p = input.profile;
     parts.push(
       `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。` +
-        `\n团队协作:需要其他成员协助时,在回复末尾另起一行用 @claude/@gemini/@opencode 交接任务。` +
         `\n工作区规则:所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。`,
     );
+  }
+  const team = input.team ?? (input.profile ? DEFAULT_ROSTER : undefined);
+  if (team && team.length > 0) {
+    parts.push(buildA2AProtocol(team, input.profile?.name));
   }
   if (input.skills && input.skills.length > 0) {
     const lines = input.skills.map((s) => `[技能:${s.name}] ${s.prompt}`);

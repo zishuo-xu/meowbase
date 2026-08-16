@@ -23,6 +23,25 @@ describe('MessageBubble', () => {
     expect(screen.getByText('墨墨')).toBeTruthy();
   });
 
+  it('可配置名字覆盖内置名册', () => {
+    render(
+      <MessageBubble
+        agentName="墨墨酱"
+        message={{
+          id: 'm1',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '你好',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    expect(screen.getByText('墨墨酱')).toBeTruthy();
+    expect(screen.queryByText('墨墨')).toBeNull();
+  });
+
   it('user 气泡无猫耳', () => {
     const { container } = render(
       <MessageBubble

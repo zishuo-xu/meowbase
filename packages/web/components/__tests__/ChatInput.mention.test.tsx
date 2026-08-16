@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ChatInput } from '../ChatInput';
 
 describe('ChatInput 提及补全', () => {
-  it('输入 @ 弹出角色菜单,点击插入 @claude', () => {
+  it('输入 @ 弹出角色菜单,点击插入 @墨墨', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
     const input = screen.getByPlaceholderText(/@墨墨/);
@@ -14,7 +14,7 @@ describe('ChatInput 提及补全', () => {
     expect(screen.getByText('团团')).toBeTruthy();
 
     fireEvent.click(screen.getByText('墨墨'));
-    expect((input as HTMLTextAreaElement).value).toBe('帮我 @claude ');
+    expect((input as HTMLTextAreaElement).value).toBe('帮我 @墨墨 ');
   });
 
   it('按中文过滤:@墨 只剩墨墨', () => {
@@ -35,6 +35,6 @@ describe('ChatInput 提及补全', () => {
     fireEvent.change(input, { target: { value: '@', selectionStart: 1 } });
     fireEvent.keyDown(input, { key: 'ArrowDown' }); // 高亮移到闪闪
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect((input as HTMLTextAreaElement).value).toBe('@gemini ');
+    expect((input as HTMLTextAreaElement).value).toBe('@闪闪 ');
   });
 });

@@ -1,9 +1,20 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type MessageDto, type ThreadDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type MessageDto, type ThreadDto } from '@/lib/api';
+import { AGENT_ORDER, getPersona } from '@/lib/persona';
 import { ThreadSidebar } from '@/components/ThreadSidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { ChatInput } from '@/components/ChatInput';
+import { TeamHub } from '@/components/TeamHub';
+import { CatAvatar } from '@/components/CatAvatar';
+
+const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
+  id,
+  name: getPersona(id).name,
+  role: getPersona(id).name,
+  aliases: [getPersona(id).name, id],
+  bin: id,
+}));
 
 export default function Home() {
   const [threads, setThreads] = useState<ThreadDto[]>([]);
@@ -11,6 +22,12 @@ export default function Home() {
   const [messages, setMessages] = useState<MessageDto[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<AppConfigDto | null>(null);
+  const [hubOpen, setHubOpen] = useState(false);
+  const [hubFocus, setHubFocus] = useState<string | undefined>();
+  const [savingHub, setSavingHub] = useState(false);
+
+  const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
 
   const refreshThreads = useCallback(async () => {
     try {
@@ -21,9 +38,18 @@ export default function Home() {
     }
   }, []);
 
+  const refreshConfig = useCallback(async () => {
+    try {
+      setConfig(await api.getConfig());
+    } catch {
+      /* 配置拉不到时侧栏仍用内置名册 */
+    }
+  }, []);
+
   useEffect(() => {
     void refreshThreads();
-  }, [refreshThreads]);
+    void refreshConfig();
+  }, [refreshThreads, refreshConfig]);
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
@@ -52,12 +78,21 @@ export default function Home() {
     async (content: string) => {
       if (!activeId || sending) return;
       setSending(true);
+      const optimistic: MessageDto = {
+        id: `local-${Date.now()}`,
+        threadId: activeId,
+        role: 'user',
+        content,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
       try {
         await api.sendMessage(activeId, content);
-        // 重新拉取完整消息列表:含用户消息、回复与系统卡片/建议消息
         setMessages(await api.listMessages(activeId));
         setError(null);
       } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setError(err instanceof Error ? err.message : '发送失败');
       } finally {
         setSending(false);
@@ -73,18 +108,51 @@ export default function Home() {
     [send],
   );
 
+  const openHub = (agentId?: string) => {
+    setHubFocus(agentId);
+    setHubOpen(true);
+  };
+
   return (
     <main className="flex h-full">
       <ThreadSidebar
         threads={threads}
         activeId={activeId}
+        agents={agents}
+        defaultAgentId={config?.defaultAgentId}
         onSelect={(id) => void openThread(id)}
         onCreate={(title, agent) => void createThread(title, agent)}
+        onOpenTeam={openHub}
       />
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-[var(--border)] bg-white/60 px-4 py-2">
-          <h1 className="text-sm font-bold">meowbase · 喵窝</h1>
-          <span className="text-xs text-[var(--ink-soft)]">墨墨 · 闪闪 · 团团 就位</span>
+        <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)]/75 px-5 py-3 backdrop-blur-sm">
+          <div>
+            <h1 className="text-sm font-bold tracking-wide">meowbase · 喵窝</h1>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
+              {agents.map((a) => a.name).join(' · ')} 就位 · 人只说目标
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-1.5">
+              {agents.map((agent) => (
+                <CatAvatar
+                  key={agent.id}
+                  agentId={agent.id}
+                  name={agent.name}
+                  size={30}
+                  title={`配置 ${agent.name}`}
+                  onClick={() => openHub(agent.id)}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => openHub()}
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--ink)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[var(--surface)]"
+            >
+              团队
+            </button>
+          </div>
         </header>
         {error && (
           <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800">
@@ -96,18 +164,79 @@ export default function Home() {
             <ChatArea
               threadId={activeId}
               messages={messages}
+              sending={sending}
+              agents={agents}
               onApprove={(id) => sendCommand(`#approve ${id}`)}
               onReject={(id) => sendCommand(`#reject ${id} 打回`)}
               onConfirmEvidence={(id) => sendCommand(`#confirm ${id}`)}
             />
-            <ChatInput onSend={(c) => void send(c)} />
+            <ChatInput sending={sending} agents={agents} onSend={(c) => void send(c)} />
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-[var(--ink-soft)]">
-            选择或新建一个线程,和猫们开始协作
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+            <div className="flex -space-x-2">
+              {agents.map((agent) => (
+                <CatAvatar
+                  key={agent.id}
+                  agentId={agent.id}
+                  name={agent.name}
+                  size={56}
+                  onClick={() => openHub(agent.id)}
+                />
+              ))}
+            </div>
+            <div>
+              <p className="text-base font-bold">选择或新建一个线程</p>
+              <p className="mt-1 max-w-sm text-sm leading-relaxed text-[var(--ink-soft)]">
+                不用点名哪只猫。说清楚要做什么,它们会自己交接。点头像可以改名字、模型和性格。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                void createThread('新线程 1', config?.defaultAgentId ?? 'claude')
+              }
+              className="rounded-2xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[var(--accent-strong)]"
+            >
+              开始协作
+            </button>
           </div>
         )}
       </section>
+      {config ? (
+        <TeamHub
+          open={hubOpen}
+          config={config}
+          focusAgentId={hubFocus}
+          saving={savingHub}
+          onClose={() => setHubOpen(false)}
+          onSaveAgent={(agentId, patch) => {
+            setSavingHub(true);
+            void api
+              .patchAgent(agentId, patch)
+              .then(() => refreshConfig())
+              .catch((err) => setError(err instanceof Error ? err.message : '保存失败'))
+              .finally(() => setSavingHub(false));
+          }}
+          onSaveSettings={(patch) => {
+            setSavingHub(true);
+            void api
+              .patchConfig(patch)
+              .then((next) => setConfig(next))
+              .catch((err) => setError(err instanceof Error ? err.message : '保存失败'))
+              .finally(() => setSavingHub(false));
+          }}
+          onSaveModels={(models) => {
+            setSavingHub(true);
+            void api
+              .patchConfig({ models })
+              .then((next) => setConfig(next))
+              .catch((err) => setError(err instanceof Error ? err.message : '保存失败'))
+              .finally(() => setSavingHub(false));
+          }}
+          onVerifyModel={(preset) => api.verifyModel(preset)}
+        />
+      ) : null}
     </main>
   );
 }

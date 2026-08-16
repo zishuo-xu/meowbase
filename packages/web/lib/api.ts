@@ -42,8 +42,77 @@ export interface ApprovalDto {
   createdAt: string;
 }
 
+export interface ModelPresetDto {
+  id: string;
+  label: string;
+  bin: string;
+  model: string;
+}
+
+export interface AgentConfigDto {
+  id: string;
+  name: string;
+  role: string;
+  aliases: string[];
+  bin: string;
+  personality?: string;
+  expertise?: string[];
+  model?: string;
+  modelId?: string;
+  autoApprove?: boolean;
+}
+
+export interface AppConfigDto {
+  a2aMaxDepth: number;
+  defaultAgentId: string;
+  agents: AgentConfigDto[];
+  models?: ModelPresetDto[];
+}
+
+export interface AgentPatchDto {
+  name?: string;
+  aliases?: string[];
+  role?: string;
+  personality?: string;
+  expertise?: string[];
+  bin?: string;
+  model?: string;
+  modelId?: string;
+  autoApprove?: boolean;
+}
+
 export const api = {
   listThreads: () => request<ThreadDto[]>('/api/threads'),
+  getConfig: () => request<AppConfigDto>('/api/config'),
+  patchConfig: (body: {
+    a2aMaxDepth?: number;
+    defaultAgentId?: string;
+    models?: ModelPresetDto[];
+    applyModel?: { model: string; agentIds: string[]; bin?: string };
+  }) =>
+    request<AppConfigDto>('/api/config', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  patchAgent: (agentId: string, body: AgentPatchDto) =>
+    request<AgentConfigDto>(`/api/config/agents/${agentId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  verifyModel: (body: { bin: string; model?: string; modelId?: string }) =>
+    request<{
+      ok: boolean;
+      stage: 'bin' | 'model';
+      latencyMs: number;
+      error?: string;
+      preview?: string;
+    }>('/api/config/models/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   createThread: (title: string, primaryAgentId: string) =>
     request<ThreadDto>('/api/threads', {
       method: 'POST',

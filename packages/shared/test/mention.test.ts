@@ -8,6 +8,12 @@ describe('parseMentions', () => {
     ]);
   });
 
+  it('解析中文名 @墨墨', () => {
+    expect(parseMentions('@墨墨 帮我写个函数')).toEqual([
+      { agentId: 'claude', offset: 0 },
+    ]);
+  });
+
   it('解析中间多个 mention', () => {
     expect(parseMentions('先 @claude 写,再 @gemini 审')).toEqual([
       { agentId: 'claude', offset: 2 },
@@ -27,6 +33,10 @@ describe('parseMentions', () => {
 describe('resolveTargetAgent', () => {
   it('有 mention 用第一个', () => {
     expect(resolveTargetAgent('@opencode 干活', 'claude')).toBe('opencode');
+  });
+
+  it('有中文 mention 用对应 agent', () => {
+    expect(resolveTargetAgent('@墨墨 干活', 'opencode')).toBe('claude');
   });
 
   it('无 mention 用 fallback', () => {
