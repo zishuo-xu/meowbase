@@ -67,7 +67,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
     { "id": "flash", "label": "DeepSeek Flash", "bins": ["opencode"], "protocol": "openai", "model": "opencode-go/deepseek-v4-flash" }
   ],
   "agents": [
-    { "id": "opencode", "name": "团团", "aliases": ["团团", "opencode"], "bin": "opencode", "modelId": "flash" }
+    { "id": "opencode", "name": "团团", "aliases": ["团团", "opencode"], "bin": "opencode", "modelId": "flash", "handoffTo": "gemini" }
   ]
 }
 ```

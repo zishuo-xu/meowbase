@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { AgentId, AgentProfile } from '@meowbase/shared';
-import { AGENT_IDS } from '@meowbase/shared';
+import { AGENT_IDS, DEFAULT_ROSTER } from '@meowbase/shared';
 
 export const MODEL_PROTOCOLS = ['anthropic', 'openai', 'gemini'] as const;
 export type ModelProtocol = (typeof MODEL_PROTOCOLS)[number];
@@ -48,6 +48,10 @@ export interface AgentSpec {
   protocol?: ModelProtocol;
   baseUrl?: string;
   apiKey?: string;
+  /** 做完本职后交接给谁;平台选审查官也读这个 */
+  handoffTo?: AgentId;
+  /** 何时必须交接;`{to}` 替换成对手 @名 */
+  handoff?: string[];
 }
 
 export interface Config {
@@ -92,6 +96,14 @@ export const DEFAULT_MODELS: ModelPreset[] = [
   },
 ];
 
+function handoffFromRoster(id: AgentId): { handoffTo?: AgentId; handoff?: string[] } {
+  const row = DEFAULT_ROSTER.find((m) => m.agentId === id);
+  return {
+    ...(row?.handoffTo ? { handoffTo: row.handoffTo } : {}),
+    ...(row?.handoff ? { handoff: [...row.handoff] } : {}),
+  };
+}
+
 export const DEFAULT_AGENTS: AgentSpec[] = [
   {
     id: 'claude',
@@ -101,6 +113,7 @@ export const DEFAULT_AGENTS: AgentSpec[] = [
     personality: '沉稳细致,先想结构再动手,重视代码可读性',
     expertise: ['架构设计', 'TypeScript', '代码实现'],
     bin: 'claude',
+    ...handoffFromRoster('claude'),
   },
   {
     id: 'gemini',
@@ -110,6 +123,7 @@ export const DEFAULT_AGENTS: AgentSpec[] = [
     personality: '严谨直接,结论写明通过或需修改',
     expertise: ['代码审查', '质量把关'],
     bin: 'gemini',
+    ...handoffFromRoster('gemini'),
   },
   {
     id: 'opencode',
@@ -120,6 +134,7 @@ export const DEFAULT_AGENTS: AgentSpec[] = [
     expertise: ['多模型兼容', '工具调用', '脚本'],
     bin: 'opencode',
     model: 'opencode-go/deepseek-v4-flash',
+    ...handoffFromRoster('opencode'),
   },
 ];
 
@@ -141,7 +156,12 @@ export function isAgentId(id: string): id is AgentId {
 }
 
 export function cloneAgentSpec(spec: AgentSpec): AgentSpec {
-  return { ...spec, aliases: [...spec.aliases], expertise: [...spec.expertise] };
+  return {
+    ...spec,
+    aliases: [...spec.aliases],
+    expertise: [...spec.expertise],
+    ...(spec.handoff ? { handoff: [...spec.handoff] } : {}),
+  };
 }
 
 export function cloneModelPreset(spec: ModelPreset): ModelPreset {
@@ -436,6 +456,8 @@ export function writeTeamFile(
       ...(a.modelId ? { modelId: a.modelId } : {}),
       ...(a.protocol ? { protocol: a.protocol } : {}),
       ...(a.baseUrl ? { baseUrl: a.baseUrl } : {}),
+      ...(a.handoffTo ? { handoffTo: a.handoffTo } : {}),
+      ...(a.handoff && a.handoff.length > 0 ? { handoff: a.handoff } : {}),
     })),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -529,7 +551,7 @@ export function publicModelPreset(
 }
 
 function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
-  const byId = new Map<AgentId, AgentSpec>(DEFAULT_AGENTS.map((a) => [a.id, { ...a, aliases: [...a.aliases], expertise: [...a.expertise] }]));
+  const byId = new Map<AgentId, AgentSpec>(DEFAULT_AGENTS.map((a) => [a.id, cloneAgentSpec(a)]));
   for (const row of overrides ?? []) {
     if (!isAgentId(row.id)) continue;
     const current = byId.get(row.id);
@@ -547,6 +569,10 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
       ...('apiKey' in row ? { apiKey: row.apiKey || undefined } : {}),
       ...(row.aliases && row.aliases.length > 0 ? { aliases: row.aliases.map((a) => a.replace(/^@/, '')) } : {}),
       ...(row.expertise && row.expertise.length > 0 ? { expertise: row.expertise } : {}),
+      ...(row.handoffTo && isAgentId(row.handoffTo) ? { handoffTo: row.handoffTo } : {}),
+      ...(Array.isArray(row.handoff) && row.handoff.length > 0
+        ? { handoff: row.handoff.map((line) => line.trim()).filter(Boolean) }
+        : {}),
     });
   }
   return AGENT_IDS.map((id) => byId.get(id)!);

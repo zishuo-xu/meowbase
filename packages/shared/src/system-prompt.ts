@@ -9,56 +9,32 @@ function rosterLines(team: readonly TeamMember[]): string {
     .join('\n');
 }
 
-function othersOf(
+function mentionTo(
+  self: TeamMember | undefined,
   team: readonly TeamMember[],
-  selfAgentId?: AgentId,
-): TeamMember[] {
-  return team.filter((m) => m.agentId !== selfAgentId);
-}
-
-function pickPeer(
-  team: readonly TeamMember[],
-  selfAgentId: AgentId | undefined,
-  preferredId: AgentId,
-  roleHint: RegExp,
-): TeamMember | undefined {
-  const others = othersOf(team, selfAgentId);
-  return (
-    others.find((m) => m.agentId === preferredId) ??
-    others.find((m) => roleHint.test(m.role)) ??
-    others[0]
-  );
-}
-
-function mentionOf(member: TeamMember | undefined): string {
-  return member ? `@${member.name}` : '@另一位成员';
+): string {
+  if (!self?.handoffTo) return '@另一位成员';
+  const peer = team.find((m) => m.agentId === self.handoffTo);
+  return peer ? `@${peer.name}` : '@另一位成员';
 }
 
 function workflowFor(
   selfAgentId: AgentId | undefined,
   team: readonly TeamMember[],
 ): string {
-  const reviewer = mentionOf(pickPeer(team, selfAgentId, 'gemini', /审查/));
-  const author = mentionOf(pickPeer(team, selfAgentId, 'claude', /架构|写/));
-  if (selfAgentId === 'gemini') {
+  const self = team.find((m) => m.agentId === selfAgentId);
+  const lines = self?.handoff ?? [];
+  if (lines.length === 0) {
     return (
       `何时必须交接:\n` +
-      `- 审查结束后,另起一行 ${author} 给结论,必须写明「通过」或「需修改」;需修改时列出要点,不要问人,不要 @ 其他人。\n` +
-      `- 你自己写完代码后交 ${author} 看一眼,不要自己审自己。\n`
+      `- 下一步明显属于别人的职责时,做完自己这段就交出去。\n`
     );
   }
-  if (selfAgentId === 'opencode') {
-    return (
-      `何时必须交接:\n` +
-      `- 脚本或落地做完后,另起一行 ${reviewer} 请审查(不要自己审自己)。\n` +
-      `- 你缺第二视角、或遇到做不了的部分时。\n`
-    );
-  }
+  const to = mentionTo(self, team);
   return (
     `何时必须交接:\n` +
-    `- 你写完或改完代码后,另起一行 ${reviewer} 请审查(不要自己审自己)。\n` +
-    `- 下一步明显属于别人的职责(审查/脚本落地)时,做完自己这段就交出去。\n` +
-    `- 你缺工具、缺第二视角、或遇到做不了的部分时。\n`
+    lines.map((line) => `- ${line.replaceAll('{to}', to)}`).join('\n') +
+    '\n'
   );
 }
 

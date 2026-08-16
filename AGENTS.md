@@ -6,7 +6,7 @@
 
 **meowbase(喵窝)**:参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT)架构自写的多 Agent 协作平台。让 Claude Code / opencode 等 agent CLI 像一支团队一样协作:路由、身份、记忆、技能、互审、审批。代码全部自写,架构思想借鉴 clowder。
 
-三只猫定位:墨墨主架构师(写完 `@闪闪`)、闪闪审查官(审完回墨墨)、团团执行者(做完交闪闪审)。
+三只猫定位:墨墨主架构师(写完 `@闪闪`)、闪闪审查官(审完回墨墨)、团团执行者(做完交闪闪审)。交接对象和工作流条目在名册的 `handoffTo` / `handoff` 里,不要写进路由代码。
 
 ## 快速上手
 
@@ -86,6 +86,6 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 ## 常见操作
 
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
-- **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
+- **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
 - **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api(claude/gemini 走本机 CLI;opencode 默认 relay:opencode.ai/zen/go,模型 deepseek-v4-flash);费用按 token 计(一次完整流程约 $0.2-0.4)

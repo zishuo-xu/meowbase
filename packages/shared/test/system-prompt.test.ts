@@ -57,6 +57,26 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('@团团 请审查');
   });
 
+  it('交接条目来自 team.handoff,{to} 填对手名字', () => {
+    const prompt = buildSystemPrompt({
+      profile,
+      team: [
+        {
+          agentId: 'claude',
+          name: '墨墨',
+          role: '主架构师',
+          handoffTo: 'opencode',
+          handoff: ['写完交 {to} 审一下'],
+        },
+        { agentId: 'opencode', name: '团团', role: '执行者' },
+      ],
+      evidenceRefs: [],
+    });
+    expect(prompt).toContain('写完交 @团团 审一下');
+    expect(prompt).not.toContain('{to}');
+    expect(prompt).not.toContain('@闪闪');
+  });
+
   it('闪闪:审完回墨墨,结论写明通过或需修改', () => {
     const prompt = buildSystemPrompt({ profile: reviewerProfile, evidenceRefs: [] });
     expect(prompt).toContain('你是 闪闪,审查官');

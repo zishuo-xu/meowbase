@@ -95,6 +95,22 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(cfg.a2aMaxDepth).toBe(5);
     expect(cfg.defaultAgentId).toBe('gemini');
     expect(agentSpec(cfg, 'claude').name).toBe('墨墨酱');
+    expect(agentSpec(cfg, 'claude').handoffTo).toBe('gemini');
+    expect(agentSpec(cfg, 'claude').handoff?.some((line) => line.includes('{to}'))).toBe(true);
+  });
+
+  it('文件里的 handoffTo 覆盖默认审查官', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-handoff-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        agents: [{ id: 'claude', handoffTo: 'opencode', handoff: ['写完交 {to}'] }],
+      }),
+    );
+    const cfg = loadConfig({}, { configPath: path });
+    expect(agentSpec(cfg, 'claude').handoffTo).toBe('opencode');
+    expect(agentSpec(cfg, 'claude').handoff).toEqual(['写完交 {to}']);
   });
 });
 

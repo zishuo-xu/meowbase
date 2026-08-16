@@ -4,6 +4,7 @@ import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 import { executeTurn, MAX_REVIEW_FIX_ROUNDS } from '../src/router/execute-turn.js';
+import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -466,6 +467,44 @@ describe('executeTurn 审批流', () => {
     expect(opencodeCalls).toBe(0);
     const card = (await stores.approvals.list(thread.id))[0];
     expect(card?.reviewerAgentId).toBe('gemini');
+  });
+
+  it('审查官跟配置 handoffTo,不写死闪闪', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let geminiCalls = 0;
+    let opencodeCalls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '写好了'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          geminiCalls += 1;
+          return { sessionId: 's-g', content: '闪闪不该出场', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          opencodeCalls += 1;
+          return { sessionId: 's-o', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+    ]);
+    const agents = DEFAULT_AGENTS.map((a) =>
+      a.id === 'claude' ? { ...cloneAgentSpec(a), handoffTo: 'opencode' as const } : cloneAgentSpec(a),
+    );
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id,
+      content: '写个文件',
+      context: { stores, registry, agents },
+    });
+
+    expect(opencodeCalls).toBe(1);
+    expect(geminiCalls).toBe(0);
+    expect((await stores.approvals.list(thread.id))[0]?.reviewerAgentId).toBe('opencode');
   });
 
   it('审查需修改 → 打回写手再审,通过后才出卡片', async () => {

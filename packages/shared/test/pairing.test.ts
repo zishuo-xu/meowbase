@@ -29,4 +29,13 @@ describe('selectReviewer', () => {
   it('写手不可用时选第一个可用且不同的', () => {
     expect(selectReviewer('claude', ['gemini'])).toBe('gemini');
   });
+
+  it('配对来自 team.handoffTo', () => {
+    const team = [
+      { agentId: 'claude' as const, name: '墨墨', role: '主架构师', handoffTo: 'opencode' as const },
+      { agentId: 'gemini' as const, name: '闪闪', role: '审查官' },
+      { agentId: 'opencode' as const, name: '团团', role: '执行者' },
+    ];
+    expect(selectReviewer('claude', ['claude', 'gemini', 'opencode'], team)).toBe('opencode');
+  });
 });

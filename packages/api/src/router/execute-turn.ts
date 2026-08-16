@@ -209,7 +209,13 @@ export async function executeTurn(input: {
   const catalog = buildMentionCatalog(members);
   const team: TeamMember[] =
     context.agents && context.agents.length > 0
-      ? context.agents.map((a) => ({ agentId: a.id, name: a.name, role: a.role }))
+      ? context.agents.map((a) => ({
+          agentId: a.id,
+          name: a.name,
+          role: a.role,
+          handoffTo: a.handoffTo,
+          handoff: a.handoff,
+        }))
       : profiles.length > 0
         ? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }))
         : [...DEFAULT_ROSTER];
@@ -519,7 +525,7 @@ async function runReviewFixThenCard(input: {
     available.includes(input.chainLastAgent)
       ? input.chainLastAgent
       : undefined;
-  const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available);
+  const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available, team);
   let latestDiff = input.initialDiff;
   let reviewComment = '(无可用审查 agent)';
 
@@ -529,6 +535,7 @@ async function runReviewFixThenCard(input: {
     const reviewerSpec = context.agents?.find((a) => a.id === reviewerAgentId);
     const reviewerPrompt = buildSystemPrompt({
       profile: overlayProfile(reviewerStored, reviewerSpec),
+      team,
       skills: reviewSkill ? [reviewSkill] : [],
       evidenceRefs: [],
     });
