@@ -152,6 +152,8 @@ export function TeamHub({
   const [newModel, setNewModel] = useState('');
   const [newBaseUrl, setNewBaseUrl] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editApiKey, setEditApiKey] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
 
@@ -165,11 +167,24 @@ export function TeamHub({
     setDefaultAgentId(config.defaultAgentId);
     setModels(config.models ?? []);
     setVerifyNotes({});
+    setEditingId(null);
+    setEditApiKey('');
   }, [open, focusAgentId, config]);
 
   if (!open) return null;
 
   const selectedPreset = models.find((m) => m.id === draft?.modelId);
+
+  const patchPreset = (id: string, patch: Partial<ModelPresetDto>) => {
+    setModels((list) =>
+      list.map((item) => {
+        if (item.id !== id) return item;
+        const next = { ...item, ...patch };
+        const bins = presetBins(next);
+        return { ...next, bin: bins[0] ?? next.bin, bins };
+      }),
+    );
+  };
 
   const runVerify = async (key: string, payload: VerifyModelPayload) => {
     if (!onVerifyModel) return;
@@ -271,7 +286,10 @@ export function TeamHub({
               {models.length === 0 && (
                 <p className="text-[11px] text-[var(--ink-soft)]">还没有模型,用下面的表单添加。</p>
               )}
-              {models.map((preset) => (
+              {models.map((preset) => {
+                const protocol = inferProtocol(preset);
+                const editing = editingId === preset.id;
+                return (
                 <div
                   key={preset.id}
                   className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2"
@@ -280,7 +298,7 @@ export function TeamHub({
                     <div className="min-w-0">
                       <div className="text-sm font-bold">{preset.label}</div>
                       <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">
-                        {protocolLabel(inferProtocol(preset))} · {presetBins(preset).join(', ')} · {preset.model}
+                        {protocolLabel(protocol)} · {presetBins(preset).join(', ')} · {preset.model}
                       </div>
                       {preset.baseUrl && (
                         <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">{preset.baseUrl}</div>
@@ -305,11 +323,22 @@ export function TeamHub({
                     <div className="flex shrink-0 gap-2">
                       <button
                         type="button"
+                        onClick={() => {
+                          setEditingId(editing ? null : preset.id);
+                          setEditApiKey('');
+                        }}
+                        className="text-xs font-bold text-[var(--ink)] hover:underline"
+                      >
+                        {editing ? '收起' : `编辑 ${preset.label}`}
+                      </button>
+                      <button
+                        type="button"
                         disabled={verifyingId === preset.id}
                         onClick={() =>
                           void runVerify(preset.id, {
                             ...preset,
                             modelId: preset.id,
+                            ...(editApiKey.trim() ? { apiKey: editApiKey.trim() } : {}),
                           })
                         }
                         className="text-xs font-bold text-[var(--accent-strong)] hover:underline disabled:opacity-60"
@@ -318,15 +347,134 @@ export function TeamHub({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setModels((list) => list.filter((m) => m.id !== preset.id))}
+                        onClick={() => {
+                          setModels((list) => list.filter((m) => m.id !== preset.id));
+                          if (editingId === preset.id) setEditingId(null);
+                        }}
                         className="text-xs text-[var(--ink-soft)] hover:text-red-700"
                       >
                         删除 {preset.label}
                       </button>
                     </div>
                   </div>
+                  {editing && (
+                    <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-xs text-[var(--ink-soft)]">
+                          显示名
+                          <input
+                            aria-label={`编辑 ${preset.id} 显示名`}
+                            className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--ink)]"
+                            value={preset.label}
+                            onChange={(e) => patchPreset(preset.id, { label: e.target.value })}
+                          />
+                        </label>
+                        <label className="block text-xs text-[var(--ink-soft)]">
+                          协议
+                          <select
+                            aria-label={`编辑 ${preset.id} 协议`}
+                            className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--ink)]"
+                            value={protocol}
+                            onChange={(e) => {
+                              const nextProtocol = e.target.value as ModelProtocol;
+                              const allowed = CLIS_FOR_PROTOCOL[nextProtocol];
+                              const bins = presetBins(preset).filter((bin) =>
+                                (allowed as readonly string[]).includes(bin),
+                              );
+                              patchPreset(preset.id, {
+                                protocol: nextProtocol,
+                                bins: bins.length > 0 ? bins : [allowed[0]!],
+                              });
+                            }}
+                          >
+                            {PROTOCOL_OPTIONS.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <label className="block text-xs text-[var(--ink-soft)]">
+                        模型 ID
+                        <input
+                          aria-label={`编辑 ${preset.id} 模型 ID`}
+                          className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                          value={preset.model}
+                          onChange={(e) => patchPreset(preset.id, { model: e.target.value })}
+                        />
+                      </label>
+                      <label className="block text-xs text-[var(--ink-soft)]">
+                        网关 URL
+                        <input
+                          aria-label={`编辑 ${preset.id} 网关 URL`}
+                          className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                          value={preset.baseUrl ?? ''}
+                          onChange={(e) =>
+                            patchPreset(preset.id, { baseUrl: e.target.value.trim() || undefined })
+                          }
+                          placeholder={gatewayPlaceholder(protocol)}
+                        />
+                      </label>
+                      <label className="block text-xs text-[var(--ink-soft)]">
+                        API Key
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          aria-label={`编辑 ${preset.id} API Key`}
+                          className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                          value={editApiKey}
+                          onChange={(e) => setEditApiKey(e.target.value)}
+                          placeholder={preset.hasApiKey || preset.apiKey ? '已配置,留空不改' : 'sk-...'}
+                        />
+                      </label>
+                      <fieldset className="text-xs text-[var(--ink-soft)]">
+                        <legend className="mb-1">可用 CLI</legend>
+                        <div className="flex flex-wrap gap-3">
+                          {CLI_OPTIONS.map((bin) => {
+                            const compatible = (CLIS_FOR_PROTOCOL[protocol] as readonly string[]).includes(bin);
+                            return (
+                              <label
+                                key={bin}
+                                className={`flex items-center gap-1.5 text-sm ${compatible ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={`${preset.label} CLI ${bin}`}
+                                  checked={presetBins(preset).includes(bin)}
+                                  disabled={!compatible}
+                                  onChange={() => {
+                                    if (!compatible) return;
+                                    const current = presetBins(preset);
+                                    const bins = current.includes(bin)
+                                      ? current.filter((item) => item !== bin)
+                                      : [...current, bin];
+                                    if (bins.length === 0) return;
+                                    patchPreset(preset.id, { bins });
+                                  }}
+                                />
+                                {bin}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editApiKey.trim()) patchPreset(preset.id, { apiKey: editApiKey.trim() });
+                          setEditingId(null);
+                          setEditApiKey('');
+                        }}
+                        className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold ring-1 ring-[var(--border)]"
+                      >
+                        完成编辑
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
               <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/40 p-3 space-y-3">
                 <div className="text-xs font-bold text-[var(--ink)]">添加新模型</div>
                 <p className="text-[11px] text-[var(--ink-soft)]">
@@ -490,7 +638,15 @@ export function TeamHub({
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => onSaveModels?.(models)}
+                onClick={() => {
+                  const outgoing =
+                    editingId && editApiKey.trim()
+                      ? models.map((item) =>
+                          item.id === editingId ? { ...item, apiKey: editApiKey.trim() } : item,
+                        )
+                      : models;
+                  onSaveModels?.(outgoing);
+                }}
                 className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
               >
                 保存模型目录

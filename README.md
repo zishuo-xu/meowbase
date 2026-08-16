@@ -14,7 +14,7 @@ pnpm install
 pnpm dev   # 起 Redis + API(3200)+ Web(3300)
 ```
 
-浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片按钮、证据确认。
+浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 配模型和密钥。
 (API 需要本机 Redis;冒烟/演示可设 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 指向 fake CLI)
 
 ```bash
@@ -42,8 +42,8 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 审批流(M4)
 
 - 写手 agent 改动文件后,平台自动生成审批卡片并请另一 agent 审查
-- `#approve ap_xxxxxxxx` —— 批准(改动提交为基线)
-- `#reject ap_xxxxxxxx <理由>` —— 打回
+- 在卡片上点「批准落地」或「打回」(也可发 `#approve` / `#reject`)
+- `tsconfig.tsbuildinfo`、`.DS_Store` 等缓存文件不会出卡
 
 ## Skills(M3)
 
@@ -53,22 +53,28 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 - `review` / `审查` / `代码评审` → 代码审查
 - `debug` / `调试` / `bug` → 系统化调试
 
-## 配置(对齐 clowder:基础设施 vs 团队名册)
+## 配置
 
-`.env` / 环境变量只管 Redis、端口、超时。**猫是谁、用哪条 CLI、什么模型**写在仓库根 `meowbase.config.json`(人类改,agent 只读):
+`.env` / 环境变量只管 Redis、端口、超时。**猫是谁、用哪条 CLI、什么模型**写在仓库根 `meowbase.config.json`。也可以在页面里打开 **团队 Hub** 改名册和模型目录,保存后立即生效,不必重启 API。
 
 ```json
 {
   "a2a": { "maxDepth": 3 },
   "defaultAgentId": "claude",
+  "models": [
+    { "id": "claude-sonnet", "label": "Claude Sonnet", "bins": ["claude", "opencode"], "protocol": "anthropic", "model": "sonnet" },
+    { "id": "gemini-pro", "label": "Gemini Pro", "bins": ["gemini", "opencode"], "protocol": "gemini", "model": "gemini-2.5-pro" },
+    { "id": "flash", "label": "DeepSeek Flash", "bins": ["opencode"], "protocol": "openai", "model": "opencode-go/deepseek-v4-flash" }
+  ],
   "agents": [
-    { "id": "opencode", "name": "团团", "aliases": ["团团", "opencode"], "bin": "opencode", "model": "opencode-go/deepseek-v4-flash" }
+    { "id": "opencode", "name": "团团", "aliases": ["团团", "opencode"], "bin": "opencode", "modelId": "flash" }
   ]
 }
 ```
 
+第三方模型在 Hub 填网关 URL 和 API Key。密钥写入本机 `meowbase.secrets.json`(已 gitignore),不会进仓库。
 环境变量仍可覆盖单字段:`CLAUDE_BIN` / `GEMINI_BIN` / `OPENCODE_BIN`、`GEMINI_MODEL` / `OPENCODE_MODEL`、`A2A_MAX_DEPTH`。
-`GET /api/config` 返回合并后的名册。改 json 后需重启 API。
+`GET /api/config` 返回合并后的名册。手动改 json 后仍需重启 API;Hub 里点保存是热更新。
 
 ## 人怎么下任务,猫怎么交接
 

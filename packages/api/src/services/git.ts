@@ -1,9 +1,25 @@
 import { execFile } from 'node:child_process';
-import { existsSync, renameSync } from 'node:fs';
+import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
+
+const SANDBOX_GITIGNORE = `*.tsbuildinfo
+.DS_Store
+Thumbs.db
+*.log
+.eslintcache
+`;
+
+const NOISE_RESET_PATHS = ['*.tsbuildinfo', '.DS_Store', 'Thumbs.db', '*.log', '.eslintcache'];
+
+export function isApprovalNoisePath(path: string): boolean {
+  const base = basename(path);
+  if (base === '.DS_Store' || base === 'Thumbs.db' || base === '.eslintcache') return true;
+  if (base.endsWith('.tsbuildinfo') || base.endsWith('.log')) return true;
+  return false;
+}
 
 async function run(dir: string, args: string[]): Promise<string> {
   const { stdout } = await exec('git', args, { cwd: dir });
@@ -14,6 +30,7 @@ export async function gitInit(dir: string): Promise<void> {
   await run(dir, ['init', '-q']);
   await run(dir, ['config', 'user.name', 'meowbase']);
   await run(dir, ['config', 'user.email', 'meowbase@local']);
+  writeFileSync(join(dir, '.gitignore'), SANDBOX_GITIGNORE);
   // 基线提交包含沙箱骨架文件(如 package.json),避免其成为首轮 diff
   await run(dir, ['add', '-A']);
   await run(dir, ['commit', '--allow-empty', '-q', '-m', 'baseline']);
@@ -21,12 +38,23 @@ export async function gitInit(dir: string): Promise<void> {
 
 export async function gitAddAll(dir: string): Promise<void> {
   await run(dir, ['add', '-A']);
+  try {
+    await run(dir, ['reset', '-q', '--', ...NOISE_RESET_PATHS]);
+  } catch {
+    // 没有匹配文件时 git reset 可能非零
+  }
 }
 
 export async function gitDiffHead(dir: string): Promise<{ stat: string; text: string } | null> {
-  const text = await run(dir, ['diff', 'HEAD', '--', '.']);
+  const names = (await run(dir, ['diff', 'HEAD', '--name-only', '--', '.']))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((path) => !isApprovalNoisePath(path));
+  if (names.length === 0) return null;
+  const text = await run(dir, ['diff', 'HEAD', '--', ...names]);
   if (!text.trim()) return null;
-  const stat = await run(dir, ['diff', 'HEAD', '--stat']);
+  const stat = await run(dir, ['diff', 'HEAD', '--stat', '--', ...names]);
   return { stat: stat.trim(), text: text.slice(0, 20_000) };
 }
 

@@ -67,6 +67,22 @@ const A2A_MAX_CAP = 10;
 
 export const DEFAULT_MODELS: ModelPreset[] = [
   {
+    id: 'claude-sonnet',
+    label: 'Claude Sonnet',
+    bin: 'claude',
+    bins: ['claude', 'opencode'],
+    protocol: 'anthropic',
+    model: 'sonnet',
+  },
+  {
+    id: 'gemini-pro',
+    label: 'Gemini Pro',
+    bin: 'gemini',
+    bins: ['gemini', 'opencode'],
+    protocol: 'gemini',
+    model: 'gemini-2.5-pro',
+  },
+  {
     id: 'flash',
     label: 'DeepSeek Flash',
     bin: 'opencode',
@@ -278,9 +294,7 @@ export function normalizeModelCatalog(
     out.push(cloneModelPreset(preset));
   };
   for (const preset of parsed ?? []) add(preset);
-  if (out.length === 0) {
-    for (const preset of DEFAULT_MODELS) add(preset);
-  }
+  for (const preset of DEFAULT_MODELS) add(preset);
   for (const agent of agents) {
     if (!agent.model) continue;
     const hit = out.find((m) => m.model === agent.model && modelBins(m).includes(agent.bin));

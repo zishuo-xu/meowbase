@@ -130,6 +130,36 @@ describe('TeamHub', () => {
     );
   });
 
+  it('可编辑已登记模型', () => {
+    const onSaveModels = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveModels={onSaveModels}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '编辑 Flash' }));
+    fireEvent.change(screen.getByLabelText('编辑 flash 显示名'), { target: { value: 'Flash 改' } });
+    fireEvent.change(screen.getByLabelText('编辑 flash 网关 URL'), {
+      target: { value: 'https://api.example.com/v1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '完成编辑' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
+    expect(onSaveModels).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'flash',
+          label: 'Flash 改',
+          baseUrl: 'https://api.example.com/v1',
+        }),
+      ]),
+    );
+  });
+
   it('目录模型可勾多个 CLI', () => {
     const onSaveModels = vi.fn();
     render(

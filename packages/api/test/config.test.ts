@@ -37,6 +37,8 @@ describe('loadConfig 团队名册', () => {
     expect(agentSpec(cfg, 'opencode').model).toBe('opencode-go/deepseek-v4-flash');
     expect(cfg.defaultAgentId).toBe('claude');
     expect(cfg.models.some((m) => m.id === 'flash')).toBe(true);
+    expect(cfg.models.some((m) => m.id === 'claude-sonnet')).toBe(true);
+    expect(cfg.models.some((m) => m.id === 'gemini-pro')).toBe(true);
     expect(agentSpec(cfg, 'opencode').modelId).toBe('flash');
   });
 
@@ -114,7 +116,7 @@ describe('模型目录', () => {
     expect(agentSpec(cfg, 'claude').bin).toBe('opencode');
     expect(agentSpec(cfg, 'claude').model).toBe('opencode-go/deepseek-v4-flash');
     expect(agentSpec(cfg, 'claude').modelId).toBe('flash');
-    expect(cfg.models.map((m) => m.id)).toEqual(['flash', 'sonnet']);
+    expect(cfg.models.map((m) => m.id)).toEqual(['flash', 'sonnet', 'claude-sonnet', 'gemini-pro']);
     expect(cfg.models[0]?.bins).toEqual(['opencode']);
     expect(cfg.models[0]?.protocol).toBe('openai');
     expect(cfg.models[1]?.protocol).toBe('anthropic');

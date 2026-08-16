@@ -7,6 +7,7 @@ import {
   gitCommit,
   gitDiffHead,
   gitInit,
+  isApprovalNoisePath,
   parseStrayFiles,
   sweepStrayFiles,
 } from '../src/services/git.js';
@@ -25,6 +26,28 @@ describe('git 辅助函数', () => {
     expect(diff?.text).toContain('+hello');
 
     await gitCommit(dir, 'baseline');
+    expect(await gitDiffHead(dir)).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('tsbuildinfo 等缓存文件不进入审批 diff', async () => {
+    expect(isApprovalNoisePath('packages/web/tsconfig.tsbuildinfo')).toBe(true);
+    expect(isApprovalNoisePath('src/app.ts')).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-git-noise-'));
+    await gitInit(dir);
+    writeFileSync(join(dir, 'tsconfig.tsbuildinfo'), '{"version":"5"}');
+    writeFileSync(join(dir, '.DS_Store'), 'junk');
+    writeFileSync(join(dir, 'app.ts'), 'export const n = 1;\n');
+    await gitAddAll(dir);
+    const diff = await gitDiffHead(dir);
+    expect(diff?.stat).toContain('app.ts');
+    expect(diff?.stat).not.toContain('tsbuildinfo');
+    expect(diff?.stat).not.toContain('.DS_Store');
+    writeFileSync(join(dir, 'only.tsbuildinfo'), 'x');
+    await gitAddAll(dir);
+    await gitCommit(dir, 'app');
+    writeFileSync(join(dir, 'tsconfig.tsbuildinfo'), '{"version":"6"}');
+    await gitAddAll(dir);
     expect(await gitDiffHead(dir)).toBeNull();
     rmSync(dir, { recursive: true, force: true });
   });
