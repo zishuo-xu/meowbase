@@ -4,6 +4,10 @@ import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 import { executeTurn } from '../src/router/execute-turn.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { gitInit } from '../src/services/git.js';
 
 function stubAgent(agentId: AgentId, reply: string, sessionId = `sess-${agentId}`): AgentService {
   return {
@@ -283,5 +287,96 @@ describe('executeTurn 技能注入', () => {
     });
     expect(received).toContain('[技能:代码审查]');
     expect(received).toContain('[技能:系统化调试]');
+  });
+});
+
+describe('executeTurn 审批流', () => {
+  const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-approval-'));
+  const reviewSkill = {
+    id: 'review', name: '代码审查', description: 'd', triggers: ['review'], prompt: '审查清单',
+  };
+
+  async function makeGitThread(stores: ReturnType<typeof createMemoryStores>) {
+    const thread = await stores.threads.create({
+      title: 't', primaryAgentId: 'claude', workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    return thread;
+  }
+
+  it('完成轮有 diff → 创建卡片并自动审查', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    const reviewedPrompts: string[] = [];
+    const registry = createAgentRegistry([
+      stubAgent('claude', '完成'),
+      {
+        agentId: 'opencode',
+        async runTurn(input) {
+          reviewedPrompts.push(input.prompt);
+          return { sessionId: 's', content: '审查意见:通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    // 模拟写手改动:在 workdir 写入文件
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    const final = await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+    expect(final.status).toBe('completed');
+
+    const cards = await stores.approvals.list(thread.id);
+    expect(cards.length).toBe(1);
+    expect(cards[0]?.status).toBe('reviewing');
+    expect(cards[0]?.reviewComment).toContain('通过');
+    expect(reviewedPrompts[0]).toContain('x.txt');
+
+    const messages = await stores.messages.list(thread.id);
+    const cardMsg = messages.find((m) => m.role === 'system' && m.content.includes('审批卡片'));
+    expect(cardMsg?.content).toContain('#approve');
+  });
+
+  it('无 diff 不创建卡片', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '纯聊天')]);
+    const thread = await makeGitThread(stores);
+    await executeTurn({ threadId: thread.id, content: '聊聊', context: { stores, registry } });
+    expect((await stores.approvals.list(thread.id)).length).toBe(0);
+  });
+
+  it('#approve 批准卡片并落地', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', 'x')]);
+    const thread = await makeGitThread(stores);
+    // 造一个真实改动,让落地提交真正发生
+    writeFileSync(join(thread.workdir, 'applied.txt'), 'v1');
+    const card = await stores.approvals.create({
+      threadId: thread.id, writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd', diffStat: 's',
+    });
+    const final = await executeTurn({
+      threadId: thread.id, content: `#approve ${card.id}`, context: { stores, registry },
+    });
+    expect(final.role).toBe('system');
+    expect(final.content).toContain('✅ 已批准并落地');
+    expect((await stores.approvals.get(card.id))?.status).toBe('applied');
+  });
+
+  it('#reject 打回卡片带理由', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', 'x')]);
+    const thread = await makeGitThread(stores);
+    const card = await stores.approvals.create({
+      threadId: thread.id, writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd', diffStat: 's',
+    });
+    const final = await executeTurn({
+      threadId: thread.id, content: `#reject ${card.id} 边界没覆盖`, context: { stores, registry },
+    });
+    expect(final.content).toContain('⛔ 已打回');
+    expect((await stores.approvals.get(card.id))?.status).toBe('rejected');
+    expect((await stores.approvals.get(card.id))?.rejectReason).toBe('边界没覆盖');
   });
 });

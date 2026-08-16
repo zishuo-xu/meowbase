@@ -1,20 +1,25 @@
 import {
   buildSystemPrompt,
   matchSkills,
+  parseApproveCommand,
   parseConfirmCommand,
   parseEvidenceRefs,
   parseLearnCommand,
+  parseRejectCommand,
   resolveTargetAgent,
+  selectReviewer,
 } from '@meowbase/shared';
 import type { AgentId, EvidenceEntry, Message } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
 import type {
+  ApprovalStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
   SkillStore,
   ThreadStore,
 } from '../stores/ports.js';
+import { gitAddAll, gitCommit, gitDiffHead } from '../services/git.js';
 
 export interface TurnContext {
   stores: {
@@ -23,6 +28,7 @@ export interface TurnContext {
     profiles: ProfileStore;
     evidence: EvidenceStore;
     skills: SkillStore;
+    approvals: ApprovalStore;
   };
   registry: AgentRegistry;
   onIncrement?: (threadId: string, messageId: string, delta: string) => void;
@@ -52,6 +58,44 @@ export async function executeTurn(input: {
     const reply = entry
       ? `✅ 已沉淀:${entry.title}`
       : `⚠️ 找不到可确认的证据:${confirm.id}`;
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: reply,
+      status: 'completed',
+    });
+  }
+
+  // #approve 分支:批准卡片并落地(git 基线提交为 best-effort)
+  const approve = parseApproveCommand(content);
+  if (approve) {
+    const card = await context.stores.approvals.approve(approve.id);
+    if (card) {
+      try {
+        await gitCommit(thread.workdir, `approve ${card.id}`);
+      } catch {
+        // git 提交失败不阻塞;批准决策本身已生效
+      }
+      await context.stores.approvals.markApplied(card.id);
+    }
+    const reply = card
+      ? `✅ 已批准并落地:${card.id}`
+      : `⚠️ 找不到可批准的卡片:${approve.id}`;
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: reply,
+      status: 'completed',
+    });
+  }
+
+  // #reject 分支:打回卡片带理由
+  const reject = parseRejectCommand(content);
+  if (reject) {
+    const card = await context.stores.approvals.reject(reject.id, reject.reason);
+    const reply = card
+      ? `⛔ 已打回:${card.id} 理由:${reject.reason || '(未填)'}`
+      : `⚠️ 找不到可打回的卡片:${reject.id}`;
     return context.stores.messages.append({
       threadId,
       role: 'system',
@@ -125,6 +169,54 @@ export async function executeTurn(input: {
       content: `💡 建议沉淀为证据:「${draft.title}」\n回复 #confirm ${draft.id} 确认`,
       status: 'completed',
     });
+  }
+
+  // 审批流:完成轮有 diff → 卡片 + 自动审查
+  if (output.status === 'completed') {
+    try {
+      await gitAddAll(thread.workdir);
+      const diff = await gitDiffHead(thread.workdir);
+      if (diff) {
+        const reviewerAgentId = selectReviewer(targetAgentId, context.registry.list());
+        const card = await context.stores.approvals.create({
+          threadId,
+          writerAgentId: targetAgentId,
+          reviewerAgentId: reviewerAgentId ?? targetAgentId,
+          diffText: diff.text,
+          diffStat: diff.stat,
+        });
+        let reviewComment = '(无可用审查 agent)';
+        if (reviewerAgentId && reviewerAgentId !== targetAgentId) {
+          const reviewerService = context.registry.get(reviewerAgentId);
+          if (reviewerService) {
+            const reviewerProfile = await context.stores.profiles.get(reviewerAgentId);
+            const reviewSkill = (await context.stores.skills.list()).find(
+              (s) => s.id === 'review',
+            );
+            const reviewerPrompt = buildSystemPrompt({
+              profile: reviewerProfile ?? undefined,
+              skills: reviewSkill ? [reviewSkill] : [],
+              evidenceRefs: [],
+            });
+            const reviewOutput = await reviewerService.runTurn({
+              prompt: `请作为审查官审查以下代码改动,输出:问题列表→建议→结论(通过/需修改)\n\n${diff.stat}\n\n${diff.text}`,
+              systemPrompt: reviewerPrompt,
+              workdir: thread.workdir,
+            });
+            reviewComment = reviewOutput.content || '(审查无输出)';
+          }
+        }
+        await context.stores.approvals.setReviewComment(card.id, reviewComment);
+        await context.stores.messages.append({
+          threadId,
+          role: 'system',
+          content: `📋 审批卡片 ${card.id}(写:${card.writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
+          status: 'completed',
+        });
+      }
+    } catch {
+      // diff 计算失败不阻塞主流程
+    }
   }
 
   return context.stores.messages.patch(threadId, assistantMessage.id, {
