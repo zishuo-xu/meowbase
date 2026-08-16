@@ -27,4 +27,20 @@ describe('ChatInput', () => {
     expect(onSend).not.toHaveBeenCalled();
     expect((input as HTMLTextAreaElement).value).toBe('写个函数');
   });
+
+  it('compositionstart 后回车不提交,compositionend 后回车才提交', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+    fireEvent.change(input, { target: { value: '写个 python' } });
+    // 输入法开始组合(输入英文候选)
+    fireEvent.compositionStart(input);
+    // 组合中回车确认候选词(此时 keydown 的 isComposing 可能已是 false)
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSend).not.toHaveBeenCalled();
+    // 组合结束,再回车才是发送
+    fireEvent.compositionEnd(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSend).toHaveBeenCalledWith('写个 python');
+  });
 });

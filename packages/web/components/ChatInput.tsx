@@ -22,6 +22,11 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 输入法组合状态:compositionstart 置 true,compositionend 置 false。
+  // 比依赖 keydown 时的 nativeEvent.isComposing 可靠——部分输入法在
+  // 回车确认组合的那一刻 isComposing 已是 false,但事件序列保证
+  // compositionend 晚于该次 keydown。
+  const composingRef = useRef(false);
 
   const updateMention = (val: string, pos: number) => {
     const q = getMentionQuery(val, pos);
@@ -92,14 +97,26 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
         <textarea
           ref={textareaRef}
           value={value}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+          }}
           onChange={(e) => {
             setValue(e.target.value);
             setCursor(e.target.selectionStart);
             updateMention(e.target.value, e.target.selectionStart);
           }}
           onKeyDown={(e) => {
-            // 输入法组合中(拼音选词)的回车不提交、不触发补全选择
-            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            // 输入法组合中(拼音/英文候选确认)的回车不提交、不触发补全选择
+            if (
+              composingRef.current ||
+              e.nativeEvent.isComposing ||
+              e.keyCode === 229
+            ) {
+              return;
+            }
             if (menuOpen && filtered.length > 0) {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
