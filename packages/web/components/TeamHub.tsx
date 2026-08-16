@@ -43,6 +43,17 @@ function splitList(raw: string): string[] {
 }
 
 const CLI_OPTIONS = ['claude', 'gemini', 'opencode'] as const;
+const PROTOCOL_OPTIONS = [
+  { value: 'openai', label: 'OpenAI 兼容' },
+  { value: 'anthropic', label: 'Anthropic / Claude' },
+  { value: 'gemini', label: 'Gemini' },
+] as const;
+type ModelProtocol = (typeof PROTOCOL_OPTIONS)[number]['value'];
+const CLIS_FOR_PROTOCOL: Record<ModelProtocol, readonly string[]> = {
+  anthropic: ['claude', 'opencode'],
+  openai: ['opencode'],
+  gemini: ['gemini', 'opencode'],
+};
 
 function isKnownCli(bin: string): bin is (typeof CLI_OPTIONS)[number] {
   return (CLI_OPTIONS as readonly string[]).includes(bin);
@@ -51,6 +62,20 @@ function isKnownCli(bin: string): bin is (typeof CLI_OPTIONS)[number] {
 function presetBins(preset: Pick<ModelPresetDto, 'bin' | 'bins'>): string[] {
   if (preset.bins && preset.bins.length > 0) return preset.bins;
   return preset.bin ? [preset.bin] : [];
+}
+
+function inferProtocol(preset: Pick<ModelPresetDto, 'bin' | 'bins' | 'protocol'>): ModelProtocol {
+  if (preset.protocol === 'anthropic' || preset.protocol === 'openai' || preset.protocol === 'gemini') {
+    return preset.protocol;
+  }
+  const bins = presetBins(preset);
+  if (bins.includes('claude')) return 'anthropic';
+  if (bins.includes('gemini')) return 'gemini';
+  return 'openai';
+}
+
+function protocolLabel(protocol: ModelProtocol): string {
+  return PROTOCOL_OPTIONS.find((item) => item.value === protocol)?.label ?? protocol;
 }
 
 function slugId(label: string, model: string): string {
@@ -116,6 +141,7 @@ export function TeamHub({
   const [models, setModels] = useState<ModelPresetDto[]>(catalog);
   const [newLabel, setNewLabel] = useState('');
   const [newBins, setNewBins] = useState<string[]>(['opencode']);
+  const [newProtocol, setNewProtocol] = useState<ModelProtocol>('openai');
   const [newModel, setNewModel] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
@@ -230,7 +256,7 @@ export function TeamHub({
           {pane === 'models' ? (
             <section className="space-y-3">
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
-                对齐 clowder:模型先登记、可挂多条 CLI;成员页选 CLI 后再选模型。密钥仍由各 CLI 自己管。
+                对齐 clowder:先选协议再勾 CLI。OpenAI 兼容只能走 opencode;Claude 协议可走 claude / opencode。密钥仍由各 CLI 自己管。
               </p>
               {models.map((preset) => (
                 <div
@@ -241,7 +267,7 @@ export function TeamHub({
                     <div className="min-w-0">
                       <div className="text-sm font-bold">{preset.label}</div>
                       <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">
-                        {presetBins(preset).join(', ')} · {preset.model}
+                        {protocolLabel(inferProtocol(preset))} · {presetBins(preset).join(', ')} · {preset.model}
                       </div>
                       {verifyNotes[preset.id] && (
                         <div
@@ -288,32 +314,62 @@ export function TeamHub({
                   />
                 </label>
                 <label className="block text-xs text-[var(--ink-soft)]">
-                  模型 ID
-                  <input
-                    className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
-                    value={newModel}
-                    onChange={(e) => setNewModel(e.target.value)}
-                    placeholder="opencode-go/deepseek-v4-flash"
-                  />
+                  协议
+                  <select
+                    className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--ink)]"
+                    value={newProtocol}
+                    onChange={(e) => {
+                      const protocol = e.target.value as ModelProtocol;
+                      const allowed = CLIS_FOR_PROTOCOL[protocol];
+                      setNewProtocol(protocol);
+                      setNewBins((list) => {
+                        const next = list.filter((bin) => (allowed as readonly string[]).includes(bin));
+                        return next.length > 0 ? next : [allowed[0]!];
+                      });
+                    }}
+                  >
+                    {PROTOCOL_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
+              <label className="block text-xs text-[var(--ink-soft)]">
+                模型 ID
+                <input
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                  value={newModel}
+                  onChange={(e) => setNewModel(e.target.value)}
+                  placeholder="opencode-go/deepseek-v4-flash"
+                />
+              </label>
               <fieldset className="text-xs text-[var(--ink-soft)]">
                 <legend className="mb-1">可用 CLI</legend>
                 <div className="flex flex-wrap gap-3">
-                  {CLI_OPTIONS.map((bin) => (
-                    <label key={bin} className="flex items-center gap-1.5 text-sm text-[var(--ink)]">
-                      <input
-                        type="checkbox"
-                        checked={newBins.includes(bin)}
-                        onChange={() =>
-                          setNewBins((list) =>
-                            list.includes(bin) ? list.filter((item) => item !== bin) : [...list, bin],
-                          )
-                        }
-                      />
-                      {bin}
-                    </label>
-                  ))}
+                  {CLI_OPTIONS.map((bin) => {
+                    const compatible = (CLIS_FOR_PROTOCOL[newProtocol] as readonly string[]).includes(bin);
+                    return (
+                      <label
+                        key={bin}
+                        className={`flex items-center gap-1.5 text-sm ${compatible ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newBins.includes(bin)}
+                          disabled={!compatible}
+                          onChange={() => {
+                            if (!compatible) return;
+                            setNewBins((list) =>
+                              list.includes(bin) ? list.filter((item) => item !== bin) : [...list, bin],
+                            );
+                          }}
+                        />
+                        {bin}
+                      </label>
+                    );
+                  })}
                 </div>
               </fieldset>
               {verifyNotes.draft && (
@@ -357,6 +413,7 @@ export function TeamHub({
                         label,
                         bin: newBins[0]!,
                         bins: [...newBins],
+                        protocol: newProtocol,
                         model,
                       },
                     ]);
@@ -542,7 +599,8 @@ export function TeamHub({
                   )}
                   {selectedPreset && (
                     <p className="text-xs text-[var(--ink-soft)]">
-                      {presetBins(selectedPreset).join(', ')} · {selectedPreset.model}
+                      {protocolLabel(inferProtocol(selectedPreset))} · {presetBins(selectedPreset).join(', ')} ·{' '}
+                      {selectedPreset.model}
                     </p>
                   )}
                   <label className="flex items-center gap-2 text-sm">

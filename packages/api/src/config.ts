@@ -2,6 +2,21 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { AgentId, AgentProfile } from '@meowbase/shared';
 import { AGENT_IDS } from '@meowbase/shared';
 
+export const MODEL_PROTOCOLS = ['anthropic', 'openai', 'gemini'] as const;
+export type ModelProtocol = (typeof MODEL_PROTOCOLS)[number];
+
+export const CLIS_FOR_PROTOCOL: Record<ModelProtocol, readonly string[]> = {
+  anthropic: ['claude', 'opencode'],
+  openai: ['opencode'],
+  gemini: ['gemini', 'opencode'],
+};
+
+export const DEFAULT_CLI_FOR_PROTOCOL: Record<ModelProtocol, string> = {
+  anthropic: 'claude',
+  openai: 'opencode',
+  gemini: 'gemini',
+};
+
 export interface ModelPreset {
   id: string;
   label: string;
@@ -9,6 +24,8 @@ export interface ModelPreset {
   bin: string;
   /** 能跑这条模型的 CLI,对齐 clowder:模型与 client 解耦 */
   bins: string[];
+  /** 上游 HTTP 协议;决定哪些 CLI 能勾 */
+  protocol: ModelProtocol;
   model: string;
 }
 
@@ -46,6 +63,7 @@ export const DEFAULT_MODELS: ModelPreset[] = [
     label: 'DeepSeek Flash',
     bin: 'opencode',
     bins: ['opencode'],
+    protocol: 'openai',
     model: 'opencode-go/deepseek-v4-flash',
   },
 ];
@@ -126,16 +144,43 @@ export function modelBins(preset: { bin?: string; bins?: string[] }): string[] {
   return uniqueBins(preset.bin);
 }
 
+export function isKnownCliName(bin: string): boolean {
+  return bin === 'claude' || bin === 'gemini' || bin === 'opencode';
+}
+
+export function parseModelProtocol(raw: unknown): ModelProtocol | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const value = raw.trim().toLowerCase();
+  if (value === 'anthropic' || value === 'anthropic-messages' || value === 'claude') return 'anthropic';
+  if (value === 'openai' || value === 'openai-completions' || value === 'openai-responses') return 'openai';
+  if (value === 'gemini' || value === 'google' || value === 'google-generative-ai') return 'gemini';
+  return undefined;
+}
+
+export function inferModelProtocol(bins: string[], explicit?: unknown): ModelProtocol {
+  return parseModelProtocol(explicit) ?? (bins.includes('claude') ? 'anthropic' : bins.includes('gemini') ? 'gemini' : 'openai');
+}
+
+export function compatibleBins(protocol: ModelProtocol, bins: string[]): string[] {
+  const allowed = new Set<string>(CLIS_FOR_PROTOCOL[protocol]);
+  const filtered = bins.filter((bin) => !isKnownCliName(bin) || allowed.has(bin));
+  return filtered.length > 0 ? filtered : [DEFAULT_CLI_FOR_PROTOCOL[protocol]];
+}
+
 export function withModelBins(input: {
   id: string;
   label: string;
   model: string;
   bin?: string;
   bins?: string[];
+  protocol?: unknown;
 }): ModelPreset | null {
-  const bins = modelBins(input);
-  if (!input.id || !input.model || bins.length === 0) return null;
-  return { id: input.id, label: input.label, model: input.model, bins, bin: bins[0]! };
+  const rawBins = modelBins(input);
+  if (!input.id || !input.model) return null;
+  const protocol = inferModelProtocol(rawBins, input.protocol);
+  const bins = compatibleBins(protocol, rawBins.length > 0 ? rawBins : [DEFAULT_CLI_FOR_PROTOCOL[protocol]]);
+  if (bins.length === 0) return null;
+  return { id: input.id, label: input.label, model: input.model, bins, bin: bins[0]!, protocol };
 }
 
 export function resolvePresetBin(
@@ -175,6 +220,7 @@ export function parseModelCatalog(raw: unknown): ModelPreset[] | null {
       model,
       bin: typeof rec.bin === 'string' ? rec.bin : undefined,
       bins: Array.isArray(rec.bins) ? (rec.bins as string[]) : undefined,
+      protocol: rec.protocol,
     });
     if (!preset) return null;
     if (seen.has(preset.id)) return null;
@@ -204,13 +250,14 @@ export function normalizeModelCatalog(
     if (!agent.model) continue;
     const hit = out.find((m) => m.model === agent.model && modelBins(m).includes(agent.bin));
     if (!hit) {
-      add({
+      const derived = withModelBins({
         id: slugModelId(agent.model, agent.bin),
         label: agent.model,
         bin: agent.bin,
         bins: [agent.bin],
         model: agent.model,
       });
+      if (derived) add(derived);
     }
   }
   return out;

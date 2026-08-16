@@ -47,6 +47,7 @@ export interface ModelPresetDto {
   label: string;
   bin: string;
   bins?: string[];
+  protocol?: 'anthropic' | 'openai' | 'gemini';
   model: string;
 }
 

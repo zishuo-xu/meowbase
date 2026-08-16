@@ -9,6 +9,7 @@
       "label": "DeepSeek Flash",
       "bin": "opencode",
       "bins": ["opencode"],
+      "protocol": "openai",
       "model": "opencode-go/deepseek-v4-flash"
     }
   ],

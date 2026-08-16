@@ -100,6 +100,7 @@ describe('TeamHub', () => {
       />,
     );
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Sonnet' } });
+    fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'opencode' }));
     fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'sonnet' } });
@@ -111,6 +112,7 @@ describe('TeamHub', () => {
           label: 'Sonnet',
           bins: ['claude'],
           bin: 'claude',
+          protocol: 'anthropic',
           model: 'sonnet',
         }),
       ]),
@@ -130,6 +132,7 @@ describe('TeamHub', () => {
       />,
     );
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Flash 多路' } });
+    fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
     fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'opencode-go/deepseek-v4-flash' } });
     fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
@@ -138,7 +141,37 @@ describe('TeamHub', () => {
       expect.arrayContaining([
         expect.objectContaining({
           bins: ['opencode', 'claude'],
+          protocol: 'anthropic',
           model: 'opencode-go/deepseek-v4-flash',
+        }),
+      ]),
+    );
+  });
+
+  it('OpenAI 协议不能勾 claude CLI', () => {
+    const onSaveModels = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveModels={onSaveModels}
+      />,
+    );
+    expect((screen.getByRole('checkbox', { name: 'claude' }) as HTMLInputElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'GPT' } });
+    fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'gpt-4.1' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
+    fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
+    expect(onSaveModels).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          protocol: 'openai',
+          bins: ['opencode'],
+          model: 'gpt-4.1',
         }),
       ]),
     );

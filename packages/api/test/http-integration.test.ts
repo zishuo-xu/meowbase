@@ -389,6 +389,31 @@ describe('HTTP 团队配置 PATCH', () => {
     expect(agent.model).toBe('opencode-go/shared-flash');
   });
 
+  it('PATCH models 按协议丢掉不兼容 CLI', async () => {
+    const save = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        models: [
+          {
+            id: 'gpt',
+            label: 'GPT',
+            bins: ['opencode', 'claude'],
+            protocol: 'openai',
+            model: 'gpt-4.1',
+          },
+        ],
+      }),
+    });
+    expect(save.status).toBe(200);
+    const cfg = (await save.json()) as {
+      models: { id: string; protocol?: string; bins: string[] }[];
+    };
+    const gpt = cfg.models.find((m) => m.id === 'gpt');
+    expect(gpt?.protocol).toBe('openai');
+    expect(gpt?.bins).toEqual(['opencode']);
+  });
+
   it('未知 agent / 空名字 / 非法链深返回 4xx', async () => {
     const missing = await fetch(`${url}/api/config/agents/nope`, {
       method: 'PATCH',
