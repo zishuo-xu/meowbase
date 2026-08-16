@@ -314,7 +314,9 @@ export function normalizeModelCatalog(
     out.push(cloneModelPreset(preset));
   };
   for (const preset of parsed ?? []) add(preset);
-  for (const preset of DEFAULT_MODELS) add(preset);
+  if (!parsed || parsed.length === 0) {
+    for (const preset of DEFAULT_MODELS) add(preset);
+  }
   for (const agent of agents) {
     if (!agent.model) continue;
     const hit = out.find((m) => m.model === agent.model && modelBins(m).includes(agent.bin));

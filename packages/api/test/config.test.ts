@@ -132,10 +132,27 @@ describe('模型目录', () => {
     expect(agentSpec(cfg, 'claude').bin).toBe('opencode');
     expect(agentSpec(cfg, 'claude').model).toBe('opencode-go/deepseek-v4-flash');
     expect(agentSpec(cfg, 'claude').modelId).toBe('flash');
-    expect(cfg.models.map((m) => m.id)).toEqual(['flash', 'sonnet', 'claude-sonnet', 'gemini-pro']);
+    expect(cfg.models.map((m) => m.id)).toEqual(['flash', 'sonnet']);
     expect(cfg.models[0]?.bins).toEqual(['opencode']);
     expect(cfg.models[0]?.protocol).toBe('openai');
     expect(cfg.models[1]?.protocol).toBe('anthropic');
+  });
+
+  it('文件已有 models 时不再追加默认 Claude/Gemini', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-no-default-models-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        models: [
+          { id: 'flash', label: 'Flash', bin: 'opencode', model: 'opencode-go/deepseek-v4-flash' },
+        ],
+      }),
+    );
+    const cfg = loadConfig({}, { configPath: path });
+    expect(cfg.models.map((m) => m.id)).toEqual(['flash']);
+    expect(cfg.models.some((m) => m.id === 'claude-sonnet')).toBe(false);
+    expect(cfg.models.some((m) => m.id === 'gemini-pro')).toBe(false);
   });
 
   it('同一模型可挂多个 CLI,选用时保留猫自己的 CLI', () => {
