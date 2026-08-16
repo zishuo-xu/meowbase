@@ -25,7 +25,13 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 架构
 
 三层:模型(推理)→ Agent CLI(工具)→ 平台(路由/线程/记忆/技能/审批)。
-本仓库当前进度:M3 Skills 按需加载(触发词注入技能 prompt,不常驻)。
+本仓库当前进度:M4 跨模型互审+审批流(claude 写 → opencode 审 → 人批准落地)。
+
+## 审批流(M4)
+
+- 写手 agent 改动文件后,平台自动生成审批卡片并请另一 agent 审查
+- `#approve ap_xxxxxxxx` —— 批准(改动提交为基线)
+- `#reject ap_xxxxxxxx <理由>` —— 打回
 
 ## Skills(M3)
 

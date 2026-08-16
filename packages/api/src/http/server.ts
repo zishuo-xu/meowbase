@@ -6,6 +6,7 @@ import websocket, { type WebSocket } from '@fastify/websocket';
 import type { AgentId } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
 import type {
+  ApprovalStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
@@ -13,6 +14,7 @@ import type {
   ThreadStore,
 } from '../stores/ports.js';
 import { executeTurn } from '../router/execute-turn.js';
+import { gitInit } from '../services/git.js';
 
 export interface ApiDeps {
   stores: {
@@ -21,6 +23,7 @@ export interface ApiDeps {
     profiles: ProfileStore;
     evidence: EvidenceStore;
     skills: SkillStore;
+    approvals: ApprovalStore;
   };
   registry: AgentRegistry;
   workdirBase: string;
@@ -41,6 +44,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       workdirBase: deps.workdirBase,
     });
     mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
     return reply.code(201).send(thread);
   });
 
@@ -54,6 +58,11 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get('/api/skills', async () => deps.stores.skills.list());
+
+  app.get('/api/approvals', async (request) => {
+    const { threadId } = request.query as { threadId?: string };
+    return deps.stores.approvals.list(threadId);
+  });
 
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };

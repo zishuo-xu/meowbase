@@ -3,6 +3,7 @@ import { buildServer } from './http/server.js';
 import { loadConfig } from './config.js';
 import { assertStorageReady, createRedisClient } from './redis.js';
 import {
+  createApprovalStore,
   createEvidenceStore,
   createMessageStore,
   createProfileStore,
@@ -11,6 +12,7 @@ import {
 } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
 import { ClaudeAdapter } from './providers/claude.js';
+import { OpenCodeAdapter } from './providers/opencode.js';
 import { createAgentRegistry } from './providers/registry.js';
 
 const config = loadConfig();
@@ -25,6 +27,7 @@ const stores = {
   profiles: createProfileStore(redis),
   evidence: createEvidenceStore(redis),
   skills: createSkillStore(config.skillsDir),
+  approvals: createApprovalStore(redis),
 };
 await ensureSeededProfiles(stores.profiles);
 
@@ -32,6 +35,11 @@ const app = await buildServer({
   stores,
   registry: createAgentRegistry([
     new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
+    new OpenCodeAdapter({
+      bin: config.opencodeBin,
+      model: config.opencodeModel,
+      timeoutMs: config.agentTimeoutMs,
+    }),
   ]),
   workdirBase: config.workdirBase,
 });
