@@ -38,8 +38,9 @@ export default function Home() {
       if (!activeId || sending) return;
       setSending(true);
       try {
-        const msg = await api.sendMessage(activeId, content);
-        setMessages((prev) => [...prev, msg]);
+        await api.sendMessage(activeId, content);
+        // 重新拉取完整消息列表:含用户消息、回复与系统卡片/建议消息
+        setMessages(await api.listMessages(activeId));
       } finally {
         setSending(false);
       }
