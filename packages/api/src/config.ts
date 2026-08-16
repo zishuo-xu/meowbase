@@ -27,6 +27,8 @@ export interface ModelPreset {
   /** 上游 HTTP 协议;决定哪些 CLI 能勾 */
   protocol: ModelProtocol;
   model: string;
+  /** 可选网关地址;spawn 时按协议注入 ANTHROPIC_BASE_URL / OPENAI_BASE_URL 等 */
+  baseUrl?: string;
 }
 
 export interface AgentSpec {
@@ -40,6 +42,8 @@ export interface AgentSpec {
   model?: string;
   /** 指向 models[] 里的条目;有则运行时用目录的 bin/model */
   modelId?: string;
+  protocol?: ModelProtocol;
+  baseUrl?: string;
 }
 
 export interface Config {
@@ -167,6 +171,12 @@ export function compatibleBins(protocol: ModelProtocol, bins: string[]): string[
   return filtered.length > 0 ? filtered : [DEFAULT_CLI_FOR_PROTOCOL[protocol]];
 }
 
+export function parseBaseUrl(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const url = raw.trim();
+  return url || undefined;
+}
+
 export function withModelBins(input: {
   id: string;
   label: string;
@@ -174,13 +184,23 @@ export function withModelBins(input: {
   bin?: string;
   bins?: string[];
   protocol?: unknown;
+  baseUrl?: unknown;
 }): ModelPreset | null {
   const rawBins = modelBins(input);
   if (!input.id || !input.model) return null;
   const protocol = inferModelProtocol(rawBins, input.protocol);
   const bins = compatibleBins(protocol, rawBins.length > 0 ? rawBins : [DEFAULT_CLI_FOR_PROTOCOL[protocol]]);
   if (bins.length === 0) return null;
-  return { id: input.id, label: input.label, model: input.model, bins, bin: bins[0]!, protocol };
+  const baseUrl = parseBaseUrl(input.baseUrl);
+  return {
+    id: input.id,
+    label: input.label,
+    model: input.model,
+    bins,
+    bin: bins[0]!,
+    protocol,
+    ...(baseUrl ? { baseUrl } : {}),
+  };
 }
 
 export function resolvePresetBin(
@@ -221,6 +241,7 @@ export function parseModelCatalog(raw: unknown): ModelPreset[] | null {
       bin: typeof rec.bin === 'string' ? rec.bin : undefined,
       bins: Array.isArray(rec.bins) ? (rec.bins as string[]) : undefined,
       protocol: rec.protocol,
+      baseUrl: rec.baseUrl,
     });
     if (!preset) return null;
     if (seen.has(preset.id)) return null;
@@ -275,6 +296,9 @@ export function syncAgentsWithCatalog(agents: AgentSpec[], models: ModelPreset[]
       }
       next.model = preset.model;
       next.bin = resolvePresetBin(preset, next.bin);
+      next.protocol = preset.protocol;
+      if (preset.baseUrl) next.baseUrl = preset.baseUrl;
+      else delete next.baseUrl;
       return next;
     }
     const match = models.find(
@@ -294,6 +318,8 @@ export interface AgentPatchInput {
   bin?: string;
   model?: string | null;
   modelId?: string | null;
+  protocol?: ModelProtocol | null;
+  baseUrl?: string | null;
 }
 
 export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentSpec {
@@ -317,6 +343,16 @@ export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentS
     delete next.modelId;
   } else if (typeof patch.modelId === 'string' && patch.modelId.trim()) {
     next.modelId = patch.modelId.trim();
+  }
+  if (patch.protocol === null) {
+    delete next.protocol;
+  } else if (patch.protocol) {
+    next.protocol = patch.protocol;
+  }
+  if (patch.baseUrl === null || patch.baseUrl === '') {
+    delete next.baseUrl;
+  } else if (typeof patch.baseUrl === 'string' && patch.baseUrl.trim()) {
+    next.baseUrl = patch.baseUrl.trim();
   }
   return next;
 }
@@ -358,6 +394,8 @@ export function writeTeamFile(
       bin: a.bin,
       ...(a.model ? { model: a.model } : {}),
       ...(a.modelId ? { modelId: a.modelId } : {}),
+      ...(a.protocol ? { protocol: a.protocol } : {}),
+      ...(a.baseUrl ? { baseUrl: a.baseUrl } : {}),
     })),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -377,6 +415,8 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
       ...('bin' in row && row.bin ? { bin: row.bin } : {}),
       ...('model' in row ? { model: row.model || undefined } : {}),
       ...('modelId' in row ? { modelId: row.modelId || undefined } : {}),
+      ...(parseModelProtocol(row.protocol) ? { protocol: parseModelProtocol(row.protocol) } : {}),
+      ...('baseUrl' in row ? { baseUrl: row.baseUrl || undefined } : {}),
       ...(row.aliases && row.aliases.length > 0 ? { aliases: row.aliases.map((a) => a.replace(/^@/, '')) } : {}),
       ...(row.expertise && row.expertise.length > 0 ? { expertise: row.expertise } : {}),
     });
@@ -417,6 +457,8 @@ export interface PublicAgentConfig {
   expertise: string[];
   model?: string;
   modelId?: string;
+  protocol?: ModelProtocol;
+  baseUrl?: string;
   autoApprove?: boolean;
 }
 
@@ -434,6 +476,8 @@ export function publicAgentConfig(
     expertise: spec.expertise,
     ...(spec.model ? { model: spec.model } : {}),
     ...(spec.modelId ? { modelId: spec.modelId } : {}),
+    ...(spec.protocol ? { protocol: spec.protocol } : {}),
+    ...(spec.baseUrl ? { baseUrl: spec.baseUrl } : {}),
     ...(typeof extras?.autoApprove === 'boolean' ? { autoApprove: extras.autoApprove } : {}),
   };
 }

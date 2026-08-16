@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ClaudeAdapter } from '../src/providers/claude.js';
+import { createAdapter } from '../src/providers/factory.js';
 
 const FAKE_BIN = join(import.meta.dirname, 'fixtures', 'fake-claude.mjs');
 const ARGS_BIN = join(import.meta.dirname, 'fixtures', 'fake-claude-args.mjs');
@@ -64,6 +65,48 @@ describe('ClaudeAdapter 参数', () => {
     expect(args).toContain('--model');
     expect(args[args.indexOf('--model') + 1]).toBe('sonnet');
     delete process.env.RECORD_ARGS_FILE;
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('ClaudeAdapter 网关', () => {
+  it('opts.env 注入到 spawn', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-env-'));
+    const recordFile = join(dir, 'env.json');
+    process.env.RECORD_ENV_FILE = recordFile;
+    const adapter = new ClaudeAdapter({
+      bin: ARGS_BIN,
+      env: { ANTHROPIC_BASE_URL: 'https://api.moonshot.cn/anthropic' },
+    });
+    await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    const env = JSON.parse(readFileSync(recordFile, 'utf8')) as { ANTHROPIC_BASE_URL: string | null };
+    expect(env.ANTHROPIC_BASE_URL).toBe('https://api.moonshot.cn/anthropic');
+    delete process.env.RECORD_ENV_FILE;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('createAdapter 按协议规范化后注入', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-factory-env-'));
+    const recordFile = join(dir, 'env.json');
+    process.env.RECORD_ENV_FILE = recordFile;
+    const adapter = createAdapter(
+      {
+        id: 'claude',
+        name: '墨墨',
+        aliases: ['claude'],
+        role: '写手',
+        personality: '',
+        expertise: [],
+        bin: ARGS_BIN,
+        protocol: 'anthropic',
+        baseUrl: 'https://api.moonshot.cn/anthropic/v1',
+      },
+      5_000,
+    );
+    await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    const env = JSON.parse(readFileSync(recordFile, 'utf8')) as { ANTHROPIC_BASE_URL: string | null };
+    expect(env.ANTHROPIC_BASE_URL).toBe('https://api.moonshot.cn/anthropic');
+    delete process.env.RECORD_ENV_FILE;
     rmSync(dir, { recursive: true, force: true });
   });
 });

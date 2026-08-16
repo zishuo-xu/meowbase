@@ -1,5 +1,6 @@
 import type { AgentId } from '@meowbase/shared';
-import type { AgentSpec } from '../config.js';
+import { inferModelProtocol, type AgentSpec } from '../config.js';
+import { envForBaseUrl } from './base-url.js';
 import { ClaudeAdapter } from './claude.js';
 import { GeminiAdapter } from './gemini.js';
 import { OpenCodeAdapter } from './opencode.js';
@@ -18,7 +19,15 @@ export function cliKindFromBin(bin: string, fallback: AgentId): CliKind {
 
 export function createAdapter(spec: AgentSpec, timeoutMs: number): AgentService {
   const kind = cliKindFromBin(spec.bin, spec.id);
-  const shared = { agentId: spec.id, bin: spec.bin, model: spec.model, timeoutMs };
+  const protocol = spec.protocol ?? inferModelProtocol([spec.bin]);
+  const env = envForBaseUrl(protocol, spec.baseUrl);
+  const shared = {
+    agentId: spec.id,
+    bin: spec.bin,
+    model: spec.model,
+    timeoutMs,
+    ...(Object.keys(env).length > 0 ? { env } : {}),
+  };
   if (kind === 'gemini') return new GeminiAdapter(shared);
   if (kind === 'opencode') return new OpenCodeAdapter(shared);
   return new ClaudeAdapter(shared);

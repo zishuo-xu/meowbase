@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
 import type { AgentId } from '@meowbase/shared';
 import { StreamAccumulator } from './stream-json.js';
-import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
+import { spawnEnv } from './base-url.js';
+import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class ClaudeAdapter implements AgentService {
   readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+    private readonly opts: AdapterOpts = {},
   ) {
     this.agentId = opts.agentId ?? 'claude';
   }
@@ -31,7 +32,11 @@ export class ClaudeAdapter implements AgentService {
     args.push(input.prompt);
 
     const accumulator = new StreamAccumulator();
-    const child = spawn(bin, args, { cwd: input.workdir, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, {
+      cwd: input.workdir,
+      env: spawnEnv(this.opts.env),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
     let timedOut = false;
     const timer = setTimeout(() => {

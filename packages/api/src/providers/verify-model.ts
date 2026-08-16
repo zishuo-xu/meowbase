@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { isAbsolute } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentSpec } from '../config.js';
+import type { AgentSpec, ModelProtocol } from '../config.js';
 import { cliKindFromBin, createAdapter } from './factory.js';
 
 const execFileAsync = promisify(execFile);
@@ -13,6 +13,8 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 export interface VerifyModelInput {
   bin: string;
   model?: string;
+  protocol?: ModelProtocol;
+  baseUrl?: string;
   timeoutMs?: number;
   workdir?: string;
 }
@@ -45,8 +47,8 @@ export async function resolveExecutable(bin: string): Promise<string | null> {
   }
 }
 
-function probeSpec(bin: string, model: string | undefined): AgentSpec {
-  const id = cliKindFromBin(bin, 'opencode');
+function probeSpec(input: VerifyModelInput, resolvedBin: string): AgentSpec {
+  const id = cliKindFromBin(resolvedBin, 'opencode');
   return {
     id,
     name: id,
@@ -54,8 +56,10 @@ function probeSpec(bin: string, model: string | undefined): AgentSpec {
     role: 'probe',
     personality: '',
     expertise: [],
-    bin,
-    ...(model ? { model } : {}),
+    bin: resolvedBin,
+    ...(input.model?.trim() ? { model: input.model.trim() } : {}),
+    ...(input.protocol ? { protocol: input.protocol } : {}),
+    ...(input.baseUrl?.trim() ? { baseUrl: input.baseUrl.trim() } : {}),
   };
 }
 
@@ -76,7 +80,7 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
   }
 
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const adapter = createAdapter(probeSpec(resolved, input.model?.trim() || undefined), timeoutMs);
+  const adapter = createAdapter(probeSpec(input, resolved), timeoutMs);
   const output = await adapter.runTurn({
     prompt: PROBE_PROMPT,
     workdir: input.workdir ?? tmpdir(),

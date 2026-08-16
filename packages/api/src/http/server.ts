@@ -22,7 +22,9 @@ import {
   cloneModelPreset,
   isAgentId,
   normalizeModelCatalog,
+  parseBaseUrl,
   parseModelCatalog,
+  parseModelProtocol,
   publicAgentConfig,
   resolvePresetBin,
   syncAgentsWithCatalog,
@@ -64,6 +66,15 @@ function parsePatchDepth(raw: unknown): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 1 || n > 10) return null;
   return Math.floor(n);
+}
+
+function adapterRuntimeChanged(prev: AgentSpec, next: AgentSpec): boolean {
+  return (
+    prev.bin !== next.bin ||
+    prev.model !== next.model ||
+    prev.protocol !== next.protocol ||
+    prev.baseUrl !== next.baseUrl
+  );
 }
 
 export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
@@ -142,17 +153,27 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/config', async () => publicConfig());
 
   app.post('/api/config/models/verify', async (request, reply) => {
-    const body = request.body as { bin?: string; model?: string; modelId?: string } | null;
+    const body = request.body as {
+      bin?: string;
+      model?: string;
+      modelId?: string;
+      protocol?: string;
+      baseUrl?: string;
+    } | null;
     let bin = body?.bin?.trim() ?? '';
     let model = body?.model?.trim() ?? '';
+    let protocol = parseModelProtocol(body?.protocol);
+    let baseUrl = parseBaseUrl(body?.baseUrl);
     if (body?.modelId?.trim()) {
       const preset = live.models.find((m) => m.id === body.modelId?.trim());
       if (!preset) return reply.code(404).send({ error: `模型目录没有: ${body.modelId}` });
       bin = bin || resolvePresetBin(preset, undefined, bin);
       model = model || preset.model;
+      protocol = protocol ?? preset.protocol;
+      baseUrl = baseUrl ?? preset.baseUrl;
     }
     if (!bin) return reply.code(400).send({ error: 'bin 不能为空' });
-    return verifyModelConnection({ bin, model, timeoutMs: 45_000 });
+    return verifyModelConnection({ bin, model, protocol, baseUrl, timeoutMs: 45_000 });
   });
 
   app.patch('/api/config', async (request, reply) => {
@@ -181,7 +202,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       live.agents = syncAgentsWithCatalog(live.agents, live.models);
       for (const next of live.agents) {
         const prev = prevAgents.find((a) => a.id === next.id);
-        if (prev && (prev.bin !== next.bin || prev.model !== next.model)) {
+        if (prev && adapterRuntimeChanged(prev, next)) {
           deps.rebuildAdapter?.(next);
         }
       }
@@ -206,7 +227,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       for (const id of agentIds) {
         const prev = prevById.get(id);
         const next = live.agents.find((a) => a.id === id);
-        if (next && prev && (prev.bin !== next.bin || prev.model !== next.model)) {
+        if (next && prev && adapterRuntimeChanged(prev, next)) {
           deps.rebuildAdapter?.(next);
         }
       }
@@ -225,14 +246,17 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       return reply.code(400).send({ error: 'name 不能为空' });
     }
     if (typeof body.modelId === 'string' && body.modelId.trim()) {
-      const preset = live.models.find((m) => m.id === body.modelId.trim());
-      if (!preset) return reply.code(400).send({ error: `模型目录没有: ${body.modelId}` });
+      const modelId = body.modelId.trim();
+      const preset = live.models.find((m) => m.id === modelId);
+      if (!preset) return reply.code(400).send({ error: `模型目录没有: ${modelId}` });
       body.model = preset.model;
       body.bin = resolvePresetBin(
         preset,
         live.agents[index]?.bin,
         typeof body.bin === 'string' ? body.bin.trim() : undefined,
       );
+      body.protocol = preset.protocol;
+      body.baseUrl = preset.baseUrl ?? '';
     }
     const prev = live.agents[index]!;
     const next = applyAgentPatch(prev, body);
@@ -240,7 +264,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (typeof body.autoApprove === 'boolean') {
       await deps.stores.profiles.updateAutoApprove(agentId, body.autoApprove);
     }
-    if (prev.bin !== next.bin || prev.model !== next.model) {
+    if (adapterRuntimeChanged(prev, next)) {
       deps.rebuildAdapter?.(next);
     }
     persist();

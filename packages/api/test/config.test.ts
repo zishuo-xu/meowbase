@@ -180,6 +180,32 @@ describe('模型目录', () => {
     expect(cfg.models[0]?.protocol).toBe('anthropic');
     expect(cfg.models[0]?.bins).toEqual(['claude']);
   });
+
+  it('目录 baseUrl 同步到绑定了 modelId 的猫', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-baseurl-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        models: [
+          {
+            id: 'kimi',
+            label: 'Kimi',
+            bins: ['claude'],
+            protocol: 'anthropic',
+            model: 'kimi-k2',
+            baseUrl: 'https://api.moonshot.cn/anthropic/v1',
+          },
+        ],
+        agents: [{ id: 'claude', modelId: 'kimi' }],
+      }),
+    );
+    const cfg = loadConfig({}, { configPath: path });
+    expect(cfg.models[0]?.baseUrl).toBe('https://api.moonshot.cn/anthropic/v1');
+    expect(agentSpec(cfg, 'claude').baseUrl).toBe('https://api.moonshot.cn/anthropic/v1');
+    expect(agentSpec(cfg, 'claude').protocol).toBe('anthropic');
+    expect(agentSpec(cfg, 'claude').model).toBe('kimi-k2');
+  });
 });
 
 describe('applySharedModel', () => {

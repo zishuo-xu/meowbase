@@ -50,6 +50,7 @@ export interface ModelPresetDto {
   bins?: string[];
   protocol?: 'anthropic' | 'openai' | 'gemini';
   model: string;
+  baseUrl?: string;
 }
 
 export interface AgentConfigDto {
@@ -104,7 +105,13 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
-  verifyModel: (body: { bin: string; model?: string; modelId?: string }) =>
+  verifyModel: (body: {
+    bin: string;
+    model?: string;
+    modelId?: string;
+    protocol?: 'anthropic' | 'openai' | 'gemini';
+    baseUrl?: string;
+  }) =>
     request<{
       ok: boolean;
       stage: 'bin' | 'model';

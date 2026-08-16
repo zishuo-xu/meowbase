@@ -2,13 +2,14 @@ import { spawn } from 'node:child_process';
 import type { AgentId } from '@meowbase/shared';
 import { OpenCodeAccumulator } from './opencode-json.js';
 import { formatCliExitError } from './cli-error.js';
-import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
+import { spawnEnv } from './base-url.js';
+import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class OpenCodeAdapter implements AgentService {
   readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+    private readonly opts: AdapterOpts = {},
   ) {
     this.agentId = opts.agentId ?? 'opencode';
   }
@@ -31,7 +32,11 @@ export class OpenCodeAdapter implements AgentService {
     args.push('-m', model);
 
     const accumulator = new OpenCodeAccumulator();
-    const child = spawn(bin, args, { cwd: input.workdir, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, {
+      cwd: input.workdir,
+      env: spawnEnv(this.opts.env),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
     let timedOut = false;
     const timer = setTimeout(() => {

@@ -17,6 +17,14 @@ export interface AgentTurnOutput {
   error?: string;
 }
 
+export interface AdapterOpts {
+  agentId?: AgentId;
+  bin?: string;
+  model?: string;
+  timeoutMs?: number;
+  env?: Record<string, string>;
+}
+
 export interface AgentService {
   readonly agentId: AgentId;
   runTurn(input: AgentTurnInput): Promise<AgentTurnOutput>;

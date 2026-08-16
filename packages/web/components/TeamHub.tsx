@@ -24,6 +24,8 @@ export interface VerifyModelPayload {
   bin: string;
   model?: string;
   modelId?: string;
+  protocol?: ModelProtocol;
+  baseUrl?: string;
   label?: string;
 }
 
@@ -76,6 +78,10 @@ function inferProtocol(preset: Pick<ModelPresetDto, 'bin' | 'bins' | 'protocol'>
 
 function protocolLabel(protocol: ModelProtocol): string {
   return PROTOCOL_OPTIONS.find((item) => item.value === protocol)?.label ?? protocol;
+}
+
+function gatewayPlaceholder(protocol: ModelProtocol): string {
+  return protocol === 'openai' ? 'https://api.example.com/v1' : 'https://api.example.com';
 }
 
 function slugId(label: string, model: string): string {
@@ -143,6 +149,7 @@ export function TeamHub({
   const [newBins, setNewBins] = useState<string[]>(['opencode']);
   const [newProtocol, setNewProtocol] = useState<ModelProtocol>('openai');
   const [newModel, setNewModel] = useState('');
+  const [newBaseUrl, setNewBaseUrl] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
 
@@ -256,7 +263,7 @@ export function TeamHub({
           {pane === 'models' ? (
             <section className="space-y-3">
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
-                对齐 clowder:先选协议再勾 CLI。OpenAI 兼容只能走 opencode;Claude 协议可走 claude / opencode。密钥仍由各 CLI 自己管。
+                对齐 clowder:先选协议再勾 CLI。OpenAI 兼容只能走 opencode;Claude 协议可走 claude / opencode。网关 URL 可选,密钥仍由各 CLI 自己管。
               </p>
               <div className="text-xs font-bold text-[var(--ink-soft)]">已登记</div>
               {models.length === 0 && (
@@ -273,6 +280,9 @@ export function TeamHub({
                       <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">
                         {protocolLabel(inferProtocol(preset))} · {presetBins(preset).join(', ')} · {preset.model}
                       </div>
+                      {preset.baseUrl && (
+                        <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">{preset.baseUrl}</div>
+                      )}
                       {verifyNotes[preset.id] && (
                         <div
                           className={`mt-1 text-[11px] ${
@@ -354,6 +364,18 @@ export function TeamHub({
                   placeholder="例如 provider/model-id"
                 />
               </label>
+              <label className="block text-xs text-[var(--ink-soft)]">
+                网关 URL
+                <input
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                  value={newBaseUrl}
+                  onChange={(e) => setNewBaseUrl(e.target.value)}
+                  placeholder={gatewayPlaceholder(newProtocol)}
+                />
+              </label>
+              <p className="text-[11px] leading-relaxed text-[var(--ink-soft)]">
+                可选。Anthropic 不要带 /v1，OpenAI 兼容要带 /v1。空则用 CLI 默认官方地址。
+              </p>
               <fieldset className="text-xs text-[var(--ink-soft)]">
                 <legend className="mb-1">可用 CLI</legend>
                 <div className="flex flex-wrap gap-3">
@@ -402,6 +424,8 @@ export function TeamHub({
                     void runVerify('draft', {
                       bin: newBins[0] ?? '',
                       model: newModel.trim(),
+                      protocol: newProtocol,
+                      ...(newBaseUrl.trim() ? { baseUrl: newBaseUrl.trim() } : {}),
                       label: newLabel.trim() || newModel.trim(),
                     })
                   }
@@ -415,6 +439,7 @@ export function TeamHub({
                     const model = newModel.trim();
                     if (!model || newBins.length === 0) return;
                     const label = newLabel.trim() || model;
+                    const baseUrl = newBaseUrl.trim();
                     setModels((list) => [
                       ...list,
                       {
@@ -424,10 +449,12 @@ export function TeamHub({
                         bins: [...newBins],
                         protocol: newProtocol,
                         model,
+                        ...(baseUrl ? { baseUrl } : {}),
                       },
                     ]);
                     setNewLabel('');
                     setNewModel('');
+                    setNewBaseUrl('');
                   }}
                   className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold ring-1 ring-[var(--border)]"
                 >
@@ -611,6 +638,7 @@ export function TeamHub({
                     <p className="text-xs text-[var(--ink-soft)]">
                       {protocolLabel(inferProtocol(selectedPreset))} · {presetBins(selectedPreset).join(', ')} ·{' '}
                       {selectedPreset.model}
+                      {selectedPreset.baseUrl ? ` · ${selectedPreset.baseUrl}` : ''}
                     </p>
                   )}
                   <label className="flex items-center gap-2 text-sm">

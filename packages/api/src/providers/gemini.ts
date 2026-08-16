@@ -2,13 +2,14 @@ import { spawn } from 'node:child_process';
 import type { AgentId } from '@meowbase/shared';
 import { GeminiAccumulator } from './gemini-json.js';
 import { formatCliExitError } from './cli-error.js';
-import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
+import { spawnEnv } from './base-url.js';
+import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class GeminiAdapter implements AgentService {
   readonly agentId: AgentId;
 
   constructor(
-    private readonly opts: { agentId?: AgentId; bin?: string; model?: string; timeoutMs?: number } = {},
+    private readonly opts: AdapterOpts = {},
   ) {
     this.agentId = opts.agentId ?? 'gemini';
   }
@@ -34,7 +35,11 @@ export class GeminiAdapter implements AgentService {
     if (model) args.push('-m', model);
 
     const accumulator = new GeminiAccumulator();
-    const child = spawn(bin, args, { cwd: input.workdir, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, {
+      cwd: input.workdir,
+      env: spawnEnv(this.opts.env),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
     let timedOut = false;
     const timer = setTimeout(() => {

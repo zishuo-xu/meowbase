@@ -102,11 +102,15 @@ describe('TeamHub', () => {
     expect(screen.getByText('添加新模型')).toBeTruthy();
     expect((screen.getByLabelText('显示名') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('模型 ID') as HTMLInputElement).value).toBe('');
+    expect(screen.getByLabelText('网关 URL')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Sonnet' } });
     fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'opencode' }));
     fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'sonnet' } });
+    fireEvent.change(screen.getByLabelText('网关 URL'), {
+      target: { value: 'https://api.moonshot.cn/anthropic' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
     fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
     expect(onSaveModels).toHaveBeenCalledWith(
@@ -117,6 +121,7 @@ describe('TeamHub', () => {
           bin: 'claude',
           protocol: 'anthropic',
           model: 'sonnet',
+          baseUrl: 'https://api.moonshot.cn/anthropic',
         }),
       ]),
     );
@@ -200,6 +205,41 @@ describe('TeamHub', () => {
     fireEvent.click(screen.getByRole('button', { name: '验证 Flash' }));
     expect(onVerifyModel).toHaveBeenCalledWith(
       expect.objectContaining({ bin: 'opencode', model: 'opencode-go/deepseek-v4-flash' }),
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/已连通/)).toBeTruthy();
+    });
+  });
+
+  it('验证新模型带上网关 URL', async () => {
+    const onVerifyModel = vi.fn().mockResolvedValue({
+      ok: true,
+      stage: 'model',
+      latencyMs: 8,
+      preview: 'pong',
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onVerifyModel={onVerifyModel}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
+    fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'kimi-k2' } });
+    fireEvent.change(screen.getByLabelText('网关 URL'), {
+      target: { value: 'https://api.moonshot.cn/anthropic' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '验证新模型' }));
+    expect(onVerifyModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        protocol: 'anthropic',
+        model: 'kimi-k2',
+        baseUrl: 'https://api.moonshot.cn/anthropic',
+      }),
     );
     await waitFor(() => {
       expect(screen.getByText(/已连通/)).toBeTruthy();
