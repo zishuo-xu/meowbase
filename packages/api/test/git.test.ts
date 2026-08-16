@@ -1,8 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { gitAddAll, gitCommit, gitDiffHead, gitInit } from '../src/services/git.js';
+import {
+  gitAddAll,
+  gitCommit,
+  gitDiffHead,
+  gitInit,
+  parseStrayFiles,
+  sweepStrayFiles,
+} from '../src/services/git.js';
 
 describe('git 辅助函数', () => {
   it('init 空基线;新增文件后 diff 非空;commit 后 diff 为空', async () => {
@@ -20,5 +27,32 @@ describe('git 辅助函数', () => {
     await gitCommit(dir, 'baseline');
     expect(await gitDiffHead(dir)).toBeNull();
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('parseStrayFiles 只取未跟踪且不在 work/ 下的文件', () => {
+    const status = [
+      '?? packages/api/mul.js',
+      '?? work/abc/x.txt',
+      ' M packages/api/edited.js',
+      '?? 另一个.txt',
+      '',
+    ].join('\n');
+    expect(parseStrayFiles(status)).toEqual(['packages/api/mul.js', '另一个.txt']);
+  });
+
+  it('sweepStrayFiles 把散落文件移回沙箱', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'meowbase-sweep-'));
+    await gitInit(root);
+    const workdir = join(root, 'work', 't1');
+    mkdirSync(workdir, { recursive: true });
+    await gitInit(workdir);
+
+    mkdirSync(join(root, 'packages', 'api'), { recursive: true });
+    writeFileSync(join(root, 'packages', 'api', 'stray.js'), 'x');
+    const moved = await sweepStrayFiles(root, workdir);
+    expect(moved).toContain('packages/api/stray.js');
+    expect(existsSync(join(workdir, 'stray.js'))).toBe(true);
+    expect(existsSync(join(root, 'packages', 'api', 'stray.js'))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
   });
 });

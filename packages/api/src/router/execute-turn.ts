@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import {
   buildSystemPrompt,
   matchSkills,
@@ -22,7 +23,7 @@ import type {
   SkillStore,
   ThreadStore,
 } from '../stores/ports.js';
-import { gitAddAll, gitCommit, gitDiffHead } from '../services/git.js';
+import { gitAddAll, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
@@ -322,6 +323,14 @@ async function runSegment(
     );
     lastOutput = output;
     prevContent = output.content || accumulated;
+
+    // 沙箱清扫:agent 写到仓库根(沙箱外)的未跟踪文件移回线程沙箱
+    try {
+      const repoRoot = resolve(thread.workdir, '..', '..');
+      await sweepStrayFiles(repoRoot, thread.workdir);
+    } catch {
+      // 清扫失败不阻塞
+    }
 
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
     if (output.status !== 'completed') break;

@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { existsSync, renameSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
@@ -30,4 +32,48 @@ export async function gitDiffHead(dir: string): Promise<{ stat: string; text: st
 
 export async function gitCommit(dir: string, message: string): Promise<void> {
   await run(dir, ['commit', '-q', '-m', message]);
+}
+
+export async function gitStatusPorcelain(dir: string): Promise<string> {
+  return run(dir, ['status', '--porcelain', '--untracked-files=all']);
+}
+
+/** 从 porcelain 输出中解析"未跟踪且不在 work/ 下的散落文件"(?? 开头) */
+export function parseStrayFiles(statusText: string, workPrefix = 'work/'): string[] {
+  return statusText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('?? '))
+    .map((line) => line.slice(3).trim())
+    .filter((path) => path.length > 0 && !path.startsWith(workPrefix));
+}
+
+/**
+ * 沙箱清扫:agent 若把文件写到仓库根(沙箱外),移回线程沙箱。
+ * 仅处理未跟踪文件;仓库根不是 git 仓库时静默跳过。
+ */
+export async function sweepStrayFiles(
+  repoRoot: string,
+  workdir: string,
+): Promise<string[]> {
+  let status: string;
+  try {
+    status = await gitStatusPorcelain(repoRoot);
+  } catch {
+    return [];
+  }
+  const strays = parseStrayFiles(status);
+  const moved: string[] = [];
+  for (const path of strays) {
+    const src = join(repoRoot, path);
+    if (!existsSync(src)) continue;
+    const dest = join(workdir, basename(path));
+    try {
+      renameSync(src, dest);
+      moved.push(path);
+    } catch {
+      // 移动失败不阻塞
+    }
+  }
+  return moved;
 }
