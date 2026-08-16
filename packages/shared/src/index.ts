@@ -33,3 +33,4 @@ export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
 export type { A2AHandoff } from './a2a.js';
 export { parseA2AHandoff } from './a2a.js';
+export { parseParallelGroups } from './parallel-groups.js';
