@@ -577,6 +577,97 @@ describe('executeTurn 审批流', () => {
     expect(card?.status).toBe('reviewing');
   });
 
+  it('A2A 已审过则不再拉第三只猫', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let opencodeCalls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '写好了。\n@gemini 请审查这份代码\n重点看边界。'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          return { sessionId: 's-g', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          opencodeCalls += 1;
+          return { sessionId: 's-o', content: '团团不该出场', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+
+    expect(opencodeCalls).toBe(0);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('🤝 接力:'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('🤝 审查:'))).toBe(false);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewerAgentId).toBe('gemini');
+    expect(card?.reviewComment).toContain('通过');
+  });
+
+  it('A2A 审出需修改 → 打回写手并由同一审查官再审', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let writerCalls = 0;
+    let geminiCalls = 0;
+    let opencodeCalls = 0;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          writerCalls += 1;
+          return {
+            sessionId: 's-w',
+            content:
+              writerCalls === 1
+                ? '写好了。\n@gemini 请审查这份代码\n重点看边界。'
+                : '已按审查改完',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          geminiCalls += 1;
+          return {
+            sessionId: 's-g',
+            content: geminiCalls === 1 ? '## 结论\n需修改' : '## 结论\n通过',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          opencodeCalls += 1;
+          return { sessionId: 's-o', content: '团团不该出场', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+
+    expect(opencodeCalls).toBe(0);
+    expect(writerCalls).toBe(2);
+    expect(geminiCalls).toBe(2);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('🤝 打回:'))).toBe(true);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewerAgentId).toBe('gemini');
+    expect(card?.reviewComment).toContain('通过');
+  });
+
   it('#approve 批准卡片并落地', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', 'x')]);

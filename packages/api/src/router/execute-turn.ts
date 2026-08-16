@@ -291,6 +291,8 @@ export async function executeTurn(input: {
           thread,
           threadId,
           writerAgentId,
+          chainLastAgent: lastAssistant.agentId,
+          chainLastContent: lastOutput.content,
           initialDiff: diff,
           writeQueue,
           catalog,
@@ -501,6 +503,8 @@ async function runReviewFixThenCard(input: {
   thread: ThreadRuntime;
   threadId: string;
   writerAgentId: AgentId;
+  chainLastAgent?: AgentId;
+  chainLastContent?: string;
   initialDiff: { text: string; stat: string };
   writeQueue: WriteQueue;
   catalog: MentionCatalog;
@@ -508,7 +512,14 @@ async function runReviewFixThenCard(input: {
   refs: EvidenceEntry[];
 }): Promise<void> {
   const { context, thread, threadId, writerAgentId, writeQueue, catalog, team, refs } = input;
-  const reviewerAgentId = selectReviewer(writerAgentId, context.registry.list());
+  const available = context.registry.list();
+  const chainReviewer =
+    input.chainLastAgent &&
+    input.chainLastAgent !== writerAgentId &&
+    available.includes(input.chainLastAgent)
+      ? input.chainLastAgent
+      : undefined;
+  const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available);
   let latestDiff = input.initialDiff;
   let reviewComment = '(无可用审查 agent)';
 
@@ -522,7 +533,7 @@ async function runReviewFixThenCard(input: {
       evidenceRefs: [],
     });
 
-    for (let round = 0; round <= MAX_REVIEW_FIX_ROUNDS; round++) {
+    const runReview = async (): Promise<string> => {
       await writeQueue(() =>
         context.stores.messages.append({
           threadId,
@@ -539,10 +550,16 @@ async function runReviewFixThenCard(input: {
         reviewerPrompt,
         writeQueue,
       );
-      reviewComment = reviewHop.content || '(审查无输出)';
-      if (parseReviewVerdict(reviewComment) !== 'revise') break;
-      if (round >= MAX_REVIEW_FIX_ROUNDS) break;
+      return reviewHop.content || '(审查无输出)';
+    };
 
+    reviewComment =
+      chainReviewer && input.chainLastContent
+        ? input.chainLastContent
+        : await runReview();
+
+    for (let fix = 0; fix < MAX_REVIEW_FIX_ROUNDS; fix++) {
+      if (parseReviewVerdict(reviewComment) !== 'revise') break;
       await writeQueue(() =>
         context.stores.messages.append({
           threadId,
@@ -578,6 +595,7 @@ async function runReviewFixThenCard(input: {
       );
       await gitAddAll(thread.workdir);
       latestDiff = (await gitDiffHead(thread.workdir)) ?? latestDiff;
+      reviewComment = await runReview();
     }
   }
 
