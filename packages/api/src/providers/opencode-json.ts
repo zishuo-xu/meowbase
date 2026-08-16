@@ -27,6 +27,7 @@ export class OpenCodeAccumulator {
       const reason = typeof part?.reason === 'string' ? part.reason : '';
       const tokens = part?.tokens as Record<string, unknown> | undefined;
       if (reason === 'stop') {
+        // 最终 step 正常结束
         if (tokens) {
           const num = (v: unknown): number | undefined =>
             typeof v === 'number' ? v : undefined;
@@ -40,9 +41,12 @@ export class OpenCodeAccumulator {
             costEstimated: typeof obj.cost === 'number',
           };
         }
-      } else {
+        this._status = 'completed';
+        this._error = undefined;
+      } else if (reason === 'error' || reason === 'max_turns' || reason === 'cancel') {
+        // 确定性的失败原因;'tool-calls' 等中间 step 结束不算失败
         this._status = 'failed';
-        this._error = reason || 'opencode_step_error';
+        this._error = reason;
       }
     }
     return null;

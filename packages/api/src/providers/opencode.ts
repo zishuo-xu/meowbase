@@ -18,7 +18,7 @@ export class OpenCodeAdapter implements AgentService {
       process.env.OPENCODE_MODEL ??
       'opencode-go/deepseek-v4-flash';
 
-    const args = ['run', input.prompt, '--format', 'json'];
+    const args = ['run', input.prompt, '--format', 'json', '--auto'];
     if (input.sessionId) args.push('--session', input.sessionId);
     args.push('-m', model);
 
@@ -35,6 +35,7 @@ export class OpenCodeAdapter implements AgentService {
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk.toString()));
 
     let buffer = '';
+    let exitCode: number | null = null;
     await new Promise<void>((resolve) => {
       child.stdout.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -46,7 +47,10 @@ export class OpenCodeAdapter implements AgentService {
           if (delta && input.onIncrement) input.onIncrement(delta);
         }
       });
-      child.on('close', () => resolve());
+      child.on('close', (code) => {
+        exitCode = code;
+        resolve();
+      });
       child.on('error', (err) => {
         stderrChunks.push(String(err));
         resolve();
@@ -71,6 +75,15 @@ export class OpenCodeAdapter implements AgentService {
         status: 'failed',
         usage: accumulator.usage,
         error: accumulator.error ?? 'opencode 执行失败',
+      };
+    }
+    if (exitCode !== null && exitCode !== 0) {
+      return {
+        sessionId,
+        content: accumulator.content,
+        status: 'failed',
+        usage: accumulator.usage,
+        error: `opencode 退出码 ${exitCode}`,
       };
     }
     return {

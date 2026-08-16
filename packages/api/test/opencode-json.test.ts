@@ -28,4 +28,15 @@ describe('OpenCodeAccumulator', () => {
     acc.push('{"type":"step_finish","sessionID":"s","part":{"type":"step-finish","reason":"error"}}');
     expect(acc.status).toBe('failed');
   });
+
+  it('中间 tool-calls 步不算失败,最终 stop 正常完成', () => {
+    const acc = new OpenCodeAccumulator();
+    acc.push('{"type":"step_finish","sessionID":"s","part":{"type":"step-finish","reason":"tool-calls"}}');
+    expect(acc.status).toBe('completed');
+    acc.push('{"type":"text","sessionID":"s","part":{"type":"text","text":"写好了"}}');
+    acc.push('{"type":"step_finish","sessionID":"s","part":{"type":"step-finish","reason":"stop","tokens":{"total":10,"input":5,"output":3}},"cost":0.00001}');
+    expect(acc.status).toBe('completed');
+    expect(acc.content).toBe('写好了');
+    expect(acc.usage?.outputTokens).toBe(3);
+  });
 });
