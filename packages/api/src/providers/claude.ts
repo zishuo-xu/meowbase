@@ -14,7 +14,14 @@ export class ClaudeAdapter implements AgentService {
     const bin = this.opts.bin ?? process.env.CLAUDE_BIN ?? 'claude';
     const timeoutMs = input.timeoutMs ?? this.opts.timeoutMs ?? 300_000;
 
-    const args = ['-p', '--output-format', 'stream-json', '--verbose'];
+    const args = [
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'acceptEdits',
+    ];
     if (input.sessionId) args.push('--resume', input.sessionId);
     if (input.systemPrompt) args.push('--append-system-prompt', input.systemPrompt);
     args.push(input.prompt);
