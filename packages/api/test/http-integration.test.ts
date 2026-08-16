@@ -355,6 +355,40 @@ describe('HTTP 团队配置 PATCH', () => {
     expect(agent.model).toBe('sonnet');
   });
 
+  it('PATCH 多 CLI 模型时保留猫当前 CLI', async () => {
+    const save = await fetch(`${url}/api/config`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        models: [
+          {
+            id: 'flash',
+            label: 'Flash',
+            bins: ['opencode', 'gemini'],
+            model: 'opencode-go/shared-flash',
+          },
+        ],
+      }),
+    });
+    expect(save.status).toBe(200);
+    const reset = await fetch(`${url}/api/config/agents/gemini`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bin: 'gemini', modelId: '' }),
+    });
+    expect(reset.status).toBe(200);
+    const pick = await fetch(`${url}/api/config/agents/gemini`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'flash' }),
+    });
+    expect(pick.status).toBe(200);
+    const agent = (await pick.json()) as { modelId?: string; bin: string; model?: string };
+    expect(agent.modelId).toBe('flash');
+    expect(agent.bin).toBe('gemini');
+    expect(agent.model).toBe('opencode-go/shared-flash');
+  });
+
   it('未知 agent / 空名字 / 非法链深返回 4xx', async () => {
     const missing = await fetch(`${url}/api/config/agents/nope`, {
       method: 'PATCH',

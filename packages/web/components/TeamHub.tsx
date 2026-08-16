@@ -48,6 +48,11 @@ function isKnownCli(bin: string): bin is (typeof CLI_OPTIONS)[number] {
   return (CLI_OPTIONS as readonly string[]).includes(bin);
 }
 
+function presetBins(preset: Pick<ModelPresetDto, 'bin' | 'bins'>): string[] {
+  if (preset.bins && preset.bins.length > 0) return preset.bins;
+  return preset.bin ? [preset.bin] : [];
+}
+
 function slugId(label: string, model: string): string {
   const raw = (label || model)
     .toLowerCase()
@@ -55,6 +60,14 @@ function slugId(label: string, model: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40);
   return raw || `model-${Date.now().toString(36)}`;
+}
+
+function uniqueModelId(label: string, model: string, existing: ModelPresetDto[]): string {
+  const base = slugId(label, model);
+  if (!existing.some((item) => item.id === base)) return base;
+  let n = 2;
+  while (existing.some((item) => item.id === `${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
 }
 
 function draftFrom(agent: AgentConfigDto) {
@@ -102,7 +115,7 @@ export function TeamHub({
   const [defaultAgentId, setDefaultAgentId] = useState(config.defaultAgentId);
   const [models, setModels] = useState<ModelPresetDto[]>(catalog);
   const [newLabel, setNewLabel] = useState('');
-  const [newBin, setNewBin] = useState('opencode');
+  const [newBins, setNewBins] = useState<string[]>(['opencode']);
   const [newModel, setNewModel] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
@@ -217,7 +230,7 @@ export function TeamHub({
           {pane === 'models' ? (
             <section className="space-y-3">
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
-                对齐 clowder 的账号/模型页:这里登记「能跑的模型」,成员页只做选择。
+                对齐 clowder:模型先登记、可挂多条 CLI;成员页选 CLI 后再选模型。密钥仍由各 CLI 自己管。
               </p>
               {models.map((preset) => (
                 <div
@@ -228,7 +241,7 @@ export function TeamHub({
                     <div className="min-w-0">
                       <div className="text-sm font-bold">{preset.label}</div>
                       <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">
-                        {preset.bin} · {preset.model}
+                        {presetBins(preset).join(', ')} · {preset.model}
                       </div>
                       {verifyNotes[preset.id] && (
                         <div
@@ -264,7 +277,7 @@ export function TeamHub({
                   </div>
                 </div>
               ))}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <label className="block text-xs text-[var(--ink-soft)]">
                   显示名
                   <input
@@ -273,18 +286,6 @@ export function TeamHub({
                     onChange={(e) => setNewLabel(e.target.value)}
                     placeholder="DeepSeek Flash"
                   />
-                </label>
-                <label className="block text-xs text-[var(--ink-soft)]">
-                  模型 CLI
-                  <select
-                    className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--ink)]"
-                    value={newBin}
-                    onChange={(e) => setNewBin(e.target.value)}
-                  >
-                    <option value="opencode">opencode</option>
-                    <option value="claude">claude</option>
-                    <option value="gemini">gemini</option>
-                  </select>
                 </label>
                 <label className="block text-xs text-[var(--ink-soft)]">
                   模型 ID
@@ -296,6 +297,25 @@ export function TeamHub({
                   />
                 </label>
               </div>
+              <fieldset className="text-xs text-[var(--ink-soft)]">
+                <legend className="mb-1">可用 CLI</legend>
+                <div className="flex flex-wrap gap-3">
+                  {CLI_OPTIONS.map((bin) => (
+                    <label key={bin} className="flex items-center gap-1.5 text-sm text-[var(--ink)]">
+                      <input
+                        type="checkbox"
+                        checked={newBins.includes(bin)}
+                        onChange={() =>
+                          setNewBins((list) =>
+                            list.includes(bin) ? list.filter((item) => item !== bin) : [...list, bin],
+                          )
+                        }
+                      />
+                      {bin}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               {verifyNotes.draft && (
                 <div
                   className={`text-[11px] ${
@@ -315,7 +335,7 @@ export function TeamHub({
                   disabled={verifyingId === 'draft'}
                   onClick={() =>
                     void runVerify('draft', {
-                      bin: newBin,
+                      bin: newBins[0] ?? '',
                       model: newModel.trim(),
                       label: newLabel.trim() || newModel.trim(),
                     })
@@ -328,11 +348,17 @@ export function TeamHub({
                   type="button"
                   onClick={() => {
                     const model = newModel.trim();
-                    if (!model) return;
+                    if (!model || newBins.length === 0) return;
                     const label = newLabel.trim() || model;
                     setModels((list) => [
                       ...list,
-                      { id: slugId(label, model), label, bin: newBin, model },
+                      {
+                        id: uniqueModelId(label, model, list),
+                        label,
+                        bin: newBins[0]!,
+                        bins: [...newBins],
+                        model,
+                      },
                     ]);
                     setNewLabel('');
                     setNewModel('');
@@ -458,7 +484,7 @@ export function TeamHub({
                         onChange={(e) => {
                           const bin = e.target.value;
                           const stillValid = models.find(
-                            (m) => m.id === draft.modelId && m.bin === bin,
+                            (m) => m.id === draft.modelId && presetBins(m).includes(bin),
                           );
                           setDraft({
                             ...draft,
@@ -486,17 +512,21 @@ export function TeamHub({
                         onChange={(e) => {
                           const modelId = e.target.value;
                           const preset = models.find((m) => m.id === modelId);
+                          const bins = preset ? presetBins(preset) : [];
                           setDraft({
                             ...draft,
                             modelId,
-                            bin: preset?.bin ?? draft.bin,
+                            bin:
+                              preset && bins.includes(draft.bin)
+                                ? draft.bin
+                                : (bins[0] ?? draft.bin),
                             model: preset?.model ?? '',
                           });
                         }}
                       >
                         <option value="">使用 CLI 默认</option>
                         {models
-                          .filter((preset) => preset.bin === draft.bin)
+                          .filter((preset) => presetBins(preset).includes(draft.bin))
                           .map((preset) => (
                             <option key={preset.id} value={preset.id}>
                               {preset.label}
@@ -505,14 +535,14 @@ export function TeamHub({
                       </select>
                     </label>
                   </div>
-                  {models.filter((preset) => preset.bin === draft.bin).length === 0 && (
+                  {models.filter((preset) => presetBins(preset).includes(draft.bin)).length === 0 && (
                     <p className="text-[11px] text-[var(--ink-soft)]">
-                      这条 CLI 还没有模型,去左侧「模型目录」添加后再选。
+                      这条 CLI 还没有模型,去左侧「模型目录」勾上对应 CLI 后再选。
                     </p>
                   )}
                   {selectedPreset && (
                     <p className="text-xs text-[var(--ink-soft)]">
-                      {selectedPreset.bin} · {selectedPreset.model}
+                      {presetBins(selectedPreset).join(', ')} · {selectedPreset.model}
                     </p>
                   )}
                   <label className="flex items-center gap-2 text-sm">

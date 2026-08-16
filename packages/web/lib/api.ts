@@ -46,6 +46,7 @@ export interface ModelPresetDto {
   id: string;
   label: string;
   bin: string;
+  bins?: string[];
   model: string;
 }
 

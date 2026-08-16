@@ -8,6 +8,7 @@
       "id": "flash",
       "label": "DeepSeek Flash",
       "bin": "opencode",
+      "bins": ["opencode"],
       "model": "opencode-go/deepseek-v4-flash"
     }
   ],

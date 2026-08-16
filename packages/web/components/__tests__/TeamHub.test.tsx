@@ -100,13 +100,46 @@ describe('TeamHub', () => {
       />,
     );
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Sonnet' } });
-    fireEvent.change(screen.getByLabelText('模型 CLI'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'opencode' }));
     fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'sonnet' } });
     fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
     fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
     expect(onSaveModels).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ label: 'Sonnet', bin: 'claude', model: 'sonnet' }),
+        expect.objectContaining({
+          label: 'Sonnet',
+          bins: ['claude'],
+          bin: 'claude',
+          model: 'sonnet',
+        }),
+      ]),
+    );
+  });
+
+  it('目录模型可勾多个 CLI', () => {
+    const onSaveModels = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveModels={onSaveModels}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Flash 多路' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
+    fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'opencode-go/deepseek-v4-flash' } });
+    fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
+    expect(onSaveModels).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bins: ['opencode', 'claude'],
+          model: 'opencode-go/deepseek-v4-flash',
+        }),
       ]),
     );
   });
@@ -157,6 +190,41 @@ describe('TeamHub', () => {
       expect.objectContaining({
         modelId: 'flash',
         bin: 'opencode',
+        model: 'opencode-go/deepseek-v4-flash',
+      }),
+    );
+  });
+
+  it('支持当前 CLI 的模型不用先改 CLI', () => {
+    const onSaveAgent = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={{
+          ...config,
+          models: [
+            {
+              id: 'flash',
+              label: 'Flash',
+              bin: 'opencode',
+              bins: ['opencode', 'claude'],
+              model: 'opencode-go/deepseek-v4-flash',
+            },
+          ],
+        }}
+        focusAgentId="claude"
+        onClose={() => {}}
+        onSaveAgent={onSaveAgent}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('选用模型'), { target: { value: 'flash' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存这只猫' }));
+    expect(onSaveAgent).toHaveBeenCalledWith(
+      'claude',
+      expect.objectContaining({
+        modelId: 'flash',
+        bin: 'claude',
         model: 'opencode-go/deepseek-v4-flash',
       }),
     );

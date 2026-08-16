@@ -5,7 +5,10 @@ import { AGENT_IDS } from '@meowbase/shared';
 export interface ModelPreset {
   id: string;
   label: string;
+  /** 兼容旧配置与探测默认值,等于 bins[0] */
   bin: string;
+  /** 能跑这条模型的 CLI,对齐 clowder:模型与 client 解耦 */
+  bins: string[];
   model: string;
 }
 
@@ -42,6 +45,7 @@ export const DEFAULT_MODELS: ModelPreset[] = [
     id: 'flash',
     label: 'DeepSeek Flash',
     bin: 'opencode',
+    bins: ['opencode'],
     model: 'opencode-go/deepseek-v4-flash',
   },
 ];
@@ -99,7 +103,50 @@ export function cloneAgentSpec(spec: AgentSpec): AgentSpec {
 }
 
 export function cloneModelPreset(spec: ModelPreset): ModelPreset {
-  return { ...spec };
+  return { ...spec, bins: [...spec.bins] };
+}
+
+export function uniqueBins(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of list) {
+    if (typeof item !== 'string') continue;
+    const bin = item.trim();
+    if (!bin || seen.has(bin)) continue;
+    seen.add(bin);
+    out.push(bin);
+  }
+  return out;
+}
+
+export function modelBins(preset: { bin?: string; bins?: string[] }): string[] {
+  const fromBins = uniqueBins(preset.bins);
+  if (fromBins.length > 0) return fromBins;
+  return uniqueBins(preset.bin);
+}
+
+export function withModelBins(input: {
+  id: string;
+  label: string;
+  model: string;
+  bin?: string;
+  bins?: string[];
+}): ModelPreset | null {
+  const bins = modelBins(input);
+  if (!input.id || !input.model || bins.length === 0) return null;
+  return { id: input.id, label: input.label, model: input.model, bins, bin: bins[0]! };
+}
+
+export function resolvePresetBin(
+  preset: { bin?: string; bins?: string[] },
+  currentBin?: string,
+  requestedBin?: string,
+): string {
+  const bins = modelBins(preset);
+  if (requestedBin && bins.includes(requestedBin)) return requestedBin;
+  if (currentBin && bins.includes(currentBin)) return currentBin;
+  return bins[0] ?? '';
 }
 
 export function slugModelId(model: string, bin: string): string {
@@ -119,14 +166,20 @@ export function parseModelCatalog(raw: unknown): ModelPreset[] | null {
     if (!row || typeof row !== 'object') return null;
     const rec = row as Record<string, unknown>;
     const id = typeof rec.id === 'string' ? rec.id.trim() : '';
-    const bin = typeof rec.bin === 'string' ? rec.bin.trim() : '';
     const model = typeof rec.model === 'string' ? rec.model.trim() : '';
     const label =
       typeof rec.label === 'string' && rec.label.trim() ? rec.label.trim() : model;
-    if (!id || !bin || !model) return null;
-    if (seen.has(id)) return null;
-    seen.add(id);
-    out.push({ id, label, bin, model });
+    const preset = withModelBins({
+      id,
+      label,
+      model,
+      bin: typeof rec.bin === 'string' ? rec.bin : undefined,
+      bins: Array.isArray(rec.bins) ? (rec.bins as string[]) : undefined,
+    });
+    if (!preset) return null;
+    if (seen.has(preset.id)) return null;
+    seen.add(preset.id);
+    out.push(preset);
   }
   return out;
 }
@@ -149,12 +202,13 @@ export function normalizeModelCatalog(
   }
   for (const agent of agents) {
     if (!agent.model) continue;
-    const hit = out.find((m) => m.model === agent.model && m.bin === agent.bin);
+    const hit = out.find((m) => m.model === agent.model && modelBins(m).includes(agent.bin));
     if (!hit) {
       add({
         id: slugModelId(agent.model, agent.bin),
         label: agent.model,
         bin: agent.bin,
+        bins: [agent.bin],
         model: agent.model,
       });
     }
@@ -172,11 +226,13 @@ export function syncAgentsWithCatalog(agents: AgentSpec[], models: ModelPreset[]
         delete next.modelId;
         return next;
       }
-      next.bin = preset.bin;
       next.model = preset.model;
+      next.bin = resolvePresetBin(preset, next.bin);
       return next;
     }
-    const match = models.find((m) => m.model === next.model && m.bin === next.bin);
+    const match = models.find(
+      (m) => m.model === next.model && modelBins(m).includes(next.bin),
+    );
     if (match) next.modelId = match.id;
     return next;
   });

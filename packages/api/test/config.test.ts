@@ -114,6 +114,32 @@ describe('模型目录', () => {
     expect(agentSpec(cfg, 'claude').model).toBe('opencode-go/deepseek-v4-flash');
     expect(agentSpec(cfg, 'claude').modelId).toBe('flash');
     expect(cfg.models.map((m) => m.id)).toEqual(['flash', 'sonnet']);
+    expect(cfg.models[0]?.bins).toEqual(['opencode']);
+  });
+
+  it('同一模型可挂多个 CLI,选用时保留猫自己的 CLI', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-multibin-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        models: [
+          {
+            id: 'flash',
+            label: 'Flash',
+            bins: ['opencode', 'claude'],
+            model: 'opencode-go/deepseek-v4-flash',
+          },
+        ],
+        agents: [{ id: 'claude', modelId: 'flash' }],
+      }),
+    );
+    const cfg = loadConfig({}, { configPath: path });
+    expect(agentSpec(cfg, 'claude').bin).toBe('claude');
+    expect(agentSpec(cfg, 'claude').model).toBe('opencode-go/deepseek-v4-flash');
+    expect(agentSpec(cfg, 'claude').modelId).toBe('flash');
+    expect(cfg.models[0]?.bins).toEqual(['opencode', 'claude']);
+    expect(cfg.models[0]?.bin).toBe('opencode');
   });
 });
 

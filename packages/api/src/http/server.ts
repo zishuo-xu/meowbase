@@ -24,6 +24,7 @@ import {
   normalizeModelCatalog,
   parseModelCatalog,
   publicAgentConfig,
+  resolvePresetBin,
   syncAgentsWithCatalog,
   writeTeamFile,
 } from '../config.js';
@@ -147,7 +148,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (body?.modelId?.trim()) {
       const preset = live.models.find((m) => m.id === body.modelId?.trim());
       if (!preset) return reply.code(404).send({ error: `模型目录没有: ${body.modelId}` });
-      bin = bin || preset.bin;
+      bin = bin || resolvePresetBin(preset, undefined, bin);
       model = model || preset.model;
     }
     if (!bin) return reply.code(400).send({ error: 'bin 不能为空' });
@@ -174,7 +175,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     }
     if (body?.models !== undefined) {
       const parsed = parseModelCatalog(body.models);
-      if (!parsed) return reply.code(400).send({ error: 'models 须为 {id,label,bin,model} 数组且 id 不重复' });
+      if (!parsed) return reply.code(400).send({ error: 'models 须为 {id,label,bins,model} 数组且 id 不重复' });
       const prevAgents = live.agents.map(cloneAgentSpec);
       live.models = parsed.map(cloneModelPreset);
       live.agents = syncAgentsWithCatalog(live.agents, live.models);
@@ -226,8 +227,12 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (typeof body.modelId === 'string' && body.modelId.trim()) {
       const preset = live.models.find((m) => m.id === body.modelId.trim());
       if (!preset) return reply.code(400).send({ error: `模型目录没有: ${body.modelId}` });
-      body.bin = preset.bin;
       body.model = preset.model;
+      body.bin = resolvePresetBin(
+        preset,
+        live.agents[index]?.bin,
+        typeof body.bin === 'string' ? body.bin.trim() : undefined,
+      );
     }
     const prev = live.agents[index]!;
     const next = applyAgentPatch(prev, body);
