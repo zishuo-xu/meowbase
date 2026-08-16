@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+:root {
+  --surface: #faf7f1;
+  --surface-raised: #ffffff;
+  --ink: #2c2a27;
+  --ink-soft: #6b6660;
+  --accent: #2f8f6b;
+  --accent-strong: #23704f;
+  --border: #e5dfd4;
+
+  --cat-claude-surface: #e4eaf4;
+  --cat-claude-badge: #3b5b8c;
+  --cat-gemini-surface: #ede7f6;
+  --cat-gemini-badge: #7c5ca8;
+  --cat-opencode-surface: #f6ead8;
+  --cat-opencode-badge: #b07a3c;
+  --cat-user-surface: #ffffff;
+  --cat-user-badge: #8a857d;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+}
