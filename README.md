@@ -7,7 +7,15 @@
 
 ```bash
 pnpm install
-pnpm --filter @meowbase/api dev   # 启动 API(需本机 Redis 与 claude CLI)
+pnpm dev   # 起 Redis + API(3200)+ Web(3300)
+```
+
+浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片按钮、证据确认。
+(API 需要本机 Redis 与 claude CLI;冒烟/演示可设 CLAUDE_BIN / OPENCODE_BIN 指向 fake)
+
+```bash
+# 仅 API:
+pnpm --filter @meowbase/api dev
 ```
 
 创建线程并让 claude 干活:
