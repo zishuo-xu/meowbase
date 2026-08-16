@@ -97,7 +97,7 @@ export function ChatArea({
           <div className="px-4 py-2 text-xs text-[var(--ink-soft)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 ring-1 ring-[var(--border)]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-              {phase === 'reviewing' ? '写完了，正在自动审查…' : '猫们正在干活…'}
+              {phase === 'reviewing' ? '猫们正在互审，通过才会交给你…' : '猫们正在干活…'}
             </span>
           </div>
         )}

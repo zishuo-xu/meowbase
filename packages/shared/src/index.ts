@@ -40,5 +40,7 @@ export {
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
+export type { ReviewVerdict } from './review-verdict.js';
+export { allowsAutoApprove, parseReviewVerdict } from './review-verdict.js';
 export type { A2AHandoff } from './a2a.js';
 export { findInlineA2AMentions, formatA2AHandoffPrompt, parseA2AHandoff } from './a2a.js';

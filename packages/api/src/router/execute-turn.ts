@@ -14,6 +14,8 @@ import {
   parseLearnCommand,
   parseMentionTargets,
   parseRejectCommand,
+  parseReviewVerdict,
+  allowsAutoApprove,
   selectReviewer,
   stripMentions,
 } from '@meowbase/shared';
@@ -23,6 +25,7 @@ import type {
   EvidenceEntry,
   MentionCatalog,
   Message,
+  Skill,
   TeamMember,
   ToolActivity,
 } from '@meowbase/shared';
@@ -41,6 +44,15 @@ import { finalizeActivities, upsertToolActivity } from '../providers/tool-activi
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
+/** 审查需修改时,最多打回写手这么多轮;仍不通过才把卡片交给人 */
+export const MAX_REVIEW_FIX_ROUNDS = 2;
+
+type ThreadRuntime = {
+  id: string;
+  workdir: string;
+  sessions: Partial<Record<AgentId, string>>;
+  primaryAgentId: AgentId;
+};
 
 export interface TurnContext {
   stores: {
@@ -267,65 +279,23 @@ export async function executeTurn(input: {
     });
   }
 
-  // 审批流:完成轮有 diff → 卡片 + 自动审查(整条链结束后只查一次)
+  // 审批流:有 diff → 可见互审(需修改则打回写手再审) → 通过或轮次用尽才出卡片
   if (lastOutput.status === 'completed') {
     try {
       await gitAddAll(thread.workdir);
       const diff = await gitDiffHead(thread.workdir);
       if (diff) {
-        // writer 归属链上首个执行者(改动可能由链上任何 agent 产生)
         const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;
-        const reviewerAgentId = selectReviewer(writerAgentId, context.registry.list());
-        const card = await context.stores.approvals.create({
+        await runReviewFixThenCard({
+          context,
+          thread,
           threadId,
           writerAgentId,
-          reviewerAgentId: reviewerAgentId ?? writerAgentId,
-          diffText: diff.text,
-          diffStat: diff.stat,
-        });
-        let reviewComment = '(无可用审查 agent)';
-        if (reviewerAgentId && reviewerAgentId !== writerAgentId) {
-          const reviewerService = context.registry.get(reviewerAgentId);
-          if (reviewerService) {
-            const reviewerProfile = await context.stores.profiles.get(reviewerAgentId);
-            const reviewSkill = (await context.stores.skills.list()).find(
-              (s) => s.id === 'review',
-            );
-            const reviewerPrompt = buildSystemPrompt({
-              profile: reviewerProfile ?? undefined,
-              skills: reviewSkill ? [reviewSkill] : [],
-              evidenceRefs: [],
-            });
-            const reviewOutput = await reviewerService.runTurn({
-              prompt: `请作为审查官审查以下代码改动,只审查线程工作目录中本次产生的改动,不要审查平台自身代码,输出:问题列表→建议→结论(通过/需修改)\n\n${diff.stat}\n\n${diff.text}`,
-              systemPrompt: reviewerPrompt,
-              workdir: thread.workdir,
-            });
-            reviewComment = reviewOutput.content || '(审查无输出)';
-          }
-        }
-        await context.stores.approvals.setReviewComment(card.id, reviewComment);
-
-        // autoApprove:写手角色配置了自动批准 → 审查后直接批准落地
-        const writerProfile = await context.stores.profiles.get(writerAgentId);
-        if (writerProfile?.autoApprove) {
-          // 状态机要求:reviewing → approved → applied
-          await context.stores.approvals.approve(card.id);
-          try {
-            await gitCommit(thread.workdir, `approve ${card.id}`);
-          } catch {
-            // 提交失败不阻塞,批准决策生效
-          }
-          await context.stores.approvals.markApplied(card.id);
-        }
-
-        await context.stores.messages.append({
-          threadId,
-          role: 'system',
-          content: writerProfile?.autoApprove
-            ? `🤖 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n✅ 已自动批准(autoApprove)`
-            : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
-          status: 'completed',
+          initialDiff: diff,
+          writeQueue,
+          catalog,
+          team,
+          refs,
         });
       }
     } catch {
@@ -357,8 +327,7 @@ async function runSegment(
   let firstAgent: AgentId = segment.agentId;
 
   for (let hop = 0; hop < maxDepth; hop++) {
-    const service = context.registry.get(currentAgent);
-    if (!service) {
+    if (!context.registry.get(currentAgent)) {
       throw new Error(`没有可用的 agent: ${currentAgent}`);
     }
     visited.add(currentAgent);
@@ -385,73 +354,20 @@ async function runSegment(
         )
       : currentTask;
 
-    const assistantMessage = await writeQueue(() =>
-      context.stores.messages.append({
-        threadId: thread.id,
-        role: 'assistant',
-        agentId: currentAgent,
-        content: '',
-        status: 'streaming',
-      }),
-    );
-
-    context.onStart?.(thread.id, assistantMessage.id, currentAgent);
-
-    let accumulated = '';
-    let thinking = '';
-    let activities: ToolActivity[] = [];
-    const output = await service.runTurn({
+    const hopResult = await runAgentTurn(
+      context,
+      thread,
+      currentAgent,
       prompt,
       systemPrompt,
-      sessionId: thread.sessions[currentAgent],
-      workdir: thread.workdir,
-      onIncrement: (delta) => {
-        // 只推送增量到 WS;落库由结束时的一次性 patch 完成,
-        // 避免无锁 read-modify-write 并发覆盖(Redis 版竞态)
-        accumulated += delta;
-        context.onIncrement?.(thread.id, assistantMessage.id, delta, currentAgent);
-      },
-      onThinking: (delta) => {
-        thinking += delta;
-        context.onThinking?.(thread.id, assistantMessage.id, delta, currentAgent);
-      },
-      onActivity: (activity) => {
-        activities = upsertToolActivity(activities, activity);
-        const latest = activities.find((a) => a.id === activity.id) ?? activity;
-        context.onActivity?.(thread.id, assistantMessage.id, latest, currentAgent);
-      },
-    });
-
-    if (output.sessionId && thread.sessions[currentAgent] !== output.sessionId) {
-      await context.stores.threads.setSession(thread.id, currentAgent, output.sessionId);
-    }
-
-    lastAssistant = await writeQueue(() =>
-      context.stores.messages.patch(thread.id, assistantMessage.id, {
-        content: output.content || accumulated,
-        status: output.status,
-        usage: output.usage,
-        error: output.error,
-        sessionId: output.sessionId || undefined,
-        ...(activities.length > 0
-          ? { activities: finalizeActivities(activities, output.status === 'completed') }
-          : {}),
-        ...(thinking ? { thinking } : {}),
-      }),
+      writeQueue,
     );
-    lastOutput = output;
-    prevContent = output.content || accumulated;
-
-    // 沙箱清扫:agent 写到仓库根(沙箱外)的未跟踪文件移回线程沙箱
-    try {
-      const repoRoot = resolve(thread.workdir, '..', '..');
-      await sweepStrayFiles(repoRoot, thread.workdir);
-    } catch {
-      // 清扫失败不阻塞
-    }
+    lastAssistant = hopResult.assistant;
+    lastOutput = hopResult.output;
+    prevContent = hopResult.content;
 
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
-    if (output.status !== 'completed') break;
+    if (lastOutput.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
     if (!handoff) {
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
@@ -496,3 +412,206 @@ async function runSegment(
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');
   return { lastAssistant, lastOutput, visited, firstAgent };
 }
+
+async function runAgentTurn(
+  context: TurnContext,
+  thread: ThreadRuntime,
+  currentAgent: AgentId,
+  prompt: string,
+  systemPrompt: string | undefined,
+  writeQueue: WriteQueue,
+): Promise<{ assistant: Message; output: AgentTurnOutput; content: string }> {
+  const service = context.registry.get(currentAgent);
+  if (!service) throw new Error(`没有可用的 agent: ${currentAgent}`);
+
+  const assistantMessage = await writeQueue(() =>
+    context.stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: currentAgent,
+      content: '',
+      status: 'streaming',
+    }),
+  );
+
+  context.onStart?.(thread.id, assistantMessage.id, currentAgent);
+
+  let accumulated = '';
+  let thinking = '';
+  let activities: ToolActivity[] = [];
+  const output = await service.runTurn({
+    prompt,
+    systemPrompt,
+    sessionId: thread.sessions[currentAgent],
+    workdir: thread.workdir,
+    onIncrement: (delta) => {
+      accumulated += delta;
+      context.onIncrement?.(thread.id, assistantMessage.id, delta, currentAgent);
+    },
+    onThinking: (delta) => {
+      thinking += delta;
+      context.onThinking?.(thread.id, assistantMessage.id, delta, currentAgent);
+    },
+    onActivity: (activity) => {
+      activities = upsertToolActivity(activities, activity);
+      const latest = activities.find((a) => a.id === activity.id) ?? activity;
+      context.onActivity?.(thread.id, assistantMessage.id, latest, currentAgent);
+    },
+  });
+
+  if (output.sessionId && thread.sessions[currentAgent] !== output.sessionId) {
+    await context.stores.threads.setSession(thread.id, currentAgent, output.sessionId);
+  }
+
+  const assistant = await writeQueue(() =>
+    context.stores.messages.patch(thread.id, assistantMessage.id, {
+      content: output.content || accumulated,
+      status: output.status,
+      usage: output.usage,
+      error: output.error,
+      sessionId: output.sessionId || undefined,
+      ...(activities.length > 0
+        ? { activities: finalizeActivities(activities, output.status === 'completed') }
+        : {}),
+      ...(thinking ? { thinking } : {}),
+    }),
+  );
+
+  try {
+    const repoRoot = resolve(thread.workdir, '..', '..');
+    await sweepStrayFiles(repoRoot, thread.workdir);
+  } catch {
+    // 清扫失败不阻塞
+  }
+
+  return { assistant, output, content: output.content || accumulated };
+}
+
+function reviewPrompt(diff: { stat: string; text: string }): string {
+  return (
+    '请作为审查官审查以下代码改动,只审查线程工作目录中本次产生的改动,不要审查平台自身代码。' +
+    '输出:问题列表→建议→结论(通过/需修改)。结论必须单独写明「通过」或「需修改」。' +
+    '需修改时列出要点,不要问人,不要 @ 其他人(平台会按结论自动打回写手再审)。\n\n' +
+    `${diff.stat}\n\n${diff.text}`
+  );
+}
+
+async function runReviewFixThenCard(input: {
+  context: TurnContext;
+  thread: ThreadRuntime;
+  threadId: string;
+  writerAgentId: AgentId;
+  initialDiff: { text: string; stat: string };
+  writeQueue: WriteQueue;
+  catalog: MentionCatalog;
+  team: readonly TeamMember[];
+  refs: EvidenceEntry[];
+}): Promise<void> {
+  const { context, thread, threadId, writerAgentId, writeQueue, catalog, team, refs } = input;
+  const reviewerAgentId = selectReviewer(writerAgentId, context.registry.list());
+  let latestDiff = input.initialDiff;
+  let reviewComment = '(无可用审查 agent)';
+
+  if (reviewerAgentId && reviewerAgentId !== writerAgentId && context.registry.get(reviewerAgentId)) {
+    const reviewSkill = (await context.stores.skills.list()).find((s: Skill) => s.id === 'review');
+    const reviewerStored = (await context.stores.profiles.get(reviewerAgentId)) ?? undefined;
+    const reviewerSpec = context.agents?.find((a) => a.id === reviewerAgentId);
+    const reviewerPrompt = buildSystemPrompt({
+      profile: overlayProfile(reviewerStored, reviewerSpec),
+      skills: reviewSkill ? [reviewSkill] : [],
+      evidenceRefs: [],
+    });
+
+    for (let round = 0; round <= MAX_REVIEW_FIX_ROUNDS; round++) {
+      await writeQueue(() =>
+        context.stores.messages.append({
+          threadId,
+          role: 'system',
+          content: `🤝 审查:${displayName(writerAgentId, catalog)} → ${displayName(reviewerAgentId, catalog)}`,
+          status: 'completed',
+        }),
+      );
+      const reviewHop = await runAgentTurn(
+        context,
+        thread,
+        reviewerAgentId,
+        reviewPrompt(latestDiff),
+        reviewerPrompt,
+        writeQueue,
+      );
+      reviewComment = reviewHop.content || '(审查无输出)';
+      if (parseReviewVerdict(reviewComment) !== 'revise') break;
+      if (round >= MAX_REVIEW_FIX_ROUNDS) break;
+
+      await writeQueue(() =>
+        context.stores.messages.append({
+          threadId,
+          role: 'system',
+          content: `🤝 打回:${displayName(reviewerAgentId, catalog)} → ${displayName(writerAgentId, catalog)}`,
+          status: 'completed',
+        }),
+      );
+      const writerStored = thread.sessions[writerAgentId]
+        ? undefined
+        : ((await context.stores.profiles.get(writerAgentId)) ?? undefined);
+      const writerSpec = context.agents?.find((a) => a.id === writerAgentId);
+      const writerProfile = overlayProfile(writerStored, writerSpec);
+      const fixSkills = await matchSkills(reviewComment, await context.stores.skills.list());
+      const fixPrompt = formatA2AHandoffPrompt(
+        displayName(reviewerAgentId, catalog),
+        reviewerAgentId,
+        reviewComment,
+        '审查结论为需修改。请只修复上述问题,改完不要问人,不要再 @ 审查官(平台会自动再审一轮)。',
+      );
+      await runAgentTurn(
+        context,
+        thread,
+        writerAgentId,
+        fixPrompt,
+        buildSystemPrompt({
+          profile: writerProfile,
+          team,
+          skills: fixSkills,
+          evidenceRefs: refs,
+        }),
+        writeQueue,
+      );
+      await gitAddAll(thread.workdir);
+      latestDiff = (await gitDiffHead(thread.workdir)) ?? latestDiff;
+    }
+  }
+
+  const card = await context.stores.approvals.create({
+    threadId,
+    writerAgentId,
+    reviewerAgentId: reviewerAgentId ?? writerAgentId,
+    diffText: latestDiff.text,
+    diffStat: latestDiff.stat,
+  });
+  await context.stores.approvals.setReviewComment(card.id, reviewComment);
+
+  const writerProfile = await context.stores.profiles.get(writerAgentId);
+  const autoApplied = allowsAutoApprove(reviewComment, writerProfile?.autoApprove);
+  if (autoApplied) {
+    await context.stores.approvals.approve(card.id);
+    try {
+      await gitCommit(thread.workdir, `approve ${card.id}`);
+    } catch {
+      // 提交失败不阻塞,批准决策生效
+    }
+    await context.stores.approvals.markApplied(card.id);
+  }
+
+  const revise = parseReviewVerdict(reviewComment) === 'revise';
+  await context.stores.messages.append({
+    threadId,
+    role: 'system',
+    content: autoApplied
+      ? `🤖 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n✅ 已自动批准(autoApprove)`
+      : revise
+        ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n互审后仍需修改，请你决定是否落地。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
+        : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
+    status: 'completed',
+  });
+}
+

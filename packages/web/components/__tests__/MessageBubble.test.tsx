@@ -158,6 +158,7 @@ describe('ApprovalCardBlock', () => {
     );
     expect(screen.getByText('墨墨 写 · 团团 审')).toBeTruthy();
     expect(screen.getByText('待你确认')).toBeTruthy();
+    expect(screen.getByText('审查通过，待你确认')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '批准落地' }));
     expect(onApprove).toHaveBeenCalledWith('ap_a1b2c3d4');
     fireEvent.click(screen.getByRole('button', { name: '打回' }));
@@ -178,7 +179,23 @@ describe('ApprovalCardBlock', () => {
       />,
     );
     expect(screen.getByText('已落地')).toBeTruthy();
+    expect(screen.getByText('改动已落地')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
     expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
+  });
+
+  it('审查未通过时标题改为待你决定', () => {
+    render(
+      <ApprovalCardBlock
+        approvalId="ap_a1b2c3d4"
+        stat="x.txt | 1 +"
+        comment={'## 结论\n需修改'}
+        status="pending"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('互审未通过，待你决定')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '批准落地' })).toBeTruthy();
   });
 });

@@ -66,3 +66,17 @@ export function approvalStatusFromDto(status: string | undefined): ApprovalUiSta
   if (status === 'draft' || status === 'reviewing') return 'pending';
   return undefined;
 }
+
+function reviewLooksRevise(comment: string): boolean {
+  const conclusion = comment.match(/(?:^|\n)#*\s*结论\s*[:：]?\s*\n?([\s\S]*)$/)?.[1] ?? comment;
+  const reviseIdx = conclusion.search(/需修改|不通过|未通过|请修复/);
+  const passIdx = conclusion.search(/通过|LGTM|可以合入/);
+  return reviseIdx >= 0 && (passIdx < 0 || reviseIdx <= passIdx);
+}
+
+export function approvalCardTitle(status: ApprovalUiStatus, comment = ''): string {
+  if (status === 'applied') return '改动已落地';
+  if (status === 'rejected') return '已打回';
+  if (reviewLooksRevise(comment)) return '互审未通过，待你决定';
+  return '审查通过，待你确认';
+}

@@ -3,7 +3,7 @@ import { createMemoryStores } from '../src/stores/factories.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
-import { executeTurn } from '../src/router/execute-turn.js';
+import { executeTurn, MAX_REVIEW_FIX_ROUNDS } from '../src/router/execute-turn.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -430,6 +430,98 @@ describe('executeTurn 审批流', () => {
     const messages = await stores.messages.list(thread.id);
     const cardMsg = messages.find((m) => m.role === 'system' && m.content.includes('审批卡片'));
     expect(cardMsg?.content).toContain('#approve');
+    expect(messages.some((m) => m.role === 'assistant' && m.agentId === 'opencode')).toBe(true);
+    expect(messages.some((m) => m.role === 'system' && m.content.includes('🤝 审查:'))).toBe(true);
+  });
+
+  it('审查需修改 → 打回写手再审,通过后才出卡片', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let writerCalls = 0;
+    let reviewRound = 0;
+    const writerPrompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          writerCalls += 1;
+          writerPrompts.push(input.prompt);
+          return { sessionId: 's-w', content: `写好了#${writerCalls}`, status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          reviewRound += 1;
+          const content =
+            reviewRound === 1
+              ? '## 问题\n缺测试\n## 结论\n需修改'
+              : '## 结论\n通过';
+          return { sessionId: 's-r', content, status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+
+    expect(writerCalls).toBe(2);
+    expect(reviewRound).toBe(2);
+    expect(writerPrompts[1]).toContain('需修改');
+    expect(writerPrompts[1]).toContain('审查');
+
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('🤝 打回:'))).toBe(true);
+    const reviewers = messages.filter((m) => m.role === 'assistant' && m.agentId === 'opencode');
+    expect(reviewers.length).toBe(2);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewComment).toContain('通过');
+    expect(card?.status).toBe('reviewing');
+    const cardMsg = messages.find((m) => m.content.includes('审批卡片'));
+    expect(cardMsg?.content).toContain('#approve');
+    expect(cardMsg?.content).toContain('通过');
+  });
+
+  it('autoApprove 遇需修改不落地,打回再审仍不通过则等人', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let writerCalls = 0;
+    let reviewRound = 0;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          writerCalls += 1;
+          return { sessionId: 's-w', content: '写好了', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          reviewRound += 1;
+          return { sessionId: 's-r', content: '## 结论\n需修改\n请修栈溢出', status: 'completed' };
+        },
+      },
+    ]);
+    await stores.profiles.create({
+      agentId: 'claude', name: '墨墨', personality: 'x', role: '写手', expertise: [],
+      autoApprove: true,
+    });
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'auto.txt'), 'v1');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+
+    expect(writerCalls).toBe(1 + MAX_REVIEW_FIX_ROUNDS);
+    expect(reviewRound).toBe(1 + MAX_REVIEW_FIX_ROUNDS);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.status).toBe('reviewing');
+    const cardMsg = (await stores.messages.list(thread.id)).find((m) => m.content.includes('审批卡片'));
+    expect(cardMsg?.content).toContain('仍需修改');
+    expect(cardMsg?.content).not.toContain('已自动批准');
   });
 
   it('无 diff 不创建卡片', async () => {

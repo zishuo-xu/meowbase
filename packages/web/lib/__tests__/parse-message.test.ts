@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHiddenChatMessage, parseMessage } from '../parse-message';
+import { approvalCardTitle, isHiddenChatMessage, parseMessage } from '../parse-message';
 
 describe('parseMessage', () => {
   it('📋 审批卡片 → approval 块', () => {
@@ -67,5 +67,14 @@ describe('isHiddenChatMessage', () => {
     expect(isHiddenChatMessage({ role: 'system', content: '⛔ 已打回:ap_a1b2c3d4 理由:打回' })).toBe(true);
     expect(isHiddenChatMessage({ role: 'user', content: '@墨墨 继续' })).toBe(false);
     expect(isHiddenChatMessage({ role: 'system', content: '✅ 已沉淀:标题' })).toBe(false);
+  });
+});
+
+describe('approvalCardTitle', () => {
+  it('按状态和审查结论写标题,不再一律待确认', () => {
+    expect(approvalCardTitle('pending', '结论:通过')).toBe('审查通过，待你确认');
+    expect(approvalCardTitle('pending', '## 结论\n需修改')).toBe('互审未通过，待你决定');
+    expect(approvalCardTitle('applied', '通过')).toBe('改动已落地');
+    expect(approvalCardTitle('rejected', '需修改')).toBe('已打回');
   });
 });
