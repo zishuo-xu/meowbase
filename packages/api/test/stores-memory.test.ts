@@ -84,3 +84,40 @@ describe('内存 Profile/Evidence 存储', () => {
     expect((await evidence.get('不存在的id'))).toBeNull();
   });
 });
+
+describe('内存 Approval 存储', () => {
+  it('create → approve → markApplied 状态流转', async () => {
+    const { approvals } = createMemoryStores();
+    const card = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd', diffStat: '1 file changed',
+    });
+    expect(card.id).toMatch(/^ap_[a-f0-9]{8}$/);
+    expect(card.status).toBe('draft');
+
+    const approved = await approvals.approve(card.id);
+    expect(approved?.status).toBe('approved');
+    expect(await approvals.approve(card.id)).toBeNull();
+
+    const applied = await approvals.markApplied(card.id);
+    expect(applied?.status).toBe('applied');
+  });
+
+  it('reject 带理由;list 按线程过滤;setReviewComment', async () => {
+    const { approvals } = createMemoryStores();
+    const card = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd', diffStat: 's',
+    });
+    const reviewed = await approvals.setReviewComment(card.id, '审查意见');
+    expect(reviewed?.status).toBe('reviewing');
+    expect(reviewed?.reviewComment).toBe('审查意见');
+
+    const rejected = await approvals.reject(card.id, '理由');
+    expect(rejected?.status).toBe('rejected');
+    expect(rejected?.rejectReason).toBe('理由');
+    expect(await approvals.reject(card.id, 'x')).toBeNull();
+    expect((await approvals.list('t1')).length).toBe(1);
+    expect(await approvals.get('ap_00000000')).toBeNull();
+  });
+});

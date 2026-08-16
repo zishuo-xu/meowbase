@@ -1,6 +1,7 @@
 import type {
   AgentId,
   AgentProfile,
+  ApprovalCard,
   EvidenceEntry,
   EvidenceKind,
   Message,
@@ -61,4 +62,20 @@ export interface EvidenceStore {
 export interface SkillStore {
   list(): Promise<Skill[]>;
   get(id: string): Promise<Skill | null>;
+}
+
+export interface ApprovalStore {
+  create(input: {
+    threadId: string;
+    writerAgentId: AgentId;
+    reviewerAgentId: AgentId;
+    diffText: string;
+    diffStat: string;
+  }): Promise<ApprovalCard>;
+  get(id: string): Promise<ApprovalCard | null>;
+  list(threadId?: string): Promise<ApprovalCard[]>;
+  setReviewComment(id: string, comment: string): Promise<ApprovalCard | null>;
+  approve(id: string): Promise<ApprovalCard | null>;
+  reject(id: string, reason: string): Promise<ApprovalCard | null>;
+  markApplied(id: string): Promise<ApprovalCard | null>;
 }

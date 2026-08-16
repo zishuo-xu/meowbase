@@ -1,15 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Redis } from 'ioredis';
-import { generateEvidenceId } from '@meowbase/shared';
+import { generateApprovalId, generateEvidenceId } from '@meowbase/shared';
 import type {
   AgentId,
   AgentProfile,
+  ApprovalCard,
   EvidenceEntry,
   Message,
   Thread,
 } from '@meowbase/shared';
-import type { EvidenceStore, MessageStore, ProfileStore, ThreadStore } from './ports.js';
+import type {
+  ApprovalStore,
+  EvidenceStore,
+  MessageStore,
+  ProfileStore,
+  ThreadStore,
+} from './ports.js';
 
 function threadKey(id: string): string {
   return `thread:${id}`;
@@ -260,5 +267,107 @@ export class RedisEvidenceStore implements EvidenceStore {
       if (entry && (!threadId || entry.threadId === threadId)) entries.push(entry);
     }
     return entries;
+  }
+}
+
+function approvalKey(id: string): string {
+  return `approval:${id}`;
+}
+
+export class RedisApprovalStore implements ApprovalStore {
+  constructor(private readonly redis: Redis) {}
+
+  private async hydrate(id: string): Promise<ApprovalCard | null> {
+    const raw = await this.redis.hgetall(approvalKey(id));
+    if (!raw.id) return null;
+    return {
+      id: raw.id,
+      threadId: raw.threadId ?? '',
+      writerAgentId: (raw.writerAgentId as AgentId) ?? 'claude',
+      reviewerAgentId: (raw.reviewerAgentId as AgentId) ?? 'opencode',
+      status: (raw.status as ApprovalCard['status']) ?? 'draft',
+      diffText: raw.diffText ?? '',
+      diffStat: raw.diffStat ?? '',
+      reviewComment: raw.reviewComment || undefined,
+      rejectReason: raw.rejectReason || undefined,
+      createdAt: raw.createdAt ?? '',
+    };
+  }
+
+  private async write(card: ApprovalCard): Promise<void> {
+    await this.redis.hset(approvalKey(card.id), {
+      id: card.id,
+      threadId: card.threadId,
+      writerAgentId: card.writerAgentId,
+      reviewerAgentId: card.reviewerAgentId,
+      status: card.status,
+      diffText: card.diffText,
+      diffStat: card.diffStat,
+      reviewComment: card.reviewComment ?? '',
+      rejectReason: card.rejectReason ?? '',
+      createdAt: card.createdAt,
+    });
+  }
+
+  async create(input: Parameters<ApprovalStore['create']>[0]): Promise<ApprovalCard> {
+    const card: ApprovalCard = {
+      id: generateApprovalId(),
+      threadId: input.threadId,
+      writerAgentId: input.writerAgentId,
+      reviewerAgentId: input.reviewerAgentId,
+      status: 'draft',
+      diffText: input.diffText,
+      diffStat: input.diffStat,
+      createdAt: new Date().toISOString(),
+    };
+    await this.write(card);
+    await this.redis.sadd('approval:index', card.id);
+    return card;
+  }
+
+  async get(id: string): Promise<ApprovalCard | null> {
+    return this.hydrate(id);
+  }
+
+  async list(threadId?: string): Promise<ApprovalCard[]> {
+    const ids = await this.redis.smembers('approval:index');
+    const cards: ApprovalCard[] = [];
+    for (const id of ids) {
+      const card = await this.hydrate(id);
+      if (card && (!threadId || card.threadId === threadId)) cards.push(card);
+    }
+    return cards;
+  }
+
+  async setReviewComment(id: string, comment: string): Promise<ApprovalCard | null> {
+    const card = await this.hydrate(id);
+    if (!card) return null;
+    const updated: ApprovalCard = { ...card, reviewComment: comment, status: 'reviewing' };
+    await this.write(updated);
+    return updated;
+  }
+
+  async approve(id: string): Promise<ApprovalCard | null> {
+    const card = await this.hydrate(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'approved' };
+    await this.write(updated);
+    return updated;
+  }
+
+  async reject(id: string, reason: string): Promise<ApprovalCard | null> {
+    const card = await this.hydrate(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'rejected', rejectReason: reason };
+    await this.write(updated);
+    return updated;
+  }
+
+  async markApplied(id: string): Promise<ApprovalCard | null> {
+    const card = await this.hydrate(id);
+    if (!card || card.status !== 'approved') return null;
+    const updated: ApprovalCard = { ...card, status: 'applied' };
+    await this.write(updated);
+    return updated;
   }
 }

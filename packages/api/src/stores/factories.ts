@@ -1,6 +1,7 @@
 import { Redis } from 'ioredis';
 import type { Skill } from '@meowbase/shared';
 import type {
+  ApprovalStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
@@ -8,6 +9,7 @@ import type {
   ThreadStore,
 } from './ports.js';
 import {
+  InMemoryApprovalStore,
   InMemoryEvidenceStore,
   InMemoryMessageStore,
   InMemoryProfileStore,
@@ -15,6 +17,7 @@ import {
   InMemoryThreadStore,
 } from './memory.js';
 import {
+  RedisApprovalStore,
   RedisEvidenceStore,
   RedisMessageStore,
   RedisProfileStore,
@@ -28,6 +31,7 @@ export function createMemoryStores(skills: Skill[] = []): {
   profiles: ProfileStore;
   evidence: EvidenceStore;
   skills: SkillStore;
+  approvals: ApprovalStore;
 } {
   return {
     threads: new InMemoryThreadStore(),
@@ -35,6 +39,7 @@ export function createMemoryStores(skills: Skill[] = []): {
     profiles: new InMemoryProfileStore(),
     evidence: new InMemoryEvidenceStore(),
     skills: new InMemorySkillStore(skills),
+    approvals: new InMemoryApprovalStore(),
   };
 }
 
@@ -56,4 +61,8 @@ export function createEvidenceStore(redis: Redis): EvidenceStore {
 
 export function createSkillStore(skillsDir: string): SkillStore {
   return new FileSkillStore(skillsDir);
+}
+
+export function createApprovalStore(redis: Redis): ApprovalStore {
+  return new RedisApprovalStore(redis);
 }

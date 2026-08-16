@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { generateEvidenceId } from '@meowbase/shared';
+import { generateApprovalId, generateEvidenceId } from '@meowbase/shared';
 import type {
   AgentId,
   AgentProfile,
+  ApprovalCard,
   EvidenceEntry,
   Message,
   Skill,
   Thread,
 } from '@meowbase/shared';
 import type {
+  ApprovalStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
@@ -173,5 +175,65 @@ export class InMemorySkillStore implements SkillStore {
 
   async get(id: string): Promise<Skill | null> {
     return this.skills.get(id) ?? null;
+  }
+}
+
+export class InMemoryApprovalStore implements ApprovalStore {
+  private readonly cards = new Map<string, ApprovalCard>();
+
+  async create(input: Parameters<ApprovalStore['create']>[0]): Promise<ApprovalCard> {
+    const card: ApprovalCard = {
+      id: generateApprovalId(),
+      threadId: input.threadId,
+      writerAgentId: input.writerAgentId,
+      reviewerAgentId: input.reviewerAgentId,
+      status: 'draft',
+      diffText: input.diffText,
+      diffStat: input.diffStat,
+      createdAt: new Date().toISOString(),
+    };
+    this.cards.set(card.id, card);
+    return card;
+  }
+
+  async get(id: string): Promise<ApprovalCard | null> {
+    return this.cards.get(id) ?? null;
+  }
+
+  async list(threadId?: string): Promise<ApprovalCard[]> {
+    const all = [...this.cards.values()];
+    return threadId ? all.filter((c) => c.threadId === threadId) : all;
+  }
+
+  async setReviewComment(id: string, comment: string): Promise<ApprovalCard | null> {
+    const card = this.cards.get(id);
+    if (!card) return null;
+    const updated: ApprovalCard = { ...card, reviewComment: comment, status: 'reviewing' };
+    this.cards.set(id, updated);
+    return updated;
+  }
+
+  async approve(id: string): Promise<ApprovalCard | null> {
+    const card = this.cards.get(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'approved' };
+    this.cards.set(id, updated);
+    return updated;
+  }
+
+  async reject(id: string, reason: string): Promise<ApprovalCard | null> {
+    const card = this.cards.get(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'rejected', rejectReason: reason };
+    this.cards.set(id, updated);
+    return updated;
+  }
+
+  async markApplied(id: string): Promise<ApprovalCard | null> {
+    const card = this.cards.get(id);
+    if (!card || card.status !== 'approved') return null;
+    const updated: ApprovalCard = { ...card, status: 'applied' };
+    this.cards.set(id, updated);
+    return updated;
   }
 }
