@@ -103,6 +103,24 @@ describe('MessageBubble', () => {
     expect(screen.getByText('已写好 quicksort.ts')).toBeTruthy();
   });
 
+  it('流式空壳显示思考中,不独留光标', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-empty',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '',
+          status: 'streaming',
+          createdAt: '',
+        }}
+      />,
+    );
+    expect(screen.getByText('思考中…')).toBeTruthy();
+    expect(screen.getByText('墨墨')).toBeTruthy();
+  });
+
   it('超时消息把进行中的工具显示为失败,不再转圈', () => {
     render(
       <MessageBubble

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MessageDto } from '../api';
-import { applyStreamActivity, applyStreamIncrement, applyStreamStart, applyStreamThinking, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
+import { applyStreamActivity, applyStreamIncrement, applyStreamStart, applyStreamThinking, dropAbandonedStreamShells, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
 
 function msg(partial: Partial<MessageDto> & Pick<MessageDto, 'id' | 'role' | 'content'>): MessageDto {
   return {
@@ -168,5 +168,18 @@ describe('pipelinePhase', () => {
         true,
       ),
     ).toBe('reviewing');
+  });
+});
+
+describe('dropAbandonedStreamShells', () => {
+  it('发送中保留空气泡', () => {
+    const shell = msg({ id: 'a1', role: 'assistant', content: '', status: 'streaming' });
+    expect(dropAbandonedStreamShells([shell], true)).toEqual([shell]);
+  });
+
+  it('发送结束后丢掉无内容的流式空壳', () => {
+    const shell = msg({ id: 'a1', role: 'assistant', content: '', status: 'streaming' });
+    const done = msg({ id: 'a2', role: 'assistant', content: '写好了' });
+    expect(dropAbandonedStreamShells([shell, done], false).map((m) => m.id)).toEqual(['a2']);
   });
 });

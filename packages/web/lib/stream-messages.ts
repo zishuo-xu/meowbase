@@ -158,6 +158,23 @@ export function pipelinePhase(
   return settled ? 'reviewing' : 'working';
 }
 
+/** 只有名字和光标、还没有任何思考/工具/正文的流式空壳 */
+export function isEmptyStreamShell(message: Pick<MessageDto, 'role' | 'status' | 'content' | 'thinking' | 'activities'>): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.status === 'streaming' &&
+    !message.content.trim() &&
+    !message.thinking?.trim() &&
+    !(message.activities && message.activities.length > 0)
+  );
+}
+
+/** 发送已结束时丢掉空气泡,避免 API 中断后页面上留一只空墨墨 */
+export function dropAbandonedStreamShells(messages: MessageDto[], sending: boolean): MessageDto[] {
+  if (sending) return messages;
+  return messages.filter((m) => !isEmptyStreamShell(m));
+}
+
 /**
  * 服务端快照与本地流式状态合并:
  * - 同 id 保留更长的 content(避免轮询/刷新把正在打的字盖掉)

@@ -94,8 +94,11 @@ export function MessageBubble({
             {displayName}
           </div>
         )}
-        {message.thinking && (
-          <ThinkingBlock content={message.thinking} streaming={message.status === 'streaming'} />
+        {(message.thinking?.trim() ||
+          (message.status === 'streaming' &&
+            !parsed.text &&
+            !(message.activities && message.activities.length > 0))) && (
+          <ThinkingBlock content={message.thinking ?? ''} streaming={message.status === 'streaming'} />
         )}
         {message.activities && message.activities.length > 0 && (
           <CliProcessBlock
@@ -103,14 +106,14 @@ export function MessageBubble({
             ended={message.status === 'failed' || message.status === 'terminated'}
           />
         )}
-        {(parsed.text || message.status === 'streaming') && (
+        {parsed.text ? (
           <div className="whitespace-pre-wrap break-words">
             {parsed.text}
             {message.status === 'streaming' && (
               <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
             )}
           </div>
-        )}
+        ) : null}
         {(message.status === 'failed' || message.status === 'terminated') && message.error && (
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>
         )}
