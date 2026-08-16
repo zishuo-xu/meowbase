@@ -60,4 +60,13 @@ describe('GeminiAdapter 参数', () => {
     delete process.env.RECORD_ARGS_FILE;
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('退出码非 0 时带上 stderr', async () => {
+    const failBin = join(import.meta.dirname, 'fixtures', 'fake-cli-fail.mjs');
+    const adapter = new GeminiAdapter({ bin: failBin });
+    const output = await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    expect(output.status).toBe('failed');
+    expect(output.error).toMatch(/退出码 1/);
+    expect(output.error).toMatch(/API key not found/);
+  });
 });

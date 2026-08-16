@@ -89,6 +89,9 @@ export function MessageBubble({
             <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
           )}
         </div>
+        {(message.status === 'failed' || message.status === 'terminated') && message.error && (
+          <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>
+        )}
       </div>
     </div>
   );

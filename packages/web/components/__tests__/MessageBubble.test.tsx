@@ -23,6 +23,26 @@ describe('MessageBubble', () => {
     expect(screen.getByText('墨墨')).toBeTruthy();
   });
 
+  it('失败且无正文时显示错误', () => {
+    render(
+      <MessageBubble
+        agentName="闪闪"
+        message={{
+          id: 'm-fail',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'gemini',
+          content: '',
+          status: 'failed',
+          error: 'gemini 退出码 1: API key not found',
+          createdAt: '',
+        }}
+      />,
+    );
+    expect(screen.getByText('闪闪')).toBeTruthy();
+    expect(screen.getByText(/失败: gemini 退出码 1/)).toBeTruthy();
+  });
+
   it('可配置名字覆盖内置名册', () => {
     render(
       <MessageBubble

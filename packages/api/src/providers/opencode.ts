@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { AgentId } from '@meowbase/shared';
 import { OpenCodeAccumulator } from './opencode-json.js';
+import { formatCliExitError } from './cli-error.js';
 import type { AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class OpenCodeAdapter implements AgentService {
@@ -84,13 +85,13 @@ export class OpenCodeAdapter implements AgentService {
         error: accumulator.error ?? 'opencode 执行失败',
       };
     }
-    if (exitCode !== null && exitCode !== 0) {
+    if (exitCode !== 0) {
       return {
         sessionId,
         content: accumulator.content,
         status: 'failed',
         usage: accumulator.usage,
-        error: `opencode 退出码 ${exitCode}`,
+        error: formatCliExitError('opencode', exitCode, stderrChunks.join('')),
       };
     }
     return {

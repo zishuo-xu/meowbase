@@ -29,6 +29,7 @@ export interface MessageDto {
   content: string;
   status: 'streaming' | 'completed' | 'failed' | 'terminated';
   createdAt: string;
+  error?: string;
 }
 
 export interface ApprovalDto {
