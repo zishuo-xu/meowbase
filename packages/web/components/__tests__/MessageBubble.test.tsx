@@ -77,6 +77,9 @@ describe('MessageBubble', () => {
         }}
       />,
     );
+    expect(screen.getByText(/CLI · 1 个工具/)).toBeTruthy();
+    expect(screen.queryByText('Write')).toBeNull();
+    fireEvent.click(screen.getByText(/CLI · 1 个工具/));
     expect(screen.getByText('Write')).toBeTruthy();
     expect(screen.getByText('add.js')).toBeTruthy();
   });
@@ -98,9 +101,30 @@ describe('MessageBubble', () => {
       />,
     );
     expect(screen.getByText('思考过程')).toBeTruthy();
+    expect(screen.queryByText('先看目录再落文件')).toBeNull();
+    fireEvent.click(screen.getByText('思考过程'));
     expect(screen.getByText('先看目录再落文件')).toBeTruthy();
-    expect(screen.getByText('Write')).toBeTruthy();
+    expect(screen.getByText(/CLI · 1 个工具/)).toBeTruthy();
     expect(screen.getByText('已写好 quicksort.ts')).toBeTruthy();
+  });
+
+  it('流式思考默认不展开正文', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-stream-think',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '',
+          status: 'streaming',
+          createdAt: '',
+          thinking: '先看目录再落文件，还要写测试。',
+        }}
+      />,
+    );
+    expect(screen.getByText('思考中…')).toBeTruthy();
+    expect(screen.queryByText(/还要写测试/)).toBeNull();
   });
 
   it('流式空壳显示思考中,不独留光标', () => {
@@ -138,6 +162,7 @@ describe('MessageBubble', () => {
       />,
     );
     expect(screen.getByText('失败: opencode 执行超时(300000ms)')).toBeTruthy();
+    fireEvent.click(screen.getByText(/CLI · 1 个工具/));
     expect(screen.getByLabelText('工具失败')).toBeTruthy();
     expect(screen.queryByLabelText('工具进行中')).toBeNull();
   });

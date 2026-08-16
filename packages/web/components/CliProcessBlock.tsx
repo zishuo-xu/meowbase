@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ToolActivity } from '@/lib/api';
 
 function displayActivities(activities: ToolActivity[], ended?: boolean): ToolActivity[] {
@@ -15,7 +15,13 @@ export function CliProcessBlock({
   ended?: boolean;
 }) {
   const rows = displayActivities(activities, ended);
-  const [open, setOpen] = useState(true);
+  const running = rows.some((a) => a.status === 'running');
+  const [open, setOpen] = useState(running);
+  const userTouched = useRef(false);
+  useEffect(() => {
+    if (userTouched.current) return;
+    setOpen(running);
+  }, [running]);
   if (rows.length === 0) return null;
 
   const current = [...rows].reverse().find((a) => a.status === 'running');
@@ -28,7 +34,10 @@ export function CliProcessBlock({
       <button
         type="button"
         className="flex w-full items-center gap-1.5 text-left"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          userTouched.current = true;
+          setOpen((v) => !v);
+        }}
       >
         <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
         <span className="truncate">{summary}</span>

@@ -9,7 +9,7 @@ export function ThinkingBlock({
   streaming?: boolean;
 }) {
   const text = content.trim();
-  const [open, setOpen] = useState(Boolean(streaming) || text.length < 80);
+  const [open, setOpen] = useState(false);
   if (!text && !streaming) return null;
 
   return (
