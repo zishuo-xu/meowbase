@@ -17,4 +17,8 @@ describe('selectReviewer', () => {
   it('写手不可用时选第一个可用且不同的', () => {
     expect(selectReviewer('claude', ['gemini'])).toBe('gemini');
   });
+
+  it('三只都在时 claude 仍优先 opencode', () => {
+    expect(selectReviewer('claude', ['claude', 'gemini', 'opencode'])).toBe('opencode');
+  });
 });

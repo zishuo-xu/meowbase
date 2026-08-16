@@ -167,7 +167,7 @@ export async function executeTurn(input: {
   );
 
   const fulfilled = targetResults.find(
-    (r): r is PromiseFulfilledResult<SegmentRunResult | null> =>
+    (r): r is PromiseFulfilledResult<SegmentRunResult> =>
       r.status === 'fulfilled',
   );
   const lastResult = fulfilled?.value ?? null;

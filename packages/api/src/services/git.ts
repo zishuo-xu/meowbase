@@ -38,14 +38,23 @@ export async function gitStatusPorcelain(dir: string): Promise<string> {
   return run(dir, ['status', '--porcelain', '--untracked-files=all']);
 }
 
-/** 从 porcelain 输出中解析"未跟踪且不在 work/ 下的散落文件"(?? 开头) */
+/** 从 porcelain 输出中解析散落产物:仓库根或包根的未跟踪文件,不碰 src/test 源码树。 */
 export function parseStrayFiles(statusText: string, workPrefix = 'work/'): string[] {
   return statusText
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.startsWith('?? '))
     .map((line) => line.slice(3).trim())
-    .filter((path) => path.length > 0 && !path.startsWith(workPrefix));
+    .filter((path) => isStrayAgentPath(path, workPrefix));
+}
+
+function isStrayAgentPath(path: string, workPrefix: string): boolean {
+  if (!path || path.startsWith(workPrefix)) return false;
+  const parts = path.split('/');
+  if (parts.length === 1) return true;
+  // CLI 上溯时可能写到 packages/<pkg>/filename
+  if (parts.length === 3 && parts[0] === 'packages') return true;
+  return false;
 }
 
 /**
@@ -74,6 +83,9 @@ export async function sweepStrayFiles(
     } catch {
       // 移动失败不阻塞
     }
+  }
+  if (moved.length > 0) {
+    console.warn(`sweepStrayFiles: 移回沙箱 ${moved.join(', ')}`);
   }
   return moved;
 }

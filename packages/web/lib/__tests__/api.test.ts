@@ -38,4 +38,9 @@ describe('api', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     await expect(api.createThread('x', 'claude')).rejects.toThrow();
   });
+
+  it('网络失败抛出可读错误', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await expect(api.listThreads()).rejects.toThrow(/无法连接 API/);
+  });
 });

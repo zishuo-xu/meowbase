@@ -2,7 +2,7 @@
 
 > **愿景**:让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
 >
-> **现状**:自研多 Agent 协作平台(架构参考 clowder-ai,代码独立实现)——线程化对话、@mention 路由、持久身份(墨墨/闪闪/团团)、证据库、技能按需加载、跨模型互审+审批流、A2A 自动接力、同题并行、Web UI。132 个测试全绿,真实模型全流程演示通过。
+> **现状**:自研多 Agent 协作平台(架构参考 clowder-ai,代码独立实现)——线程化对话、@mention 路由、持久身份(墨墨/闪闪/团团)、三支 CLI 适配器(claude/gemini/opencode)、证据库、技能按需加载、跨模型互审+审批流、A2A 自动接力、同题并行、Web UI。单测全绿,真实模型全流程演示通过。
 
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。
@@ -15,7 +15,7 @@ pnpm dev   # 起 Redis + API(3200)+ Web(3300)
 ```
 
 浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片按钮、证据确认。
-(API 需要本机 Redis 与 claude CLI;冒烟/演示可设 CLAUDE_BIN / OPENCODE_BIN 指向 fake)
+(API 需要本机 Redis;冒烟/演示可设 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 指向 fake CLI)
 
 ```bash
 # 仅 API:
@@ -37,7 +37,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 架构
 
 三层:模型(推理)→ Agent CLI(工具)→ 平台(路由/线程/记忆/技能/审批)。
-本仓库当前进度:M4 跨模型互审+审批流(claude 写 → opencode 审 → 人批准落地)。
+本仓库当前进度:M1–M5 已完成;三支 agent CLI 适配器齐了(claude / gemini / opencode)。自动审查默认仍是 claude ↔ opencode 配对,`@gemini`(闪闪)可直接呼叫。
 
 ## 审批流(M4)
 
@@ -56,6 +56,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 多角色协作
 
 - **同题并行**:`@墨墨 @团团 帮我看看这个方案` —— 同一消息并行发给所有目标,各自回答(适合征求意见/评审)
+- **跨模型审查**:`@闪闪` 走 Gemini CLI(身份:审查官);写手改动触发的自动审查默认仍配对 团团(opencode),与现有演示路径一致
 - **A2A 接力**:agent 回复中行首 `@其他角色 任务` → 平台自动交接继续执行(链深 3,防环)
 - 分工由猫们自己协调,你不必当"路由器"
 

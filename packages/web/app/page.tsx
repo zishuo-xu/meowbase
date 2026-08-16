@@ -10,9 +10,15 @@ export default function Home() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDto[]>([]);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshThreads = useCallback(async () => {
-    setThreads(await api.listThreads());
+    try {
+      setThreads(await api.listThreads());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载线程失败');
+    }
   }, []);
 
   useEffect(() => {
@@ -21,14 +27,23 @@ export default function Home() {
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
-    setMessages(await api.listMessages(id));
+    try {
+      setMessages(await api.listMessages(id));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载消息失败');
+    }
   }, []);
 
   const createThread = useCallback(
     async (title: string, primaryAgentId: string) => {
-      const thread = await api.createThread(title, primaryAgentId);
-      await refreshThreads();
-      await openThread(thread.id);
+      try {
+        const thread = await api.createThread(title, primaryAgentId);
+        await refreshThreads();
+        await openThread(thread.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '新建线程失败');
+      }
     },
     [openThread, refreshThreads],
   );
@@ -41,6 +56,9 @@ export default function Home() {
         await api.sendMessage(activeId, content);
         // 重新拉取完整消息列表:含用户消息、回复与系统卡片/建议消息
         setMessages(await api.listMessages(activeId));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '发送失败');
       } finally {
         setSending(false);
       }
@@ -68,6 +86,11 @@ export default function Home() {
           <h1 className="text-sm font-bold">meowbase · 喵窝</h1>
           <span className="text-xs text-[var(--ink-soft)]">墨墨 · 闪闪 · 团团 就位</span>
         </header>
+        {error && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800">
+            {error}
+          </div>
+        )}
         {activeId ? (
           <>
             <ChatArea

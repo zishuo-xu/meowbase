@@ -66,7 +66,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       return reply.code(400).send({ error: 'autoApprove 必须是布尔值' });
     }
     const updated = await deps.stores.profiles.updateAutoApprove(
-      agentId,
+      agentId as AgentId,
       body.autoApprove,
     );
     if (!updated) return reply.code(404).send({ error: `profile 不存在: ${agentId}` });

@@ -39,7 +39,7 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 关键文件(按阅读顺序):
 1. `packages/api/src/router/execute-turn.ts` —— **心脏**。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 多 @ 同题并行 → 每目标跑 A2A 接力链 → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
 2. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
-3. `packages/api/src/providers/` —— ClaudeAdapter / OpenCodeAdapter,统一 `runTurn` 契约
+3. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
 4. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
 5. `packages/web/components/` —— UI 组件
 
@@ -62,8 +62,8 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 - 业务逻辑只依赖 `stores/ports.ts` 接口,禁止直接 import ioredis
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
-- 测试:`pnpm test`(shared 47 + api 61 + web 24 ≈ 132);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
-- 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`
+- 测试:`pnpm test`(shared 48 + api 70 + web 24 ≈ 142);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
+- 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
 ## 踩坑记录(血泪清单,改代码前先看)
@@ -71,17 +71,19 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。
 2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
-4. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:线程工作目录有 package.json + 系统提示沙箱规则 + 每轮 `sweepStrayFiles` 自动移回。
-5. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
-6. **审批状态机**:`markApplied` 只接受 `approved` 状态,自动批准路径必须先 `approve()`。
-7. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。
-8. **IME 输入法**:前端回车处理必须检查组合状态(composingRef + isComposing + keyCode 229),否则中文选词回车会误发送。
-9. **Redis 测试数据污染**:测试线程/证据会留在 Redis,断言前用唯一 id(如 `t-${Date.now()}`)。
-10. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——改 shared 后需重启 api 或手动 `pnpm --filter @meowbase/shared build`。
+4. **gemini 适配器**:`stream-json` 事件是 `init`/`message`/`result`(不是 claude 的 assistant/result);无系统提示词参数,身份前置拼进 prompt;headless 写文件必须 `--approval-mode yolo`,否则会卡在审批。`--resume`/`-r` 接受 session UUID(init 事件的 `session_id`)。
+5. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:线程工作目录有 package.json + 系统提示沙箱规则 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。
+6. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
+7. **审批状态机**:`markApplied` 只接受 `approved` 状态,自动批准路径必须先 `approve()`。
+8. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。
+9. **IME 输入法**:前端回车处理必须检查组合状态(composingRef + isComposing + keyCode 229),否则中文选词回车会误发送。
+10. **Redis 测试数据污染**:测试线程/证据会留在 Redis,断言前用唯一 id(如 `t-${Date.now()}`)。
+11. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——改 shared 后需重启 api 或手动 `pnpm --filter @meowbase/shared build`。
+12. **未跟踪源码会被沙箱清扫误搬走**:新文件若还没 `git add`,旧版 `sweepStrayFiles` 会把它 `rename` 进 `work/<threadId>/`,tsx 记成 `unlink`,API 重启后模块找不到、3200 掉线。规避:新适配器/测试立刻提交(或至少 `git add`);改清扫规则后只允许浅层散落文件;API 日志出现 `sweepStrayFiles: 移回沙箱` 时去对应线程目录找回。
 
 ## 常见操作
 
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent 身份**:`packages/api/src/stores/seeds.ts`(墨墨/闪闪/团团);`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
-- **真实模型演示**:不带 CLAUDE_BIN/OPENCODE_BIN 启动 api(默认走 relay:opencode.ai/zen/go,模型 deepseek-v4-flash);费用按 token 计(一次完整流程约 $0.2-0.4)
+- **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api(claude/gemini 走本机 CLI;opencode 默认 relay:opencode.ai/zen/go,模型 deepseek-v4-flash);费用按 token 计(一次完整流程约 $0.2-0.4)

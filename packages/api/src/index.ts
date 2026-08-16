@@ -13,6 +13,7 @@ import {
 } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
 import { ClaudeAdapter } from './providers/claude.js';
+import { GeminiAdapter } from './providers/gemini.js';
 import { OpenCodeAdapter } from './providers/opencode.js';
 import { createAgentRegistry } from './providers/registry.js';
 
@@ -41,6 +42,11 @@ const app = await buildServer({
   stores,
   registry: createAgentRegistry([
     new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
+    new GeminiAdapter({
+      bin: config.geminiBin,
+      model: config.geminiModel,
+      timeoutMs: config.agentTimeoutMs,
+    }),
     new OpenCodeAdapter({
       bin: config.opencodeBin,
       model: config.opencodeModel,

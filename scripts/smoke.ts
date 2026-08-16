@@ -15,6 +15,7 @@ import {
 } from '../packages/api/src/stores/factories.js';
 import { ensureSeededProfiles } from '../packages/api/src/stores/seeds.js';
 import { ClaudeAdapter } from '../packages/api/src/providers/claude.js';
+import { GeminiAdapter } from '../packages/api/src/providers/gemini.js';
 import { OpenCodeAdapter } from '../packages/api/src/providers/opencode.js';
 import { createAgentRegistry } from '../packages/api/src/providers/registry.js';
 
@@ -37,6 +38,11 @@ const app = await buildServer({
   stores,
   registry: createAgentRegistry([
     new ClaudeAdapter({ bin: config.claudeBin, timeoutMs: config.agentTimeoutMs }),
+    new GeminiAdapter({
+      bin: config.geminiBin,
+      model: config.geminiModel,
+      timeoutMs: config.agentTimeoutMs,
+    }),
     new OpenCodeAdapter({
       bin: config.opencodeBin,
       model: config.opencodeModel,

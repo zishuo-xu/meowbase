@@ -40,6 +40,18 @@ describe('git 辅助函数', () => {
     expect(parseStrayFiles(status)).toEqual(['packages/api/mul.js', '另一个.txt']);
   });
 
+  it('parseStrayFiles 不碰源码树里的未跟踪文件', () => {
+    const status = [
+      '?? packages/api/src/providers/gemini.ts',
+      '?? packages/api/test/gemini-json.test.ts',
+      '?? packages/api/test/fixtures/fake-gemini.mjs',
+      '?? docs/notes.md',
+      '?? mul.js',
+      '?? packages/api/mul.js',
+    ].join('\n');
+    expect(parseStrayFiles(status)).toEqual(['mul.js', 'packages/api/mul.js']);
+  });
+
   it('sweepStrayFiles 把散落文件移回沙箱', async () => {
     const root = mkdtempSync(join(tmpdir(), 'meowbase-sweep-'));
     await gitInit(root);

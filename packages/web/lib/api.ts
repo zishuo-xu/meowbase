@@ -2,7 +2,12 @@ export const baseUrl =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3200';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`, init);
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, init);
+  } catch {
+    throw new Error(`无法连接 API ${baseUrl}${path}(请确认后端已启动)`);
+  }
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   return res.json() as Promise<T>;
 }
