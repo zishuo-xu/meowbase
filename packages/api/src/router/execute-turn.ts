@@ -7,6 +7,7 @@ import {
   parseEvidenceRefs,
   parseLearnCommand,
   parseMentionSegments,
+  parseParallelGroups,
   parseRejectCommand,
   resolveTargetAgent,
   selectReviewer,
@@ -122,8 +123,8 @@ export async function executeTurn(input: {
     if (entry?.status === 'confirmed') refs.push(entry);
   }
 
-  const segments = parseMentionSegments(content, thread.primaryAgentId);
-  if (segments.length === 0) {
+  const groups = parseParallelGroups(content);
+  if (groups.length === 0) {
     return context.stores.messages.append({
       threadId,
       role: 'system',
@@ -132,13 +133,37 @@ export async function executeTurn(input: {
     });
   }
 
-  // 分段接力:每段路由给对应角色;段内再跑 A2A 链(回复行首 @ 自动交接)
-  let lastResult: SegmentRunResult | null = null;
-  const sharedVisited = new Set<AgentId>();
-  for (const segment of segments) {
-    lastResult = await runSegment(context, thread, segment, refs, sharedVisited);
+  // 并行组:每组独立串行接力;组间并发执行,失败互不影响
+  const groupResults = await Promise.allSettled(
+    groups.map(async (group) => {
+      const segments = parseMentionSegments(group, thread.primaryAgentId);
+      if (segments.length === 0) return null;
+      let lastResult: SegmentRunResult | null = null;
+      const visited = new Set<AgentId>();
+      for (const segment of segments) {
+        lastResult = await runSegment(context, thread, segment, refs, visited);
+      }
+      return lastResult;
+    }),
+  );
+
+  const fulfilled = groupResults.find(
+    (r): r is PromiseFulfilledResult<SegmentRunResult | null> =>
+      r.status === 'fulfilled',
+  );
+  const lastResult = fulfilled?.value ?? null;
+  if (!lastResult) {
+    const rejected = groupResults.find(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    );
+    if (rejected) throw rejected.reason;
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: '⚠️ 没有可执行的任务文本',
+      status: 'completed',
+    });
   }
-  if (!lastResult) throw new Error('执行失败:未产生任何输出');
 
   const { lastAssistant, lastOutput, visited, firstAgent: chainFirstAgent } = lastResult;
 
