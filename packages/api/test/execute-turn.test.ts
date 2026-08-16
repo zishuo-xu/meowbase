@@ -106,6 +106,32 @@ describe('executeTurn', () => {
     expect(final.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
   });
 
+  it('超时后把未完成的工具标成 error', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          input.onActivity?.({ id: 't1', name: 'read', arg: 'a.ts', status: 'running' });
+          return {
+            sessionId: 'sess-claude',
+            content: '',
+            status: 'terminated',
+            error: 'opencode 执行超时(300000ms)',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: { stores, registry },
+    });
+    expect(final.status).toBe('terminated');
+    expect(final.activities).toEqual([{ id: 't1', name: 'read', arg: 'a.ts', status: 'error' }]);
+  });
+
   it('新会话 ID 会写回线程', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', 'ok', 'sess-new-1')]);

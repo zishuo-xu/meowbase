@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractToolActivities, upsertToolActivity } from '../src/providers/tool-activity.js';
+import { extractToolActivities, finalizeActivities, upsertToolActivity } from '../src/providers/tool-activity.js';
 
 describe('extractToolActivities', () => {
   it('Claude assistant tool_use → running + 主参数', () => {
@@ -64,6 +64,21 @@ describe('extractToolActivities', () => {
     ).toEqual([{ id: 'call_1', name: 'write', arg: 'add.js', status: 'done' }]);
   });
 
+  it('OpenCode { type: tool_use, part } 读 part.tool 与完成态', () => {
+    expect(
+      extractToolActivities({
+        type: 'tool_use',
+        sessionID: 's',
+        part: {
+          type: 'tool',
+          id: 'call_1',
+          tool: 'read',
+          state: { status: 'completed', input: { path: 'quicksort.ts' } },
+        },
+      }),
+    ).toEqual([{ id: 'call_1', name: 'read', arg: 'quicksort.ts', status: 'done' }]);
+  });
+
   it('纯文本不产出活动', () => {
     expect(extractToolActivities({ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } })).toEqual(
       [],
@@ -76,5 +91,19 @@ describe('upsertToolActivity', () => {
     const first = upsertToolActivity([], { id: 't1', name: 'Write', arg: 'add.js', status: 'running' });
     const next = upsertToolActivity(first, { id: 't1', name: 'tool', status: 'done' });
     expect(next).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
+  });
+});
+
+describe('finalizeActivities', () => {
+  it('超时/失败把 running 标成 error', () => {
+    expect(
+      finalizeActivities([{ id: 't1', name: 'read', arg: 'a.ts', status: 'running' }], false),
+    ).toEqual([{ id: 't1', name: 'read', arg: 'a.ts', status: 'error' }]);
+  });
+
+  it('成功结束把残留 running 标成 done', () => {
+    expect(
+      finalizeActivities([{ id: 't1', name: 'Write', status: 'running' }], true),
+    ).toEqual([{ id: 't1', name: 'Write', status: 'done' }]);
   });
 });

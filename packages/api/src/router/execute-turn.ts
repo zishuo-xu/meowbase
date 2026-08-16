@@ -37,7 +37,7 @@ import type {
 } from '../stores/ports.js';
 import { gitAddAll, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
 import type { AgentSpec } from '../config.js';
-import { upsertToolActivity } from '../providers/tool-activity.js';
+import { finalizeActivities, upsertToolActivity } from '../providers/tool-activity.js';
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
@@ -424,7 +424,9 @@ async function runSegment(
         usage: output.usage,
         error: output.error,
         sessionId: output.sessionId || undefined,
-        ...(activities.length > 0 ? { activities } : {}),
+        ...(activities.length > 0
+          ? { activities: finalizeActivities(activities, output.status === 'completed') }
+          : {}),
       }),
     );
     lastOutput = output;

@@ -100,7 +100,10 @@ export function MessageBubble({
           )}
         </div>
         {message.activities && message.activities.length > 0 && (
-          <CliProcessBlock activities={message.activities} />
+          <CliProcessBlock
+            activities={message.activities}
+            ended={message.status === 'failed' || message.status === 'terminated'}
+          />
         )}
         {(message.status === 'failed' || message.status === 'terminated') && message.error && (
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>

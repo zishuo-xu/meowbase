@@ -39,6 +39,11 @@ function fromToolPart(part: Record<string, unknown>): ToolActivity | null {
 
 export function extractToolActivities(obj: Record<string, unknown>): ToolActivity[] {
   const type = str(obj.type) ?? '';
+  const part = obj.part as Record<string, unknown> | undefined;
+  if (part && typeof part === 'object') {
+    const fromPart = fromToolPart(part);
+    if (fromPart) return [fromPart];
+  }
 
   if (type === 'tool_use' && !obj.message) {
     const id = str(obj.tool_id) ?? str(obj.id) ?? str(obj.tool_name) ?? 'tool';
@@ -54,12 +59,6 @@ export function extractToolActivities(obj: Record<string, unknown>): ToolActivit
     const status: ToolActivityStatus =
       obj.status === 'error' || obj.is_error === true ? 'error' : 'done';
     return [{ id, name, status }];
-  }
-
-  const part = obj.part as Record<string, unknown> | undefined;
-  if (part && typeof part === 'object') {
-    const fromPart = fromToolPart(part);
-    if (fromPart) return [fromPart];
   }
 
   if (type === 'assistant' || type === 'user') {
@@ -100,6 +99,11 @@ export function upsertToolActivity(list: ToolActivity[], next: ToolActivity): To
     status: next.status,
   };
   return list.map((item, i) => (i === idx ? merged : item));
+}
+
+export function finalizeActivities(list: ToolActivity[], succeeded: boolean): ToolActivity[] {
+  const nextStatus: ToolActivity['status'] = succeeded ? 'done' : 'error';
+  return list.map((item) => (item.status === 'running' ? { ...item, status: nextStatus } : item));
 }
 
 export function drainActivities(pending: ToolActivity[]): ToolActivity[] {

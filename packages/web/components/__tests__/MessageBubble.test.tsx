@@ -81,6 +81,27 @@ describe('MessageBubble', () => {
     expect(screen.getByText('add.js')).toBeTruthy();
   });
 
+  it('超时消息把进行中的工具显示为失败,不再转圈', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-timeout',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'gemini',
+          content: '',
+          status: 'terminated',
+          error: 'opencode 执行超时(300000ms)',
+          createdAt: '',
+          activities: [{ id: 't1', name: 'tool', status: 'running' }],
+        }}
+      />,
+    );
+    expect(screen.getByText('失败: opencode 执行超时(300000ms)')).toBeTruthy();
+    expect(screen.getByLabelText('工具失败')).toBeTruthy();
+    expect(screen.queryByLabelText('工具进行中')).toBeNull();
+  });
+
   it('user 气泡无猫耳', () => {
     const { container } = render(
       <MessageBubble
