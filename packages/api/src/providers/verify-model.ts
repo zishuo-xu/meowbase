@@ -15,6 +15,7 @@ export interface VerifyModelInput {
   model?: string;
   protocol?: ModelProtocol;
   baseUrl?: string;
+  apiKey?: string;
   timeoutMs?: number;
   workdir?: string;
 }
@@ -60,6 +61,7 @@ function probeSpec(input: VerifyModelInput, resolvedBin: string): AgentSpec {
     ...(input.model?.trim() ? { model: input.model.trim() } : {}),
     ...(input.protocol ? { protocol: input.protocol } : {}),
     ...(input.baseUrl?.trim() ? { baseUrl: input.baseUrl.trim() } : {}),
+    ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
   };
 }
 

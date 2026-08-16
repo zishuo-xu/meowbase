@@ -100,12 +100,17 @@ describe('ClaudeAdapter 网关', () => {
         bin: ARGS_BIN,
         protocol: 'anthropic',
         baseUrl: 'https://api.moonshot.cn/anthropic/v1',
+        apiKey: 'sk-ant-test',
       },
       5_000,
     );
     await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
-    const env = JSON.parse(readFileSync(recordFile, 'utf8')) as { ANTHROPIC_BASE_URL: string | null };
+    const env = JSON.parse(readFileSync(recordFile, 'utf8')) as {
+      ANTHROPIC_BASE_URL: string | null;
+      ANTHROPIC_API_KEY: string | null;
+    };
     expect(env.ANTHROPIC_BASE_URL).toBe('https://api.moonshot.cn/anthropic');
+    expect(env.ANTHROPIC_API_KEY).toBe('sk-ant-test');
     delete process.env.RECORD_ENV_FILE;
     rmSync(dir, { recursive: true, force: true });
   });

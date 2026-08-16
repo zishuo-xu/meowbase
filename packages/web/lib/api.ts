@@ -51,6 +51,8 @@ export interface ModelPresetDto {
   protocol?: 'anthropic' | 'openai' | 'gemini';
   model: string;
   baseUrl?: string;
+  apiKey?: string;
+  hasApiKey?: boolean;
 }
 
 export interface AgentConfigDto {
@@ -111,6 +113,7 @@ export const api = {
     modelId?: string;
     protocol?: 'anthropic' | 'openai' | 'gemini';
     baseUrl?: string;
+    apiKey?: string;
   }) =>
     request<{
       ok: boolean;

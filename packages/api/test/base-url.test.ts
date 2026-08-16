@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { envForBaseUrl, normalizeGatewayUrl } from '../src/providers/base-url.js';
+import { envForApiKey, envForBaseUrl, normalizeGatewayUrl } from '../src/providers/base-url.js';
 
 describe('normalizeGatewayUrl', () => {
   it('Anthropic 去掉末尾 /v1', () => {
@@ -37,6 +37,23 @@ describe('envForBaseUrl', () => {
     expect(envForBaseUrl('gemini', 'https://example.com/gemini')).toEqual({
       GOOGLE_GEMINI_BASE_URL: 'https://example.com/gemini',
       GEMINI_API_BASE: 'https://example.com/gemini',
+    });
+  });
+});
+
+describe('envForApiKey', () => {
+  it('空密钥不注入', () => {
+    expect(envForApiKey('openai', undefined)).toEqual({});
+    expect(envForApiKey('anthropic', '  ')).toEqual({});
+  });
+
+  it('按协议写 API Key 环境变量', () => {
+    expect(envForApiKey('anthropic', 'sk-ant')).toEqual({ ANTHROPIC_API_KEY: 'sk-ant' });
+    expect(envForApiKey('openai', 'sk-openai')).toEqual({ OPENAI_API_KEY: 'sk-openai' });
+    expect(envForApiKey('gemini', 'sk-gem')).toEqual({
+      GEMINI_API_KEY: 'sk-gem',
+      GOOGLE_API_KEY: 'sk-gem',
+      GOOGLE_GENAI_API_KEY: 'sk-gem',
     });
   });
 });

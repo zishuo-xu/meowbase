@@ -9,6 +9,7 @@ import {
   cloneAgentSpec,
   DEFAULT_AGENTS,
   loadConfig,
+  persistTeamConfig,
   writeTeamFile,
 } from '../src/config.js';
 
@@ -195,6 +196,7 @@ describe('模型目录', () => {
             protocol: 'anthropic',
             model: 'kimi-k2',
             baseUrl: 'https://api.moonshot.cn/anthropic/v1',
+            apiKey: 'sk-legacy-in-config',
           },
         ],
         agents: [{ id: 'claude', modelId: 'kimi' }],
@@ -202,9 +204,39 @@ describe('模型目录', () => {
     );
     const cfg = loadConfig({}, { configPath: path });
     expect(cfg.models[0]?.baseUrl).toBe('https://api.moonshot.cn/anthropic/v1');
+    expect(cfg.models[0]?.apiKey).toBe('sk-legacy-in-config');
     expect(agentSpec(cfg, 'claude').baseUrl).toBe('https://api.moonshot.cn/anthropic/v1');
+    expect(agentSpec(cfg, 'claude').apiKey).toBe('sk-legacy-in-config');
     expect(agentSpec(cfg, 'claude').protocol).toBe('anthropic');
     expect(agentSpec(cfg, 'claude').model).toBe('kimi-k2');
+  });
+
+  it('API Key 写入 secrets 文件,不进 config json', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-secrets-'));
+    const path = join(dir, 'meowbase.config.json');
+    persistTeamConfig(path, {
+      a2aMaxDepth: 3,
+      defaultAgentId: 'claude',
+      agents: DEFAULT_AGENTS.map((a) => cloneAgentSpec(a)),
+      models: [
+        {
+          id: 'kimi',
+          label: 'Kimi',
+          bin: 'claude',
+          bins: ['claude'],
+          protocol: 'anthropic',
+          model: 'kimi-k2',
+          baseUrl: 'https://api.moonshot.cn/anthropic',
+          apiKey: 'sk-secret',
+        },
+      ],
+    });
+    const disk = JSON.parse(readFileSync(path, 'utf8')) as { models: Array<{ apiKey?: string; baseUrl?: string }> };
+    expect(disk.models[0]?.apiKey).toBeUndefined();
+    expect(disk.models[0]?.baseUrl).toBe('https://api.moonshot.cn/anthropic');
+    const cfg = loadConfig({}, { configPath: path });
+    expect(cfg.models[0]?.apiKey).toBe('sk-secret');
+    expect(JSON.stringify(cfg.models)).toContain('sk-secret');
   });
 });
 

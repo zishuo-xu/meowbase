@@ -19,6 +19,31 @@ export function envForBaseUrl(
   return { GOOGLE_GEMINI_BASE_URL: url, GEMINI_API_BASE: url };
 }
 
+export function envForApiKey(
+  protocol: ModelProtocol,
+  apiKey: string | undefined,
+): Record<string, string> {
+  const key = (apiKey ?? '').trim();
+  if (!key) return {};
+  if (protocol === 'anthropic') return { ANTHROPIC_API_KEY: key };
+  if (protocol === 'openai') return { OPENAI_API_KEY: key };
+  return {
+    GEMINI_API_KEY: key,
+    GOOGLE_API_KEY: key,
+    GOOGLE_GENAI_API_KEY: key,
+  };
+}
+
+export function envForGateway(
+  protocol: ModelProtocol,
+  input: { baseUrl?: string; apiKey?: string },
+): Record<string, string> {
+  return {
+    ...envForBaseUrl(protocol, input.baseUrl),
+    ...envForApiKey(protocol, input.apiKey),
+  };
+}
+
 export function spawnEnv(extra?: Record<string, string>): NodeJS.ProcessEnv {
   if (!extra || Object.keys(extra).length === 0) return process.env;
   return { ...process.env, ...extra };

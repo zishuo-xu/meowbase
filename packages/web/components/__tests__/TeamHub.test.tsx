@@ -103,6 +103,7 @@ describe('TeamHub', () => {
     expect((screen.getByLabelText('显示名') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('模型 ID') as HTMLInputElement).value).toBe('');
     expect(screen.getByLabelText('网关 URL')).toBeTruthy();
+    expect(screen.getByLabelText('API Key')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Sonnet' } });
     fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));
@@ -111,6 +112,7 @@ describe('TeamHub', () => {
     fireEvent.change(screen.getByLabelText('网关 URL'), {
       target: { value: 'https://api.moonshot.cn/anthropic' },
     });
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } });
     fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
     fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
     expect(onSaveModels).toHaveBeenCalledWith(
@@ -122,6 +124,7 @@ describe('TeamHub', () => {
           protocol: 'anthropic',
           model: 'sonnet',
           baseUrl: 'https://api.moonshot.cn/anthropic',
+          apiKey: 'sk-test',
         }),
       ]),
     );
@@ -233,12 +236,14 @@ describe('TeamHub', () => {
     fireEvent.change(screen.getByLabelText('网关 URL'), {
       target: { value: 'https://api.moonshot.cn/anthropic' },
     });
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-kimi' } });
     fireEvent.click(screen.getByRole('button', { name: '验证新模型' }));
     expect(onVerifyModel).toHaveBeenCalledWith(
       expect.objectContaining({
         protocol: 'anthropic',
         model: 'kimi-k2',
         baseUrl: 'https://api.moonshot.cn/anthropic',
+        apiKey: 'sk-kimi',
       }),
     );
     await waitFor(() => {

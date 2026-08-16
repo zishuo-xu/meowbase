@@ -9,6 +9,7 @@ if (process.env.RECORD_ENV_FILE) {
     process.env.RECORD_ENV_FILE,
     JSON.stringify({
       ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL ?? null,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? null,
       OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? null,
       OPENAI_API_BASE: process.env.OPENAI_API_BASE ?? null,
     }),

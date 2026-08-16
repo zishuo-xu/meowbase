@@ -22,13 +22,16 @@ import {
   cloneModelPreset,
   isAgentId,
   normalizeModelCatalog,
+  parseApiKey,
   parseBaseUrl,
   parseModelCatalog,
   parseModelProtocol,
+  persistTeamConfig,
   publicAgentConfig,
+  publicModelPreset,
+  applyCatalogApiKeys,
   resolvePresetBin,
   syncAgentsWithCatalog,
-  writeTeamFile,
 } from '../config.js';
 import { executeTurn } from '../router/execute-turn.js';
 import { gitInit } from '../services/git.js';
@@ -73,7 +76,8 @@ function adapterRuntimeChanged(prev: AgentSpec, next: AgentSpec): boolean {
     prev.bin !== next.bin ||
     prev.model !== next.model ||
     prev.protocol !== next.protocol ||
-    prev.baseUrl !== next.baseUrl
+    prev.baseUrl !== next.baseUrl ||
+    prev.apiKey !== next.apiKey
   );
 }
 
@@ -97,7 +101,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       return;
     }
     if (deps.configPath) {
-      writeTeamFile(deps.configPath, live);
+      persistTeamConfig(deps.configPath, live);
     }
   }
 
@@ -120,7 +124,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return {
       a2aMaxDepth: live.a2aMaxDepth,
       defaultAgentId: live.defaultAgentId,
-      models: live.models,
+      models: live.models.map(publicModelPreset),
       agents,
     };
   }
@@ -159,11 +163,13 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       modelId?: string;
       protocol?: string;
       baseUrl?: string;
+      apiKey?: string;
     } | null;
     let bin = body?.bin?.trim() ?? '';
     let model = body?.model?.trim() ?? '';
     let protocol = parseModelProtocol(body?.protocol);
     let baseUrl = parseBaseUrl(body?.baseUrl);
+    let apiKey = parseApiKey(body?.apiKey);
     if (body?.modelId?.trim()) {
       const preset = live.models.find((m) => m.id === body.modelId?.trim());
       if (!preset) return reply.code(404).send({ error: `模型目录没有: ${body.modelId}` });
@@ -171,9 +177,10 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       model = model || preset.model;
       protocol = protocol ?? preset.protocol;
       baseUrl = baseUrl ?? preset.baseUrl;
+      apiKey = apiKey ?? preset.apiKey;
     }
     if (!bin) return reply.code(400).send({ error: 'bin 不能为空' });
-    return verifyModelConnection({ bin, model, protocol, baseUrl, timeoutMs: 45_000 });
+    return verifyModelConnection({ bin, model, protocol, baseUrl, apiKey, timeoutMs: 45_000 });
   });
 
   app.patch('/api/config', async (request, reply) => {
@@ -198,7 +205,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       const parsed = parseModelCatalog(body.models);
       if (!parsed) return reply.code(400).send({ error: 'models 须为 {id,label,bins,model} 数组且 id 不重复' });
       const prevAgents = live.agents.map(cloneAgentSpec);
-      live.models = parsed.map(cloneModelPreset);
+      live.models = applyCatalogApiKeys(live.models, parsed, body.models);
       live.agents = syncAgentsWithCatalog(live.agents, live.models);
       for (const next of live.agents) {
         const prev = prevAgents.find((a) => a.id === next.id);
@@ -257,6 +264,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       );
       body.protocol = preset.protocol;
       body.baseUrl = preset.baseUrl ?? '';
+      body.apiKey = preset.apiKey ?? '';
     }
     const prev = live.agents[index]!;
     const next = applyAgentPatch(prev, body);

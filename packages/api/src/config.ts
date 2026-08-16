@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { AgentId, AgentProfile } from '@meowbase/shared';
 import { AGENT_IDS } from '@meowbase/shared';
 
@@ -29,6 +30,8 @@ export interface ModelPreset {
   model: string;
   /** 可选网关地址;spawn 时按协议注入 ANTHROPIC_BASE_URL / OPENAI_BASE_URL 等 */
   baseUrl?: string;
+  /** 可选;只进 meowbase.secrets.json,不进 git */
+  apiKey?: string;
 }
 
 export interface AgentSpec {
@@ -44,6 +47,7 @@ export interface AgentSpec {
   modelId?: string;
   protocol?: ModelProtocol;
   baseUrl?: string;
+  apiKey?: string;
 }
 
 export interface Config {
@@ -177,6 +181,12 @@ export function parseBaseUrl(raw: unknown): string | undefined {
   return url || undefined;
 }
 
+export function parseApiKey(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const key = raw.trim();
+  return key || undefined;
+}
+
 export function withModelBins(input: {
   id: string;
   label: string;
@@ -185,6 +195,7 @@ export function withModelBins(input: {
   bins?: string[];
   protocol?: unknown;
   baseUrl?: unknown;
+  apiKey?: unknown;
 }): ModelPreset | null {
   const rawBins = modelBins(input);
   if (!input.id || !input.model) return null;
@@ -192,6 +203,7 @@ export function withModelBins(input: {
   const bins = compatibleBins(protocol, rawBins.length > 0 ? rawBins : [DEFAULT_CLI_FOR_PROTOCOL[protocol]]);
   if (bins.length === 0) return null;
   const baseUrl = parseBaseUrl(input.baseUrl);
+  const apiKey = parseApiKey(input.apiKey);
   return {
     id: input.id,
     label: input.label,
@@ -200,6 +212,7 @@ export function withModelBins(input: {
     bin: bins[0]!,
     protocol,
     ...(baseUrl ? { baseUrl } : {}),
+    ...(apiKey ? { apiKey } : {}),
   };
 }
 
@@ -242,6 +255,7 @@ export function parseModelCatalog(raw: unknown): ModelPreset[] | null {
       bins: Array.isArray(rec.bins) ? (rec.bins as string[]) : undefined,
       protocol: rec.protocol,
       baseUrl: rec.baseUrl,
+      apiKey: rec.apiKey,
     });
     if (!preset) return null;
     if (seen.has(preset.id)) return null;
@@ -299,6 +313,8 @@ export function syncAgentsWithCatalog(agents: AgentSpec[], models: ModelPreset[]
       next.protocol = preset.protocol;
       if (preset.baseUrl) next.baseUrl = preset.baseUrl;
       else delete next.baseUrl;
+      if (preset.apiKey) next.apiKey = preset.apiKey;
+      else delete next.apiKey;
       return next;
     }
     const match = models.find(
@@ -320,6 +336,7 @@ export interface AgentPatchInput {
   modelId?: string | null;
   protocol?: ModelProtocol | null;
   baseUrl?: string | null;
+  apiKey?: string | null;
 }
 
 export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentSpec {
@@ -354,6 +371,11 @@ export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentS
   } else if (typeof patch.baseUrl === 'string' && patch.baseUrl.trim()) {
     next.baseUrl = patch.baseUrl.trim();
   }
+  if (patch.apiKey === null || patch.apiKey === '') {
+    delete next.apiKey;
+  } else if (typeof patch.apiKey === 'string' && patch.apiKey.trim()) {
+    next.apiKey = patch.apiKey.trim();
+  }
   return next;
 }
 
@@ -383,7 +405,11 @@ export function writeTeamFile(
   const payload: TeamFile = {
     a2a: { maxDepth: input.a2aMaxDepth },
     defaultAgentId: input.defaultAgentId,
-    models: (input.models ?? []).map(cloneModelPreset),
+    models: (input.models ?? []).map((preset) => {
+      const row = cloneModelPreset(preset);
+      delete row.apiKey;
+      return row;
+    }),
     agents: input.agents.map((a) => ({
       id: a.id,
       name: a.name,
@@ -399,6 +425,93 @@ export function writeTeamFile(
     })),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+export function secretsPathFor(configPath: string): string {
+  return join(dirname(configPath), 'meowbase.secrets.json');
+}
+
+export function readModelSecrets(configPath: string | undefined): Record<string, string> {
+  if (!configPath) return {};
+  const path = secretsPathFor(configPath);
+  if (!existsSync(path)) return {};
+  try {
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as { modelApiKeys?: unknown };
+    if (!raw.modelApiKeys || typeof raw.modelApiKeys !== 'object') return {};
+    const out: Record<string, string> = {};
+    for (const [id, value] of Object.entries(raw.modelApiKeys as Record<string, unknown>)) {
+      const key = parseApiKey(value);
+      if (key) out[id] = key;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function applyModelSecrets(models: ModelPreset[], keys: Record<string, string>): ModelPreset[] {
+  return models.map((preset) => {
+    const apiKey = keys[preset.id];
+    if (!apiKey) return cloneModelPreset(preset);
+    return { ...cloneModelPreset(preset), apiKey };
+  });
+}
+
+export function writeSecretsFile(configPath: string, models: ModelPreset[]): void {
+  const modelApiKeys: Record<string, string> = {};
+  for (const preset of models) {
+    if (preset.apiKey) modelApiKeys[preset.id] = preset.apiKey;
+  }
+  const path = secretsPathFor(configPath);
+  writeFileSync(path, `${JSON.stringify({ modelApiKeys }, null, 2)}\n`);
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Windows 等可能不支持 chmod
+  }
+}
+
+export function persistTeamConfig(
+  configPath: string,
+  input: {
+    a2aMaxDepth: number;
+    defaultAgentId: AgentId;
+    agents: AgentSpec[];
+    models?: ModelPreset[];
+  },
+): void {
+  writeTeamFile(configPath, input);
+  writeSecretsFile(configPath, input.models ?? []);
+}
+
+export function applyCatalogApiKeys(
+  previous: ModelPreset[],
+  parsed: ModelPreset[],
+  raw: unknown,
+): ModelPreset[] {
+  const prevById = new Map(previous.map((preset) => [preset.id, preset]));
+  const rows = Array.isArray(raw) ? raw : [];
+  return parsed.map((preset, index) => {
+    const next = cloneModelPreset(preset);
+    const rec =
+      rows[index] && typeof rows[index] === 'object' ? (rows[index] as Record<string, unknown>) : {};
+    if ('apiKey' in rec) {
+      const key = parseApiKey(rec.apiKey);
+      if (key) next.apiKey = key;
+      else delete next.apiKey;
+      return next;
+    }
+    const old = prevById.get(preset.id);
+    if (old?.apiKey) next.apiKey = old.apiKey;
+    return next;
+  });
+}
+
+export function publicModelPreset(
+  preset: ModelPreset,
+): Omit<ModelPreset, 'apiKey'> & { hasApiKey?: boolean } {
+  const { apiKey, ...rest } = cloneModelPreset(preset);
+  return { ...rest, ...(apiKey ? { hasApiKey: true } : {}) };
 }
 
 function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
@@ -417,6 +530,7 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
       ...('modelId' in row ? { modelId: row.modelId || undefined } : {}),
       ...(parseModelProtocol(row.protocol) ? { protocol: parseModelProtocol(row.protocol) } : {}),
       ...('baseUrl' in row ? { baseUrl: row.baseUrl || undefined } : {}),
+      ...('apiKey' in row ? { apiKey: row.apiKey || undefined } : {}),
       ...(row.aliases && row.aliases.length > 0 ? { aliases: row.aliases.map((a) => a.replace(/^@/, '')) } : {}),
       ...(row.expertise && row.expertise.length > 0 ? { expertise: row.expertise } : {}),
     });
@@ -489,7 +603,10 @@ export function loadConfig(
 ): Config {
   const file = readTeamFile(opts.configPath);
   const agents = mergeAgents(file.agents);
-  const models = normalizeModelCatalog(file.models, agents);
+  const models = applyModelSecrets(
+    normalizeModelCatalog(file.models, agents),
+    readModelSecrets(opts.configPath),
+  );
   const bound = syncAgentsWithCatalog(agents, models);
 
   const envBin: Record<AgentId, string | undefined> = {

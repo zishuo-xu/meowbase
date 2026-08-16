@@ -26,6 +26,7 @@ export interface VerifyModelPayload {
   modelId?: string;
   protocol?: ModelProtocol;
   baseUrl?: string;
+  apiKey?: string;
   label?: string;
 }
 
@@ -150,6 +151,7 @@ export function TeamHub({
   const [newProtocol, setNewProtocol] = useState<ModelProtocol>('openai');
   const [newModel, setNewModel] = useState('');
   const [newBaseUrl, setNewBaseUrl] = useState('');
+  const [newApiKey, setNewApiKey] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
 
@@ -247,7 +249,7 @@ export function TeamHub({
                 团队 Hub
               </h2>
               <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-                先在模型目录配好,再给每只猫选用。密钥仍由各 CLI 自己管。
+                先在模型目录配好,再给每只猫选用。第三方模型在目录里填网关和 API Key。
               </p>
             </div>
             <button
@@ -263,7 +265,7 @@ export function TeamHub({
           {pane === 'models' ? (
             <section className="space-y-3">
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
-                对齐 clowder:先选协议再勾 CLI。OpenAI 兼容只能走 opencode;Claude 协议可走 claude / opencode。网关 URL 可选,密钥仍由各 CLI 自己管。
+                对齐 clowder:先选协议再勾 CLI。第三方模型填网关 URL 和 API Key；官方登录或 opencode zen 可留空。密钥只存在本机，不进 git。
               </p>
               <div className="text-xs font-bold text-[var(--ink-soft)]">已登记</div>
               {models.length === 0 && (
@@ -283,6 +285,9 @@ export function TeamHub({
                       {preset.baseUrl && (
                         <div className="truncate font-mono text-[11px] text-[var(--ink-soft)]">{preset.baseUrl}</div>
                       )}
+                      {(preset.hasApiKey || preset.apiKey) && (
+                        <div className="text-[11px] text-[var(--ink-soft)]">已配置 API Key</div>
+                      )}
                       {verifyNotes[preset.id] && (
                         <div
                           className={`mt-1 text-[11px] ${
@@ -301,7 +306,12 @@ export function TeamHub({
                       <button
                         type="button"
                         disabled={verifyingId === preset.id}
-                        onClick={() => void runVerify(preset.id, preset)}
+                        onClick={() =>
+                          void runVerify(preset.id, {
+                            ...preset,
+                            modelId: preset.id,
+                          })
+                        }
                         className="text-xs font-bold text-[var(--accent-strong)] hover:underline disabled:opacity-60"
                       >
                         验证 {preset.label}
@@ -373,8 +383,19 @@ export function TeamHub({
                   placeholder={gatewayPlaceholder(newProtocol)}
                 />
               </label>
+              <label className="block text-xs text-[var(--ink-soft)]">
+                API Key
+                <input
+                  type="password"
+                  autoComplete="off"
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
+                  value={newApiKey}
+                  onChange={(e) => setNewApiKey(e.target.value)}
+                  placeholder="sk-..."
+                />
+              </label>
               <p className="text-[11px] leading-relaxed text-[var(--ink-soft)]">
-                可选。Anthropic 不要带 /v1，OpenAI 兼容要带 /v1。空则用 CLI 默认官方地址。
+                第三方必填 URL 和 Key。Anthropic 不要带 /v1，OpenAI 兼容要带 /v1。官方 CLI 登录可留空。
               </p>
               <fieldset className="text-xs text-[var(--ink-soft)]">
                 <legend className="mb-1">可用 CLI</legend>
@@ -426,6 +447,7 @@ export function TeamHub({
                       model: newModel.trim(),
                       protocol: newProtocol,
                       ...(newBaseUrl.trim() ? { baseUrl: newBaseUrl.trim() } : {}),
+                      ...(newApiKey.trim() ? { apiKey: newApiKey.trim() } : {}),
                       label: newLabel.trim() || newModel.trim(),
                     })
                   }
@@ -440,6 +462,7 @@ export function TeamHub({
                     if (!model || newBins.length === 0) return;
                     const label = newLabel.trim() || model;
                     const baseUrl = newBaseUrl.trim();
+                    const apiKey = newApiKey.trim();
                     setModels((list) => [
                       ...list,
                       {
@@ -450,11 +473,13 @@ export function TeamHub({
                         protocol: newProtocol,
                         model,
                         ...(baseUrl ? { baseUrl } : {}),
+                        ...(apiKey ? { apiKey } : {}),
                       },
                     ]);
                     setNewLabel('');
                     setNewModel('');
                     setNewBaseUrl('');
+                    setNewApiKey('');
                   }}
                   className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold ring-1 ring-[var(--border)]"
                 >
