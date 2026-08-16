@@ -18,7 +18,12 @@ export class OpenCodeAdapter implements AgentService {
       process.env.OPENCODE_MODEL ??
       'opencode-go/deepseek-v4-flash';
 
-    const args = ['run', input.prompt, '--format', 'json', '--auto'];
+    // opencode run 无系统提示词参数:身份/规则前置拼进用户 prompt
+    const prompt = input.systemPrompt
+      ? `${input.systemPrompt}\n\n---\n${input.prompt}`
+      : input.prompt;
+
+    const args = ['run', prompt, '--format', 'json', '--auto'];
     if (input.sessionId) args.push('--session', input.sessionId);
     args.push('-m', model);
 
