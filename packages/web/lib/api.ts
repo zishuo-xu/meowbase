@@ -48,6 +48,7 @@ export interface ApprovalDto {
   reviewerAgentId: string;
   status: string;
   diffStat: string;
+  diffText?: string;
   reviewComment?: string;
   createdAt: string;
 }

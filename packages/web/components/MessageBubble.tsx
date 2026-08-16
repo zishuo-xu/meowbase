@@ -5,6 +5,7 @@ import { parseMessage, type ApprovalUiStatus } from '@/lib/parse-message';
 import { ApprovalCardBlock } from './ApprovalCardBlock';
 import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
 import { CliProcessBlock } from './CliProcessBlock';
+import { MarkdownBody } from './MarkdownBody';
 import { ThinkingBlock } from './ThinkingBlock';
 
 export function MessageBubble({
@@ -13,6 +14,7 @@ export function MessageBubble({
   writerName,
   reviewerName,
   approvalStatus,
+  diffText,
   onApprove,
   onReject,
   onConfirmEvidence,
@@ -22,6 +24,7 @@ export function MessageBubble({
   writerName?: string;
   reviewerName?: string;
   approvalStatus?: ApprovalUiStatus;
+  diffText?: string;
   onApprove?: (id: string) => void;
   onReject?: (id: string, reason: string) => void;
   onConfirmEvidence?: (id: string) => void;
@@ -34,6 +37,7 @@ export function MessageBubble({
         <ApprovalCardBlock
           approvalId={parsed.approvalId ?? ''}
           stat={parsed.stat ?? ''}
+          diff={diffText}
           comment={parsed.comment ?? ''}
           writerName={writerName}
           reviewerName={reviewerName}
@@ -107,12 +111,14 @@ export function MessageBubble({
           />
         )}
         {parsed.text ? (
-          <div className="whitespace-pre-wrap break-words">
-            {parsed.text}
-            {message.status === 'streaming' && (
-              <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
-            )}
-          </div>
+          <MarkdownBody
+            text={parsed.text}
+            trailing={
+              message.status === 'streaming' ? (
+                <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
+              ) : null
+            }
+          />
         ) : null}
         {(message.status === 'failed' || message.status === 'terminated') && message.error && (
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>

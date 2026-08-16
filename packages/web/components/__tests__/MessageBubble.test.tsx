@@ -167,6 +167,25 @@ describe('MessageBubble', () => {
     expect(screen.queryByLabelText('工具进行中')).toBeNull();
   });
 
+  it('正文按 Markdown 渲染标题和加粗', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-md',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'gemini',
+          content: '## 结论\n\n**通过**',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: '结论' })).toBeTruthy();
+    expect(screen.getByText('通过').tagName).toBe('STRONG');
+    expect(screen.queryByText('## 结论')).toBeNull();
+  });
+
   it('user 气泡无猫耳', () => {
     const { container } = render(
       <MessageBubble
@@ -225,6 +244,26 @@ describe('ApprovalCardBlock', () => {
     expect(screen.getByText('改动已落地')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
     expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
+  });
+
+  it('有 diff 时展示加减行,审查意见按 Markdown 渲染', () => {
+    render(
+      <ApprovalCardBlock
+        approvalId="ap_a1b2c3d4"
+        stat="quicksort.ts | 3 +"
+        diff={
+          'diff --git a/quicksort.ts b/quicksort.ts\n--- a/quicksort.ts\n+++ b/quicksort.ts\n@@ -0,0 +1,1 @@\n+export function qs() {}\n'
+        }
+        comment={'## 结论\n\n**通过**'}
+        status="pending"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('quicksort.ts')).toBeTruthy();
+    expect(screen.getByText('export function qs() {}')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '结论' })).toBeTruthy();
+    expect(screen.getByText('通过').tagName).toBe('STRONG');
   });
 
   it('审查未通过时标题改为待你决定', () => {

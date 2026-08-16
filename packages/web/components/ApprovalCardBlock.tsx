@@ -2,6 +2,9 @@
 import { useState } from 'react';
 import type { ApprovalUiStatus } from '@/lib/parse-message';
 import { approvalCardTitle } from '@/lib/parse-message';
+import { parseUnifiedDiff } from '@/lib/parse-diff';
+import { DiffView } from './DiffView';
+import { MarkdownBody } from './MarkdownBody';
 
 function fileRows(stat: string): string[] {
   return stat
@@ -19,6 +22,7 @@ const STATUS_LABEL: Record<ApprovalUiStatus, string> = {
 export function ApprovalCardBlock({
   approvalId,
   stat,
+  diff,
   comment,
   writerName,
   reviewerName,
@@ -28,6 +32,7 @@ export function ApprovalCardBlock({
 }: {
   approvalId: string;
   stat: string;
+  diff?: string;
   comment: string;
   writerName?: string;
   reviewerName?: string;
@@ -38,10 +43,11 @@ export function ApprovalCardBlock({
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const pending = status === 'pending';
-  const files = fileRows(stat);
+  const parsed = parseUnifiedDiff(diff ?? '');
+  const files = parsed.length > 0 ? parsed.map((file) => file.path) : fileRows(stat);
 
   return (
-    <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-[0_10px_30px_-18px_rgba(40,30,20,0.45)] ring-1 ring-[var(--border)]">
+    <div className="w-full max-w-2xl rounded-2xl bg-white p-4 shadow-[0_10px_30px_-18px_rgba(40,30,20,0.45)] ring-1 ring-[var(--border)]">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <div className="text-sm font-bold text-[var(--ink)]">{approvalCardTitle(status, comment)}</div>
@@ -62,22 +68,28 @@ export function ApprovalCardBlock({
           {STATUS_LABEL[status]}
         </span>
       </div>
-      {files.length > 0 && (
-        <ul className="mb-3 space-y-1">
-          {files.map((file) => (
-            <li
-              key={file}
-              className="rounded-lg bg-[var(--surface)] px-2.5 py-1.5 font-mono text-[11px] text-[var(--ink-soft)]"
-            >
-              {file}
-            </li>
-          ))}
-        </ul>
+      {parsed.length > 0 ? (
+        <DiffView diff={diff ?? ''} />
+      ) : (
+        files.length > 0 && (
+          <ul className="mb-3 space-y-1">
+            {files.map((file) => (
+              <li
+                key={file}
+                className="rounded-lg bg-[var(--surface)] px-2.5 py-1.5 font-mono text-[11px] text-[var(--ink-soft)]"
+              >
+                {file}
+              </li>
+            ))}
+          </ul>
+        )
       )}
       {comment && (
         <details className="mb-3 rounded-xl bg-[var(--surface)] px-3 py-2" open={comment.length < 80}>
           <summary className="cursor-pointer text-xs font-bold text-[var(--ink-soft)]">审查意见</summary>
-          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink)]">{comment}</div>
+          <div className="mt-1 text-sm leading-relaxed text-[var(--ink)]">
+            <MarkdownBody text={comment} />
+          </div>
         </details>
       )}
       {pending && !rejecting && (

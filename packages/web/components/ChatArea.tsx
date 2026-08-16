@@ -89,6 +89,7 @@ export function ChatArea({
               writerName={writerId ? agentName(writerId, agents) : undefined}
               reviewerName={reviewerId ? agentName(reviewerId, agents) : undefined}
               approvalStatus={approvalStatusFromDto(card?.status) ?? parsed.approvalStatus}
+              diffText={card?.diffText}
               onApprove={onApprove}
               onReject={onReject}
               onConfirmEvidence={onConfirmEvidence}
