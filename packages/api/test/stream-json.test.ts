@@ -61,4 +61,13 @@ describe('StreamAccumulator', () => {
     expect(acc.status).toBe('failed');
     expect(acc.error).toBe('error_max_turns');
   });
+
+  it('tool_use 行进入 takeActivities', () => {
+    const acc = new StreamAccumulator();
+    acc.push(
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"a.ts"}}]},"session_id":"s"}',
+    );
+    expect(acc.takeActivities()).toEqual([{ id: 't1', name: 'Read', arg: 'a.ts', status: 'running' }]);
+    expect(acc.takeActivities()).toEqual([]);
+  });
 });

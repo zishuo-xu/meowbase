@@ -1,13 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { baseUrl } from './api';
+import { baseUrl, type ToolActivity } from './api';
 
-export interface StreamEvent {
-  type: 'increment';
-  messageId: string;
-  delta: string;
-  agentId?: string;
-}
+export type StreamEvent =
+  | { type: 'increment'; messageId: string; delta: string; agentId?: string }
+  | { type: 'activity'; messageId: string; activity: ToolActivity; agentId?: string };
 
 export function useThreadStream(threadId: string | null): {
   lastEvent: StreamEvent | null;

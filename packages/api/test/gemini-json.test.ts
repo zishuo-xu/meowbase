@@ -62,6 +62,12 @@ describe('GeminiAccumulator', () => {
     expect(acc.content).toBe('写好了');
   });
 
+  it('tool_use 进入 takeActivities', () => {
+    const acc = new GeminiAccumulator();
+    acc.push('{"type":"tool_use","tool_name":"write_file","tool_id":"t1"}');
+    expect(acc.takeActivities()).toEqual([{ id: 't1', name: 'write_file', status: 'running' }]);
+  });
+
   it('空行/非 JSON 返回 null', () => {
     const acc = new GeminiAccumulator();
     expect(acc.push('')).toBeNull();

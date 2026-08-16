@@ -12,6 +12,8 @@ export type {
   Skill,
   Thread,
   TokenUsage,
+  ToolActivity,
+  ToolActivityStatus,
 } from './types.js';
 export { AGENT_IDS } from './types.js';
 export type { MentionCatalog, TeamMember } from './catalog.js';

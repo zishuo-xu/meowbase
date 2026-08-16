@@ -75,6 +75,37 @@ describe('executeTurn', () => {
     expect(assistant?.sessionId).toBe('sess-claude');
   });
 
+  it('工具过程经 onActivity 推送并落库', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          input.onActivity?.({ id: 't1', name: 'Write', arg: 'add.js', status: 'running' });
+          input.onIncrement?.('写好了');
+          input.onActivity?.({ id: 't1', name: 'tool', status: 'done' });
+          return { sessionId: 'sess-claude', content: '写好了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const seen: Array<{ name: string; status: string }> = [];
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: {
+        stores,
+        registry,
+        onActivity: (_tid, _mid, activity) => seen.push({ name: activity.name, status: activity.status }),
+      },
+    });
+    expect(seen).toEqual([
+      { name: 'Write', status: 'running' },
+      { name: 'Write', status: 'done' },
+    ]);
+    expect(final.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
+  });
+
   it('新会话 ID 会写回线程', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', 'ok', 'sess-new-1')]);

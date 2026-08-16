@@ -1,4 +1,5 @@
 import type { MessageStatus, TokenUsage } from '@meowbase/shared';
+import { drainActivities, extractToolActivities, type ToolActivity } from './tool-activity.js';
 
 export interface StreamJsonEvent {
   type: string;
@@ -8,6 +9,7 @@ export interface StreamJsonEvent {
   resultText?: string;
   usage?: TokenUsage;
   isError?: boolean;
+  activities?: ToolActivity[];
 }
 
 interface RawBlock {
@@ -51,9 +53,15 @@ export function parseStreamJsonLine(line: string): StreamJsonEvent | null {
     return null;
   }
   const sessionId = typeof obj.session_id === 'string' ? obj.session_id : undefined;
+  const activities = extractToolActivities(obj);
 
   if (obj.type === 'assistant') {
-    return { type: 'assistant', sessionId, textDelta: extractTextDelta(obj.message) };
+    return {
+      type: 'assistant',
+      sessionId,
+      textDelta: extractTextDelta(obj.message),
+      ...(activities.length > 0 ? { activities } : {}),
+    };
   }
   if (obj.type === 'result') {
     return {
@@ -69,11 +77,13 @@ export function parseStreamJsonLine(line: string): StreamJsonEvent | null {
     type: typeof obj.type === 'string' ? obj.type : 'unknown',
     subtype: typeof obj.subtype === 'string' ? obj.subtype : undefined,
     sessionId,
+    ...(activities.length > 0 ? { activities } : {}),
   };
 }
 
 export class StreamAccumulator {
   private parts: string[] = [];
+  private pending: ToolActivity[] = [];
   private _sessionId?: string;
   private _usage?: TokenUsage;
   private _status: MessageStatus = 'completed';
@@ -84,6 +94,7 @@ export class StreamAccumulator {
     const event = parseStreamJsonLine(line);
     if (!event) return null;
     if (event.sessionId) this._sessionId = event.sessionId;
+    if (event.activities?.length) this.pending.push(...event.activities);
     if (event.textDelta) this.parts.push(event.textDelta);
     if (event.type === 'result') {
       if (event.resultText) this.parts = [event.resultText];
@@ -94,6 +105,10 @@ export class StreamAccumulator {
       }
     }
     return event.textDelta ?? null;
+  }
+
+  takeActivities(): ToolActivity[] {
+    return drainActivities(this.pending);
   }
 
   get content(): string {

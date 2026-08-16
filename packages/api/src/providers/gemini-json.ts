@@ -1,4 +1,5 @@
 import type { MessageStatus, TokenUsage } from '@meowbase/shared';
+import { drainActivities, extractToolActivities, type ToolActivity } from './tool-activity.js';
 
 function num(v: unknown): number | undefined {
   return typeof v === 'number' ? v : undefined;
@@ -6,6 +7,7 @@ function num(v: unknown): number | undefined {
 
 export class GeminiAccumulator {
   private parts: string[] = [];
+  private pending: ToolActivity[] = [];
   private _sessionId?: string;
   private _usage?: TokenUsage;
   private _status: MessageStatus = 'completed';
@@ -22,6 +24,7 @@ export class GeminiAccumulator {
     }
 
     if (typeof obj.session_id === 'string') this._sessionId = obj.session_id;
+    this.pending.push(...extractToolActivities(obj));
 
     if (obj.type === 'message' && obj.role === 'assistant' && typeof obj.content === 'string') {
       if (obj.delta === true) {
@@ -54,6 +57,10 @@ export class GeminiAccumulator {
     }
 
     return null;
+  }
+
+  takeActivities(): ToolActivity[] {
+    return drainActivities(this.pending);
   }
 
   get content(): string {

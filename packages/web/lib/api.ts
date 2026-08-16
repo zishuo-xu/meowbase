@@ -30,6 +30,14 @@ export interface MessageDto {
   status: 'streaming' | 'completed' | 'failed' | 'terminated';
   createdAt: string;
   error?: string;
+  activities?: ToolActivity[];
+}
+
+export interface ToolActivity {
+  id: string;
+  name: string;
+  arg?: string;
+  status: 'running' | 'done' | 'error';
 }
 
 export interface ApprovalDto {

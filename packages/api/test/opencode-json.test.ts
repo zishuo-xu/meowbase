@@ -39,4 +39,12 @@ describe('OpenCodeAccumulator', () => {
     expect(acc.content).toBe('写好了');
     expect(acc.usage?.outputTokens).toBe(3);
   });
+
+  it('tool part 进入 takeActivities', () => {
+    const acc = new OpenCodeAccumulator();
+    acc.push(
+      '{"type":"tool","sessionID":"s","part":{"type":"tool","id":"c1","tool":"write","state":{"status":"running","input":{"path":"add.js"}}}}',
+    );
+    expect(acc.takeActivities()).toEqual([{ id: 'c1', name: 'write', arg: 'add.js', status: 'running' }]);
+  });
 });

@@ -1,9 +1,49 @@
-import type { MessageDto } from './api';
+import type { MessageDto, ToolActivity } from './api';
 
 export interface StreamIncrement {
   messageId: string;
   delta: string;
   agentId?: string;
+}
+
+export interface StreamActivity {
+  messageId: string;
+  activity: ToolActivity;
+  agentId?: string;
+}
+
+export function upsertToolActivity(list: ToolActivity[], next: ToolActivity): ToolActivity[] {
+  const idx = list.findIndex((a) => a.id === next.id);
+  if (idx < 0) return [...list, next];
+  const prev = list[idx];
+  if (!prev) return [...list, next];
+  return list.map((item, i) =>
+    i === idx
+      ? {
+          id: prev.id,
+          name: next.name && next.name !== 'tool' ? next.name : prev.name,
+          arg: next.arg ?? prev.arg,
+          status: next.status,
+        }
+      : item,
+  );
+}
+
+function assistantShell(
+  event: { messageId: string; agentId?: string },
+  threadId: string,
+  extra: Partial<MessageDto>,
+): MessageDto {
+  return {
+    id: event.messageId,
+    threadId,
+    role: 'assistant',
+    agentId: event.agentId,
+    content: '',
+    status: 'streaming',
+    createdAt: new Date().toISOString(),
+    ...extra,
+  };
 }
 
 /** 把一条 WS 增量合并进消息列表;尚未出现的 messageId 新建一条 streaming 气泡 */
@@ -35,6 +75,32 @@ export function applyStreamIncrement(
       status: 'streaming',
       createdAt: new Date().toISOString(),
     },
+  ];
+}
+
+/** 把一条 CLI 工具过程合并进消息;尚未出现的 messageId 新建空气泡 */
+export function applyStreamActivity(
+  messages: MessageDto[],
+  event: StreamActivity,
+  threadId: string,
+): MessageDto[] {
+  const idx = messages.findIndex((m) => m.id === event.messageId);
+  if (idx >= 0) {
+    const current = messages[idx];
+    if (!current) return messages;
+    const next = [...messages];
+    next[idx] = {
+      ...current,
+      status: current.status === 'completed' ? current.status : 'streaming',
+      activities: upsertToolActivity(current.activities ?? [], event.activity),
+    };
+    return next;
+  }
+  return [
+    ...messages,
+    assistantShell(event, threadId, {
+      activities: [event.activity],
+    }),
   ];
 }
 
@@ -76,10 +142,15 @@ export function mergeCanonicalMessages(
   const streamedById = new Map(local.map((m) => [m.id, m]));
   const merged = canonical.map((m) => {
     const s = streamedById.get(m.id);
-    if (!s || s.content.length <= m.content.length) return m;
+    if (!s) return m;
+    const activities =
+      (s.activities?.length ?? 0) > (m.activities?.length ?? 0) ? s.activities : m.activities;
+    if (s.content.length <= m.content.length) {
+      return activities ? { ...m, activities } : m;
+    }
     const settled =
       m.status === 'completed' || m.status === 'failed' || m.status === 'terminated';
-    return { ...m, content: s.content, status: settled ? m.status : s.status };
+    return { ...m, content: s.content, status: settled ? m.status : s.status, activities };
   });
   const ids = new Set(canonical.map((m) => m.id));
   for (const s of local) {

@@ -24,6 +24,7 @@ import type {
   MentionCatalog,
   Message,
   TeamMember,
+  ToolActivity,
 } from '@meowbase/shared';
 import type { AgentRegistry, AgentService, AgentTurnOutput } from '../providers/types.js';
 import type {
@@ -36,6 +37,7 @@ import type {
 } from '../stores/ports.js';
 import { gitAddAll, gitCommit, gitDiffHead, sweepStrayFiles } from '../services/git.js';
 import type { AgentSpec } from '../config.js';
+import { upsertToolActivity } from '../providers/tool-activity.js';
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
@@ -58,6 +60,12 @@ export interface TurnContext {
     threadId: string,
     messageId: string,
     delta: string,
+    agentId?: AgentId,
+  ) => void;
+  onActivity?: (
+    threadId: string,
+    messageId: string,
+    activity: ToolActivity,
     agentId?: AgentId,
   ) => void;
 }
@@ -386,6 +394,7 @@ async function runSegment(
     );
 
     let accumulated = '';
+    let activities: ToolActivity[] = [];
     const output = await service.runTurn({
       prompt,
       systemPrompt,
@@ -396,6 +405,11 @@ async function runSegment(
         // 避免无锁 read-modify-write 并发覆盖(Redis 版竞态)
         accumulated += delta;
         context.onIncrement?.(thread.id, assistantMessage.id, delta, currentAgent);
+      },
+      onActivity: (activity) => {
+        activities = upsertToolActivity(activities, activity);
+        const latest = activities.find((a) => a.id === activity.id) ?? activity;
+        context.onActivity?.(thread.id, assistantMessage.id, latest, currentAgent);
       },
     });
 
@@ -410,6 +424,7 @@ async function runSegment(
         usage: output.usage,
         error: output.error,
         sessionId: output.sessionId || undefined,
+        ...(activities.length > 0 ? { activities } : {}),
       }),
     );
     lastOutput = output;

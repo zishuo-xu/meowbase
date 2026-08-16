@@ -1,7 +1,9 @@
 import type { MessageStatus, TokenUsage } from '@meowbase/shared';
+import { drainActivities, extractToolActivities, type ToolActivity } from './tool-activity.js';
 
 export class OpenCodeAccumulator {
   private parts: string[] = [];
+  private pending: ToolActivity[] = [];
   private _sessionId?: string;
   private _usage?: TokenUsage;
   private _status: MessageStatus = 'completed';
@@ -17,6 +19,7 @@ export class OpenCodeAccumulator {
       return null;
     }
     if (typeof obj.sessionID === 'string') this._sessionId = obj.sessionID;
+    this.pending.push(...extractToolActivities(obj));
 
     const part = obj.part as Record<string, unknown> | undefined;
     if (obj.type === 'text' && part?.type === 'text' && typeof part.text === 'string') {
@@ -50,6 +53,10 @@ export class OpenCodeAccumulator {
       }
     }
     return null;
+  }
+
+  takeActivities(): ToolActivity[] {
+    return drainActivities(this.pending);
   }
 
   get content(): string {

@@ -27,6 +27,15 @@ export interface TokenUsage {
   costEstimated?: boolean;
 }
 
+export type ToolActivityStatus = 'running' | 'done' | 'error';
+
+export interface ToolActivity {
+  id: string;
+  name: string;
+  arg?: string;
+  status: ToolActivityStatus;
+}
+
 export interface Message {
   id: string;
   threadId: string;
@@ -39,6 +48,8 @@ export interface Message {
   usage?: TokenUsage;
   error?: string;
   createdAt: string;
+  /** CLI 工具过程(Read/Write/Bash 等),页面 CLI 块用 */
+  activities?: ToolActivity[];
 }
 
 export type EvidenceKind = 'fact' | 'lesson' | 'decision';

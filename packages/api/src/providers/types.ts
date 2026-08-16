@@ -1,4 +1,4 @@
-import type { AgentId, MessageStatus, TokenUsage } from '@meowbase/shared';
+import type { AgentId, MessageStatus, TokenUsage, ToolActivity } from '@meowbase/shared';
 
 export interface AgentTurnInput {
   prompt: string;
@@ -7,6 +7,7 @@ export interface AgentTurnInput {
   workdir: string;
   timeoutMs?: number;
   onIncrement?: (delta: string) => void;
+  onActivity?: (activity: ToolActivity) => void;
 }
 
 export interface AgentTurnOutput {

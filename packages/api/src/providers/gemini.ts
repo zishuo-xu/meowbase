@@ -3,6 +3,7 @@ import type { AgentId } from '@meowbase/shared';
 import { GeminiAccumulator } from './gemini-json.js';
 import { formatCliExitError } from './cli-error.js';
 import { spawnEnv } from './base-url.js';
+import { emitParsedLine } from './tool-activity.js';
 import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class GeminiAdapter implements AgentService {
@@ -60,7 +61,7 @@ export class GeminiAdapter implements AgentService {
           const line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
           const delta = accumulator.push(line);
-          if (delta && input.onIncrement) input.onIncrement(delta);
+          emitParsedLine(input, delta, accumulator.takeActivities());
         }
       });
       child.on('close', (code) => {

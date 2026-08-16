@@ -20,6 +20,7 @@ const fakeClaude: AgentService = {
     for (const part of parts) {
       input.onIncrement?.(part);
     }
+    input.onActivity?.({ id: 't-http', name: 'Write', arg: 'hello.js', status: 'done' });
     return {
       sessionId: 'sess-http',
       content: parts.join(''),
@@ -125,6 +126,35 @@ describe('HTTP 集成', () => {
     expect(events.filter((e) => e.type === 'increment').map((e) => e.delta).join('')).toBe(
       '你好,我是 claude。',
     );
+  });
+
+  it('WebSocket 收到工具过程', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'ws-cli' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+
+    const ws = new WebSocket(`ws://127.0.0.1:${new URL(baseUrl).port}/api/ws?threadId=${thread.id}`);
+    const received: Array<{ type: string; activity?: { name: string; arg?: string } }> = [];
+    ws.onmessage = (event) => {
+      received.push(JSON.parse((event.data as string).toString()) as (typeof received)[number]);
+    };
+    await new Promise<void>((resolve) => {
+      ws.onopen = () => resolve();
+    });
+
+    await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: 'hi' }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    ws.close();
+
+    const activities = received.filter((e) => e.type === 'activity');
+    expect(activities.map((e) => e.activity?.name)).toContain('Write');
   });
 
   it('GET /api/config 返回 A2A 链深与角色别名', async () => {

@@ -4,6 +4,7 @@ import { getPersona } from '@/lib/persona';
 import { parseMessage, type ApprovalUiStatus } from '@/lib/parse-message';
 import { ApprovalCardBlock } from './ApprovalCardBlock';
 import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
+import { CliProcessBlock } from './CliProcessBlock';
 
 export function MessageBubble({
   message,
@@ -98,6 +99,9 @@ export function MessageBubble({
             <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
           )}
         </div>
+        {message.activities && message.activities.length > 0 && (
+          <CliProcessBlock activities={message.activities} />
+        )}
         {(message.status === 'failed' || message.status === 'terminated') && message.error && (
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>
         )}

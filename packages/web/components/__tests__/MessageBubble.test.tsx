@@ -62,6 +62,25 @@ describe('MessageBubble', () => {
     expect(screen.queryByText('墨墨')).toBeNull();
   });
 
+  it('assistant 带工具过程时显示 CLI 行', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm1',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '已创建 add.js',
+          status: 'completed',
+          createdAt: '',
+          activities: [{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }],
+        }}
+      />,
+    );
+    expect(screen.getByText('Write')).toBeTruthy();
+    expect(screen.getByText('add.js')).toBeTruthy();
+  });
+
   it('user 气泡无猫耳', () => {
     const { container } = render(
       <MessageBubble

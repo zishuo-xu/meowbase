@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MessageDto } from '../api';
-import { applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
+import { applyStreamActivity, applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
 
 function msg(partial: Partial<MessageDto> & Pick<MessageDto, 'id' | 'role' | 'content'>): MessageDto {
   return {
@@ -34,6 +34,38 @@ describe('applyStreamIncrement', () => {
   });
 });
 
+describe('applyStreamActivity', () => {
+  it('未知 messageId 新建气泡并挂上工具行', () => {
+    const next = applyStreamActivity(
+      [msg({ id: 'u1', role: 'user', content: '写 add.js' })],
+      { messageId: 'a1', activity: { id: 't1', name: 'Write', arg: 'add.js', status: 'running' }, agentId: 'claude' },
+      't1',
+    );
+    expect(next[1]?.id).toBe('a1');
+    expect(next[1]?.content).toBe('');
+    expect(next[1]?.status).toBe('streaming');
+    expect(next[1]?.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'running' }]);
+  });
+
+  it('同工具 id 更新为完成', () => {
+    const messages = [
+      msg({
+        id: 'a1',
+        role: 'assistant',
+        content: '',
+        status: 'streaming',
+        activities: [{ id: 't1', name: 'Write', arg: 'add.js', status: 'running' }],
+      }),
+    ];
+    const next = applyStreamActivity(
+      messages,
+      { messageId: 'a1', activity: { id: 't1', name: 'tool', status: 'done' } },
+      't1',
+    );
+    expect(next[0]?.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
+  });
+});
+
 describe('mergeCanonicalMessages', () => {
   it('同 id 保留更长的流式正文', () => {
     const canonical = [
@@ -64,6 +96,21 @@ describe('mergeCanonicalMessages', () => {
     expect(next).toHaveLength(2);
     expect(next[1]?.id).toBe('a2');
     expect(next[1]?.content).toBe('墨');
+  });
+
+  it('服务端快照无工具行时保留本地 CLI 过程', () => {
+    const canonical = [msg({ id: 'a1', role: 'assistant', agentId: 'claude', content: '写好了' })];
+    const streamed = [
+      msg({
+        id: 'a1',
+        role: 'assistant',
+        agentId: 'claude',
+        content: '写好了',
+        activities: [{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }],
+      }),
+    ];
+    const next = mergeCanonicalMessages(canonical, streamed, 't1');
+    expect(next[0]?.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
   });
 });
 

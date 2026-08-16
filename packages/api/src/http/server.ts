@@ -329,6 +329,9 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         onIncrement: (tid, messageId, delta, agentId) => {
           emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
         },
+        onActivity: (tid, messageId, activity, agentId) => {
+          emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
+        },
       },
     });
     return reply.code(200).send(message);
@@ -340,12 +343,17 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       socket.close();
       return;
     }
-    const handler = (payload: unknown) => {
+    const onIncrement = (payload: unknown) => {
       socket.send(JSON.stringify({ type: 'increment', ...(payload as object) }));
     };
-    emitter.on(`increment:${threadId}`, handler);
+    const onActivity = (payload: unknown) => {
+      socket.send(JSON.stringify({ type: 'activity', ...(payload as object) }));
+    };
+    emitter.on(`increment:${threadId}`, onIncrement);
+    emitter.on(`activity:${threadId}`, onActivity);
     socket.on('close', () => {
-      emitter.off(`increment:${threadId}`, handler);
+      emitter.off(`increment:${threadId}`, onIncrement);
+      emitter.off(`activity:${threadId}`, onActivity);
     });
   });
 
