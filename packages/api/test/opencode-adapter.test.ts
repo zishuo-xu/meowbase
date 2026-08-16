@@ -11,10 +11,15 @@ describe('OpenCodeAdapter', () => {
   it('跑通一轮:解析增量、usage、会话 ID', async () => {
     const adapter = new OpenCodeAdapter({ bin: FAKE_BIN });
     const deltas: string[] = [];
+    const thoughts: string[] = [];
     const output = await adapter.runTurn({
-      prompt: '审查', workdir: '/tmp', onIncrement: (d) => deltas.push(d),
+      prompt: '审查',
+      workdir: '/tmp',
+      onIncrement: (d) => deltas.push(d),
+      onThinking: (d) => thoughts.push(d),
     });
     expect(deltas.join('')).toBe('审查通过');
+    expect(thoughts.join('')).toBe('先看再审');
     expect(output.content).toBe('审查通过');
     expect(output.sessionId).toBe('ses-fake');
     expect(output.status).toBe('completed');
@@ -41,6 +46,7 @@ describe('OpenCodeAdapter', () => {
     const runPrompt = args[1];
     expect(runPrompt).toContain('你是 团团');
     expect(runPrompt).toContain('写 mul.js');
+    expect(args).toContain('--thinking');
     delete process.env.RECORD_ARGS_FILE;
     rmSync(dir, { recursive: true, force: true });
   });

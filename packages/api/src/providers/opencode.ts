@@ -28,7 +28,7 @@ export class OpenCodeAdapter implements AgentService {
       ? `${input.systemPrompt}\n\n---\n${input.prompt}`
       : input.prompt;
 
-    const args = ['run', prompt, '--format', 'json', '--auto'];
+    const args = ['run', prompt, '--format', 'json', '--auto', '--thinking'];
     if (input.sessionId) args.push('--session', input.sessionId);
     args.push('-m', model);
 
@@ -58,7 +58,7 @@ export class OpenCodeAdapter implements AgentService {
           const line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
           const delta = accumulator.push(line);
-          emitParsedLine(input, delta, accumulator.takeActivities());
+          emitParsedLine(input, delta, accumulator.takeActivities(), accumulator.takeThinking());
         }
       });
       child.on('close', (code) => {

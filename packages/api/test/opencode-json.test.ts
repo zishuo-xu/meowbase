@@ -40,6 +40,17 @@ describe('OpenCodeAccumulator', () => {
     expect(acc.usage?.outputTokens).toBe(3);
   });
 
+  it('reasoning 进入 takeThinking,不混进正文', () => {
+    const acc = new OpenCodeAccumulator();
+    acc.push(
+      '{"type":"reasoning","sessionID":"s","part":{"type":"reasoning","text":"先看 quicksort.ts"}}',
+    );
+    acc.push('{"type":"text","sessionID":"s","part":{"type":"text","text":"审查通过"}}');
+    expect(acc.takeThinking()).toBe('先看 quicksort.ts');
+    expect(acc.takeThinking()).toBeNull();
+    expect(acc.content).toBe('审查通过');
+  });
+
   it('tool part 进入 takeActivities', () => {
     const acc = new OpenCodeAccumulator();
     acc.push(

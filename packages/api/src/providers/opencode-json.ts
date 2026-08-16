@@ -3,6 +3,8 @@ import { drainActivities, extractToolActivities, type ToolActivity } from './too
 
 export class OpenCodeAccumulator {
   private parts: string[] = [];
+  private thinkingParts: string[] = [];
+  private thinkingEmitted = 0;
   private pending: ToolActivity[] = [];
   private _sessionId?: string;
   private _usage?: TokenUsage;
@@ -22,6 +24,14 @@ export class OpenCodeAccumulator {
     this.pending.push(...extractToolActivities(obj));
 
     const part = obj.part as Record<string, unknown> | undefined;
+    if (
+      (obj.type === 'reasoning' || part?.type === 'reasoning') &&
+      typeof part?.text === 'string' &&
+      part.text.length > 0
+    ) {
+      this.thinkingParts.push(part.text);
+      return null;
+    }
     if (obj.type === 'text' && part?.type === 'text' && typeof part.text === 'string') {
       this.parts.push(part.text);
       return part.text;
@@ -57,6 +67,17 @@ export class OpenCodeAccumulator {
 
   takeActivities(): ToolActivity[] {
     return drainActivities(this.pending);
+  }
+
+  takeThinking(): string | null {
+    const full = this.thinkingParts.join('');
+    const extra = full.slice(this.thinkingEmitted);
+    this.thinkingEmitted = full.length;
+    return extra.length > 0 ? extra : null;
+  }
+
+  get thinking(): string {
+    return this.thinkingParts.join('');
   }
 
   get content(): string {
