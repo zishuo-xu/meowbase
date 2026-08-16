@@ -153,4 +153,29 @@ describe('HTTP 集成', () => {
     expect(skills.length).toBeGreaterThan(0);
     expect(skills.map((s) => s.id)).toContain('tdd');
   });
+
+  it('PATCH /api/profiles/:agentId 更新 autoApprove', async () => {
+    const res = await fetch(`${baseUrl}/api/profiles/claude`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autoApprove: true }),
+    });
+    expect(res.status).toBe(200);
+    const profile = (await res.json()) as { autoApprove: boolean };
+    expect(profile.autoApprove).toBe(true);
+
+    const bad = await fetch(`${baseUrl}/api/profiles/claude`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autoApprove: 'yes' }),
+    });
+    expect(bad.status).toBe(400);
+
+    const missing = await fetch(`${baseUrl}/api/profiles/nonexistent`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autoApprove: true }),
+    });
+    expect(missing.status).toBe(404);
+  });
 });

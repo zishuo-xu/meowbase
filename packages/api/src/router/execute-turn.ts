@@ -240,10 +240,26 @@ export async function executeTurn(input: {
           }
         }
         await context.stores.approvals.setReviewComment(card.id, reviewComment);
+
+        // autoApprove:写手角色配置了自动批准 → 审查后直接批准落地
+        const writerProfile = await context.stores.profiles.get(writerAgentId);
+        if (writerProfile?.autoApprove) {
+          // 状态机要求:reviewing → approved → applied
+          await context.stores.approvals.approve(card.id);
+          try {
+            await gitCommit(thread.workdir, `approve ${card.id}`);
+          } catch {
+            // 提交失败不阻塞,批准决策生效
+          }
+          await context.stores.approvals.markApplied(card.id);
+        }
+
         await context.stores.messages.append({
           threadId,
           role: 'system',
-          content: `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
+          content: writerProfile?.autoApprove
+            ? `🤖 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n✅ 已自动批准(autoApprove)`
+            : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${diff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
           status: 'completed',
         });
       }

@@ -120,6 +120,17 @@ export class InMemoryProfileStore implements ProfileStore {
   async list(): Promise<AgentProfile[]> {
     return [...this.profiles.values()];
   }
+
+  async updateAutoApprove(
+    agentId: string,
+    autoApprove: boolean,
+  ): Promise<AgentProfile | null> {
+    const existing = this.profiles.get(agentId);
+    if (!existing) return null;
+    const updated: AgentProfile = { ...existing, autoApprove };
+    this.profiles.set(agentId, updated);
+    return updated;
+  }
 }
 
 export class InMemoryEvidenceStore implements EvidenceStore {

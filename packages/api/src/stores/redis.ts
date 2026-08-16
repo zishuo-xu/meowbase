@@ -181,6 +181,7 @@ export class RedisProfileStore implements ProfileStore {
       personality: raw.personality ?? '',
       role: raw.role ?? '',
       expertise: JSON.parse(raw.expertise ?? '[]') as string[],
+      autoApprove: raw.autoApprove === 'true',
       createdAt: raw.createdAt ?? '',
     };
   }
@@ -197,6 +198,16 @@ export class RedisProfileStore implements ProfileStore {
       if (profile) profiles.push(profile);
     }
     return profiles;
+  }
+
+  async updateAutoApprove(
+    agentId: string,
+    autoApprove: boolean,
+  ): Promise<AgentProfile | null> {
+    const existing = await this.hydrate(agentId);
+    if (!existing) return null;
+    await this.redis.hset(profileKey(agentId), 'autoApprove', String(autoApprove));
+    return this.hydrate(agentId);
   }
 }
 

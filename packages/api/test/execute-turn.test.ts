@@ -346,6 +346,51 @@ describe('executeTurn 审批流', () => {
     expect((await stores.approvals.list(thread.id)).length).toBe(0);
   });
 
+  it('写手 autoApprove → 审查后自动批准落地', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '完成'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return { sessionId: 's', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    await stores.profiles.create({
+      agentId: 'claude', name: '墨墨', personality: 'x', role: '写手', expertise: [],
+      autoApprove: true,
+    });
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'auto.txt'), 'v1');
+
+    await executeTurn({ threadId: thread.id, content: '写个文件', context: { stores, registry } });
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.status).toBe('applied');
+    const messages = await stores.messages.list(thread.id);
+    const cardMsg = messages.find((m) => m.content.includes('审批卡片'));
+    expect(cardMsg?.content).toContain('已自动批准');
+  });
+
+  it('未开 autoApprove → 仍等待人工批准', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '完成'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return { sessionId: 's', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'manual.txt'), 'v1');
+
+    await executeTurn({ threadId: thread.id, content: '写个文件', context: { stores, registry } });
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.status).toBe('reviewing');
+  });
+
   it('#approve 批准卡片并落地', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', 'x')]);

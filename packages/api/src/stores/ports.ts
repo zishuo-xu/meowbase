@@ -45,6 +45,8 @@ export interface ProfileStore {
   create(profile: Omit<AgentProfile, 'createdAt'>): Promise<AgentProfile>;
   get(agentId: AgentId): Promise<AgentProfile | null>;
   list(): Promise<AgentProfile[]>;
+  /** 更新审批策略(身份字段不可变,仅 autoApprove 可改) */
+  updateAutoApprove(agentId: AgentId, autoApprove: boolean): Promise<AgentProfile | null>;
 }
 
 export interface EvidenceStore {

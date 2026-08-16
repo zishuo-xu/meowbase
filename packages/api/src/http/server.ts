@@ -59,6 +59,20 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
 
   app.get('/api/profiles', async () => deps.stores.profiles.list());
 
+  app.patch('/api/profiles/:agentId', async (request, reply) => {
+    const { agentId } = request.params as { agentId: string };
+    const body = request.body as { autoApprove?: boolean } | null;
+    if (typeof body?.autoApprove !== 'boolean') {
+      return reply.code(400).send({ error: 'autoApprove 必须是布尔值' });
+    }
+    const updated = await deps.stores.profiles.updateAutoApprove(
+      agentId,
+      body.autoApprove,
+    );
+    if (!updated) return reply.code(404).send({ error: `profile 不存在: ${agentId}` });
+    return reply.code(200).send(updated);
+  });
+
   app.get('/api/evidence', async (request) => {
     const { threadId } = request.query as { threadId?: string };
     return deps.stores.evidence.list(threadId);

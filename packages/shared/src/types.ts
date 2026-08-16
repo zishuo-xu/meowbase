@@ -50,6 +50,8 @@ export interface AgentProfile {
   personality: string;
   role: string;
   expertise: string[];
+  /** 审批策略:true = 该角色的 diff 自动批准落地(默认 false = 人工批准) */
+  autoApprove?: boolean;
   createdAt: string;
 }
 
