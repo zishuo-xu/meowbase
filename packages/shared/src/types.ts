@@ -70,3 +70,18 @@ export interface Skill {
   triggers: string[];
   prompt: string;
 }
+
+export type ApprovalStatus = 'draft' | 'reviewing' | 'approved' | 'rejected' | 'applied';
+
+export interface ApprovalCard {
+  id: string;
+  threadId: string;
+  writerAgentId: AgentId;
+  reviewerAgentId: AgentId;
+  status: ApprovalStatus;
+  diffText: string;
+  diffStat: string;
+  reviewComment?: string;
+  rejectReason?: string;
+  createdAt: string;
+}

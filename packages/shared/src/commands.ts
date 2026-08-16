@@ -28,3 +28,24 @@ export function parseEvidenceRefs(content: string): string[] {
     .map((m) => (m[1] ? `ev_${m[1]}` : undefined))
     .filter((x): x is string => x !== undefined);
 }
+
+const APPROVE_PATTERN = /#approve\s+(ap_[a-f0-9]{8})\b/;
+
+export function parseApproveCommand(content: string): { id: string } | null {
+  const match = content.match(APPROVE_PATTERN);
+  const id = match?.[1];
+  return id ? { id } : null;
+}
+
+const REJECT_PATTERN = /#reject\s+(ap_[a-f0-9]{8})(?:\s+(.*))?$/;
+
+export function parseRejectCommand(content: string): { id: string; reason: string } | null {
+  const match = content.match(REJECT_PATTERN);
+  const id = match?.[1];
+  if (!id) return null;
+  return { id, reason: (match?.[2] ?? '').trim() };
+}
+
+export function generateApprovalId(): string {
+  return `ap_${randomBytes(4).toString('hex')}`;
+}
