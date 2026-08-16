@@ -149,6 +149,7 @@ describe('TeamHub', () => {
         onSaveSettings={vi.fn()}
       />,
     );
+    fireEvent.change(screen.getByLabelText('CLI'), { target: { value: 'opencode' } });
     fireEvent.change(screen.getByLabelText('选用模型'), { target: { value: 'flash' } });
     fireEvent.click(screen.getByRole('button', { name: '保存这只猫' }));
     expect(onSaveAgent).toHaveBeenCalledWith(
@@ -159,6 +160,25 @@ describe('TeamHub', () => {
         model: 'opencode-go/deepseek-v4-flash',
       }),
     );
+  });
+
+  it('CLI 与选用模型都是下拉框', () => {
+    render(
+      <TeamHub
+        open
+        config={config}
+        focusAgentId="claude"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('CLI').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('选用模型').tagName).toBe('SELECT');
+    expect(screen.queryByLabelText('默认模型')).toBeNull();
+    fireEvent.change(screen.getByLabelText('CLI'), { target: { value: 'opencode' } });
+    const picker = screen.getByLabelText('选用模型') as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.value)).toContain('flash');
   });
 
   it('关闭时不渲染面板', () => {

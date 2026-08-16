@@ -42,6 +42,12 @@ function splitList(raw: string): string[] {
     .filter(Boolean);
 }
 
+const CLI_OPTIONS = ['claude', 'gemini', 'opencode'] as const;
+
+function isKnownCli(bin: string): bin is (typeof CLI_OPTIONS)[number] {
+  return (CLI_OPTIONS as readonly string[]).includes(bin);
+}
+
 function slugId(label: string, model: string): string {
   const raw = (label || model)
     .toLowerCase()
@@ -443,53 +449,71 @@ export function TeamHub({
                       onChange={(e) => setDraft({ ...draft, expertise: e.target.value })}
                     />
                   </label>
-                  <label className="block text-xs text-[var(--ink-soft)]">
-                    选用模型
-                    <select
-                      className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
-                      value={draft.modelId}
-                      onChange={(e) => {
-                        const modelId = e.target.value;
-                        const preset = models.find((m) => m.id === modelId);
-                        setDraft({
-                          ...draft,
-                          modelId,
-                          bin: preset?.bin ?? draft.bin,
-                          model: preset?.model ?? '',
-                        });
-                      }}
-                    >
-                      <option value="">自定义</option>
-                      {models.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {selectedPreset ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-xs text-[var(--ink-soft)]">
+                      CLI
+                      <select
+                        className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+                        value={draft.bin}
+                        onChange={(e) => {
+                          const bin = e.target.value;
+                          const stillValid = models.find(
+                            (m) => m.id === draft.modelId && m.bin === bin,
+                          );
+                          setDraft({
+                            ...draft,
+                            bin,
+                            modelId: stillValid ? draft.modelId : '',
+                            model: stillValid ? draft.model : '',
+                          });
+                        }}
+                      >
+                        {!isKnownCli(draft.bin) && (
+                          <option value={draft.bin}>{draft.bin}</option>
+                        )}
+                        {CLI_OPTIONS.map((bin) => (
+                          <option key={bin} value={bin}>
+                            {bin}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-xs text-[var(--ink-soft)]">
+                      选用模型
+                      <select
+                        className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+                        value={draft.modelId}
+                        onChange={(e) => {
+                          const modelId = e.target.value;
+                          const preset = models.find((m) => m.id === modelId);
+                          setDraft({
+                            ...draft,
+                            modelId,
+                            bin: preset?.bin ?? draft.bin,
+                            model: preset?.model ?? '',
+                          });
+                        }}
+                      >
+                        <option value="">使用 CLI 默认</option>
+                        {models
+                          .filter((preset) => preset.bin === draft.bin)
+                          .map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {preset.label}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  </div>
+                  {models.filter((preset) => preset.bin === draft.bin).length === 0 && (
+                    <p className="text-[11px] text-[var(--ink-soft)]">
+                      这条 CLI 还没有模型,去左侧「模型目录」添加后再选。
+                    </p>
+                  )}
+                  {selectedPreset && (
                     <p className="text-xs text-[var(--ink-soft)]">
                       {selectedPreset.bin} · {selectedPreset.model}
                     </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="block text-xs text-[var(--ink-soft)]">
-                        CLI
-                        <input
-                          className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-mono text-sm text-[var(--ink)]"
-                          value={draft.bin}
-                          onChange={(e) => setDraft({ ...draft, bin: e.target.value })}
-                        />
-                      </label>
-                      <label className="block text-xs text-[var(--ink-soft)]">
-                        默认模型
-                        <input
-                          className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-mono text-sm text-[var(--ink)]"
-                          value={draft.model}
-                          onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-                        />
-                      </label>
-                    </div>
                   )}
                   <label className="flex items-center gap-2 text-sm">
                     <input
