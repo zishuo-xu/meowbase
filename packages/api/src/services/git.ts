@@ -12,6 +12,8 @@ export async function gitInit(dir: string): Promise<void> {
   await run(dir, ['init', '-q']);
   await run(dir, ['config', 'user.name', 'meowbase']);
   await run(dir, ['config', 'user.email', 'meowbase@local']);
+  // 基线提交包含沙箱骨架文件(如 package.json),避免其成为首轮 diff
+  await run(dir, ['add', '-A']);
   await run(dir, ['commit', '--allow-empty', '-q', '-m', 'baseline']);
 }
 

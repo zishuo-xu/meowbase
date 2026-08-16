@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
@@ -44,6 +45,12 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       workdirBase: deps.workdirBase,
     });
     mkdirSync(thread.workdir, { recursive: true });
+    // 先写 package.json 再建基线:让 opencode 把沙箱目录识别为项目根,
+    // 避免它上溯到仓库根导致文件写到沙箱外;且不污染 diff 基线
+    writeFileSync(
+      join(thread.workdir, 'package.json'),
+      JSON.stringify({ name: 'meowbase-thread', private: true }, null, 2),
+    );
     await gitInit(thread.workdir);
     return reply.code(201).send(thread);
   });
