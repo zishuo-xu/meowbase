@@ -382,7 +382,7 @@ describe('executeTurn 审批流', () => {
 });
 
 describe('executeTurn 多角色协作', () => {
-  it('分段接力:一条消息 @ 两个角色按顺序执行', async () => {
+  it('多 @ 同题并行:每个目标收到同一消息', async () => {
     const stores = createMemoryStores();
     const prompts: string[] = [];
     const registry = createAgentRegistry([
@@ -397,22 +397,28 @@ describe('executeTurn 多角色协作', () => {
         agentId: 'opencode',
         async runTurn(input) {
           prompts.push(`opencode:${input.prompt}`);
-          return { sessionId: 's2', content: '团团审完了', status: 'completed' };
+          return { sessionId: 's2', content: '团团写好了', status: 'completed' };
         },
       },
     ]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     const final = await executeTurn({
       threadId: thread.id,
-      content: '@claude 写个函数 @opencode 审查它',
+      content: '@claude 写个加法函数 @opencode 写个乘法函数',
       context: { stores, registry },
     });
-    expect(prompts).toEqual(['claude:写个函数', 'opencode:审查它']);
-    expect(final.agentId).toBe('opencode');
+    // 两个目标都收到清理后的同一消息(无 @ 标记)
+    expect(prompts.length).toBe(2);
+    for (const p of prompts) {
+      expect(p).toContain('写个加法函数');
+      expect(p).toContain('写个乘法函数');
+      expect(p).not.toContain('@claude');
+    }
+    expect(final.agentId).toBe('claude');
 
     const messages = await stores.messages.list(thread.id);
     const assistants = messages.filter((m) => m.role === 'assistant');
-    expect(assistants.map((m) => m.agentId)).toEqual(['claude', 'opencode']);
+    expect(assistants.map((m) => m.agentId).sort()).toEqual(['claude', 'opencode']);
   });
 
   it('A2A 接力:回复行首 @ 自动续跑,后角能看到前角输出', async () => {
@@ -475,74 +481,5 @@ describe('executeTurn 多角色协作', () => {
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
     // claude → opencode → (claude 已出场,停止)
     expect(calls).toEqual(['claude', 'opencode']);
-  });
-});
-
-describe('executeTurn 并行协作', () => {
-  it('| 分隔的组并行执行,两个角色都出场', async () => {
-    const stores = createMemoryStores();
-    const calls: string[] = [];
-    const registry = createAgentRegistry([
-      {
-        agentId: 'claude',
-        async runTurn() {
-          calls.push('claude');
-          await new Promise((r) => setTimeout(r, 40));
-          return { sessionId: 's1', content: '墨墨完成', status: 'completed' };
-        },
-      },
-      {
-        agentId: 'opencode',
-        async runTurn() {
-          calls.push('opencode');
-          await new Promise((r) => setTimeout(r, 5));
-          return { sessionId: 's2', content: '团团完成', status: 'completed' };
-        },
-      },
-    ]);
-    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
-    const final = await executeTurn({
-      threadId: thread.id,
-      content: '@claude 写 X | @opencode 写 Y',
-      context: { stores, registry },
-    });
-    // 两个角色都被调用(并行,顺序无关)
-    expect(calls.sort()).toEqual(['claude', 'opencode']);
-    // 两条 assistant 消息都落库
-    const messages = await stores.messages.list(thread.id);
-    const assistants = messages.filter((m) => m.role === 'assistant');
-    expect(assistants.map((m) => m.agentId).sort()).toEqual(['claude', 'opencode']);
-    // 返回第一组(按组序)的最后消息
-    expect(final.agentId).toBe('claude');
-    expect(final.content).toBe('墨墨完成');
-  });
-
-  it('一组失败不影响另一组', async () => {
-    const stores = createMemoryStores();
-    const registry = createAgentRegistry([
-      {
-        agentId: 'claude',
-        async runTurn() {
-          return { sessionId: '', content: '', status: 'failed', error: 'boom' };
-        },
-      },
-      {
-        agentId: 'opencode',
-        async runTurn() {
-          return { sessionId: 's2', content: '团团完成', status: 'completed' };
-        },
-      },
-    ]);
-    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
-    const final = await executeTurn({
-      threadId: thread.id,
-      content: '@claude 写 X | @opencode 写 Y',
-      context: { stores, registry },
-    });
-    expect(final.agentId).toBe('claude');
-    expect(final.status).toBe('failed');
-    const messages = await stores.messages.list(thread.id);
-    const assistants = messages.filter((m) => m.role === 'assistant');
-    expect(assistants.map((m) => m.agentId).sort()).toEqual(['claude', 'opencode']);
   });
 });

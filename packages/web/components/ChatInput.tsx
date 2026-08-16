@@ -127,7 +127,7 @@ export function ChatInput({ onSend }: { onSend: (content: string) => void }) {
             }
           }}
           rows={2}
-          placeholder="@墨墨 干活吧…(支持 #learn / #confirm / #ev_ / #approve)"
+          placeholder="@墨墨 干活吧…(可 @ 多个角色同题并行 / #learn / #confirm / #approve)"
           className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
         />
         <button

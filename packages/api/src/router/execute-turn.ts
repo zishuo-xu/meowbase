@@ -7,11 +7,11 @@ import {
   parseConfirmCommand,
   parseEvidenceRefs,
   parseLearnCommand,
-  parseMentionSegments,
-  parseParallelGroups,
+  parseMentionTargets,
   parseRejectCommand,
   resolveTargetAgent,
   selectReviewer,
+  stripMentions,
 } from '@meowbase/shared';
 import type { AgentId, EvidenceEntry, Message } from '@meowbase/shared';
 import type { AgentRegistry, AgentService, AgentTurnOutput } from '../providers/types.js';
@@ -139,8 +139,10 @@ export async function executeTurn(input: {
     if (entry?.status === 'confirmed') refs.push(entry);
   }
 
-  const groups = parseParallelGroups(content);
-  if (groups.length === 0) {
+  // 多 @ 同题并行(对齐 clowder):每个目标收到同一消息;A2A 接力各自串行;失败隔离
+  const targets = parseMentionTargets(content, thread.primaryAgentId);
+  const cleanMessage = stripMentions(content).trim();
+  if (!cleanMessage) {
     return context.stores.messages.append({
       threadId,
       role: 'system',
@@ -149,28 +151,28 @@ export async function executeTurn(input: {
     });
   }
 
-  // 并行组:每组独立串行接力;组间并发执行,失败互不影响
   const writeQueue = createWriteQueue();
-  const groupResults = await Promise.allSettled(
-    groups.map(async (group) => {
-      const segments = parseMentionSegments(group, thread.primaryAgentId);
-      if (segments.length === 0) return null;
-      let lastResult: SegmentRunResult | null = null;
+  const targetResults = await Promise.allSettled(
+    targets.map(async (target) => {
       const visited = new Set<AgentId>();
-      for (const segment of segments) {
-        lastResult = await runSegment(context, thread, segment, refs, visited, writeQueue);
-      }
-      return lastResult;
+      return runSegment(
+        context,
+        thread,
+        { agentId: target, text: cleanMessage },
+        refs,
+        visited,
+        writeQueue,
+      );
     }),
   );
 
-  const fulfilled = groupResults.find(
+  const fulfilled = targetResults.find(
     (r): r is PromiseFulfilledResult<SegmentRunResult | null> =>
       r.status === 'fulfilled',
   );
   const lastResult = fulfilled?.value ?? null;
   if (!lastResult) {
-    const rejected = groupResults.find(
+    const rejected = targetResults.find(
       (r): r is PromiseRejectedResult => r.status === 'rejected',
     );
     if (rejected) throw rejected.reason;
