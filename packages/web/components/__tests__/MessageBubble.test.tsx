@@ -229,7 +229,7 @@ describe('ApprovalCardBlock', () => {
     expect(onReject).toHaveBeenCalledWith('ap_a1b2c3d4', '再改改');
   });
 
-  it('已落地时不再显示批准按钮', () => {
+  it('已确认时不再显示批准按钮', () => {
     render(
       <ApprovalCardBlock
         approvalId="ap_a1b2c3d4"
@@ -240,8 +240,9 @@ describe('ApprovalCardBlock', () => {
         onReject={vi.fn()}
       />,
     );
-    expect(screen.getByText('已落地')).toBeTruthy();
-    expect(screen.getByText('改动已落地')).toBeTruthy();
+    expect(screen.getByText('已确认')).toBeTruthy();
+    expect(screen.getByText('改动已确认')).toBeTruthy();
+    expect(screen.getByText('已记进这个线程的基线。')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
     expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
   });

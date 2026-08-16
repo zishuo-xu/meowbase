@@ -74,7 +74,7 @@ describe('approvalCardTitle', () => {
   it('按状态和审查结论写标题,不再一律待确认', () => {
     expect(approvalCardTitle('pending', '结论:通过')).toBe('审查通过，待你确认');
     expect(approvalCardTitle('pending', '## 结论\n需修改')).toBe('互审未通过，待你决定');
-    expect(approvalCardTitle('applied', '通过')).toBe('改动已落地');
+    expect(approvalCardTitle('applied', '通过')).toBe('改动已确认');
     expect(approvalCardTitle('rejected', '需修改')).toBe('已打回');
   });
 });

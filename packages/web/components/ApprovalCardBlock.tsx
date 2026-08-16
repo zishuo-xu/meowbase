@@ -15,7 +15,7 @@ function fileRows(stat: string): string[] {
 
 const STATUS_LABEL: Record<ApprovalUiStatus, string> = {
   pending: '待你确认',
-  applied: '已落地',
+  applied: '已确认',
   rejected: '已打回',
 };
 
@@ -140,10 +140,10 @@ export function ApprovalCardBlock({
         </div>
       )}
       {status === 'applied' && (
-        <p className="text-xs text-[var(--accent-strong)]">已写入这个线程，不用再操作。</p>
+        <p className="text-xs text-[var(--accent-strong)]">已记进这个线程的基线。</p>
       )}
       {status === 'rejected' && (
-        <p className="text-xs text-red-700">已打回，改动没有落地。</p>
+        <p className="text-xs text-red-700">没收下。文件还在沙箱里。</p>
       )}
       <div className="mt-2 font-mono text-[10px] text-[var(--ink-soft)]/70">{approvalId}</div>
     </div>

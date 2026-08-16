@@ -75,7 +75,7 @@ function reviewLooksRevise(comment: string): boolean {
 }
 
 export function approvalCardTitle(status: ApprovalUiStatus, comment = ''): string {
-  if (status === 'applied') return '改动已落地';
+  if (status === 'applied') return '改动已确认';
   if (status === 'rejected') return '已打回';
   if (reviewLooksRevise(comment)) return '互审未通过，待你决定';
   return '审查通过，待你确认';
