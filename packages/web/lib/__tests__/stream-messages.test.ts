@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MessageDto } from '../api';
-import { applyStreamIncrement, mergeCanonicalMessages } from '../stream-messages';
+import { applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
 
 function msg(partial: Partial<MessageDto> & Pick<MessageDto, 'id' | 'role' | 'content'>): MessageDto {
   return {
@@ -64,5 +64,35 @@ describe('mergeCanonicalMessages', () => {
     expect(next).toHaveLength(2);
     expect(next[1]?.id).toBe('a2');
     expect(next[1]?.content).toBe('墨');
+  });
+});
+
+describe('pipelinePhase', () => {
+  it('未发送时为空闲', () => {
+    expect(pipelinePhase([msg({ id: 'u1', role: 'user', content: 'hi' })], false)).toBe('idle');
+  });
+
+  it('发送中且写手尚未完成时为干活', () => {
+    expect(
+      pipelinePhase(
+        [
+          msg({ id: 'u1', role: 'user', content: '写 add.js' }),
+          msg({ id: 'a1', role: 'assistant', content: '正在', status: 'streaming' }),
+        ],
+        true,
+      ),
+    ).toBe('working');
+  });
+
+  it('发送中且写手已完成时为审查', () => {
+    expect(
+      pipelinePhase(
+        [
+          msg({ id: 'u1', role: 'user', content: '写 add.js' }),
+          msg({ id: 'a1', role: 'assistant', content: '写好了', status: 'completed' }),
+        ],
+        true,
+      ),
+    ).toBe('reviewing');
   });
 });

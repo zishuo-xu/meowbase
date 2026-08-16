@@ -38,6 +38,29 @@ export function applyStreamIncrement(
   ];
 }
 
+export type PipelinePhase = 'idle' | 'working' | 'reviewing';
+
+/** sending 未结束时:已有写手回复则视为审查中,避免气泡已出还一直「干活」 */
+export function pipelinePhase(
+  messages: Pick<MessageDto, 'role' | 'status'>[],
+  sending: boolean,
+): PipelinePhase {
+  if (!sending) return 'idle';
+  let lastUser = -1;
+  for (let i = 0; i < messages.length; i += 1) {
+    if (messages[i]?.role === 'user') lastUser = i;
+  }
+  if (lastUser < 0) return 'working';
+  const settled = messages
+    .slice(lastUser + 1)
+    .some(
+      (m) =>
+        m.role === 'assistant' &&
+        (m.status === 'completed' || m.status === 'failed' || m.status === 'terminated'),
+    );
+  return settled ? 'reviewing' : 'working';
+}
+
 /**
  * 服务端快照与本地流式状态合并:
  * - 同 id 保留更长的 content(避免轮询/刷新把正在打的字盖掉)

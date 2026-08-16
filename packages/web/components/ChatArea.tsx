@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type AgentConfigDto, type ApprovalDto, type MessageDto } from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
 import { useThreadStream } from '@/lib/use-thread-stream';
-import { applyStreamIncrement, mergeCanonicalMessages } from '@/lib/stream-messages';
+import { applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '@/lib/stream-messages';
 import { agentName } from '@/lib/persona';
 import { approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '@/lib/parse-message';
 
@@ -54,7 +54,7 @@ export function ChatArea({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [streamed]);
 
-  const waiting = Boolean(sending) && streamed.every((m) => m.status !== 'streaming');
+  const phase = pipelinePhase(streamed, Boolean(sending));
   const approvalById = new Map(approvals.map((card) => [card.id, card]));
   const visible = streamed.filter((m) => !isHiddenChatMessage(m));
 
@@ -80,11 +80,11 @@ export function ChatArea({
             />
           );
         })}
-        {waiting && (
+        {phase !== 'idle' && (
           <div className="px-4 py-2 text-xs text-[var(--ink-soft)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 ring-1 ring-[var(--border)]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-              猫们正在干活…
+              {phase === 'reviewing' ? '写完了，正在自动审查…' : '猫们正在干活…'}
             </span>
           </div>
         )}
