@@ -47,6 +47,21 @@ interface SegmentRunResult {
   firstAgent: AgentId;
 }
 
+/** 串行化存储写操作:并行组并发 append/patch 时避免 Redis lost-update */
+type WriteQueue = <T>(fn: () => Promise<T>) => Promise<T>;
+
+function createWriteQueue(): WriteQueue {
+  let tail: Promise<unknown> = Promise.resolve();
+  return <T>(fn: () => Promise<T>): Promise<T> => {
+    const next = tail.then(fn, fn);
+    tail = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  };
+}
+
 export async function executeTurn(input: {
   threadId: string;
   content: string;
@@ -134,6 +149,7 @@ export async function executeTurn(input: {
   }
 
   // 并行组:每组独立串行接力;组间并发执行,失败互不影响
+  const writeQueue = createWriteQueue();
   const groupResults = await Promise.allSettled(
     groups.map(async (group) => {
       const segments = parseMentionSegments(group, thread.primaryAgentId);
@@ -141,7 +157,7 @@ export async function executeTurn(input: {
       let lastResult: SegmentRunResult | null = null;
       const visited = new Set<AgentId>();
       for (const segment of segments) {
-        lastResult = await runSegment(context, thread, segment, refs, visited);
+        lastResult = await runSegment(context, thread, segment, refs, visited, writeQueue);
       }
       return lastResult;
     }),
@@ -243,6 +259,7 @@ async function runSegment(
   segment: { agentId: AgentId; text: string },
   refs: EvidenceEntry[],
   visited: Set<AgentId>,
+  writeQueue: WriteQueue,
 ): Promise<SegmentRunResult> {
   let lastAssistant: Message | null = null;
   let lastOutput: AgentTurnOutput | null = null;
@@ -266,13 +283,15 @@ async function runSegment(
     const systemPrompt = buildSystemPrompt({ profile, skills: matchedSkills, evidenceRefs: refs });
     const prompt = prevContent ? `${prevContent}\n\n---\n${currentTask}` : currentTask;
 
-    const assistantMessage = await context.stores.messages.append({
-      threadId: thread.id,
-      role: 'assistant',
-      agentId: currentAgent,
-      content: '',
-      status: 'streaming',
-    });
+    const assistantMessage = await writeQueue(() =>
+      context.stores.messages.append({
+        threadId: thread.id,
+        role: 'assistant',
+        agentId: currentAgent,
+        content: '',
+        status: 'streaming',
+      }),
+    );
 
     let accumulated = '';
     const output = await service.runTurn({
@@ -292,13 +311,15 @@ async function runSegment(
       await context.stores.threads.setSession(thread.id, currentAgent, output.sessionId);
     }
 
-    lastAssistant = await context.stores.messages.patch(thread.id, assistantMessage.id, {
-      content: output.content || accumulated,
-      status: output.status,
-      usage: output.usage,
-      error: output.error,
-      sessionId: output.sessionId || undefined,
-    });
+    lastAssistant = await writeQueue(() =>
+      context.stores.messages.patch(thread.id, assistantMessage.id, {
+        content: output.content || accumulated,
+        status: output.status,
+        usage: output.usage,
+        error: output.error,
+        sessionId: output.sessionId || undefined,
+      }),
+    );
     lastOutput = output;
     prevContent = output.content || accumulated;
 
@@ -306,12 +327,14 @@ async function runSegment(
     if (output.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent);
     if (!handoff || visited.has(handoff.target) || !context.registry.get(handoff.target)) break;
-    await context.stores.messages.append({
-      threadId: thread.id,
-      role: 'system',
-      content: `🤝 接力:@${handoff.target}`,
-      status: 'completed',
-    });
+    await writeQueue(() =>
+      context.stores.messages.append({
+        threadId: thread.id,
+        role: 'system',
+        content: `🤝 接力:@${handoff.target}`,
+        status: 'completed',
+      }),
+    );
     currentAgent = handoff.target;
     currentTask = handoff.task;
   }
