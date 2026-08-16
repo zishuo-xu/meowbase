@@ -1,5 +1,9 @@
 # Meowbase(喵窝)
 
+> **愿景**:让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
+>
+> **现状**:自研多 Agent 协作平台(架构参考 clowder-ai,代码独立实现)——线程化对话、@mention 路由、持久身份(墨墨/闪闪/团团)、证据库、技能按需加载、跨模型互审+审批流、A2A 自动接力、同题并行、Web UI。132 个测试全绿,真实模型全流程演示通过。
+
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。
 
