@@ -16,6 +16,8 @@ export type {
 export { AGENT_IDS } from './types.js';
 export type { Mention } from './mention.js';
 export { parseMentions, resolveTargetAgent } from './mention.js';
+export type { MentionSegment } from './mention-segments.js';
+export { parseMentionSegments } from './mention-segments.js';
 export { mergeTokenUsage } from './token-usage.js';
 export {
   generateApprovalId,
