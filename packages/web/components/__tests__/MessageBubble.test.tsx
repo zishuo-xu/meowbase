@@ -81,6 +81,28 @@ describe('MessageBubble', () => {
     expect(screen.getByText('add.js')).toBeTruthy();
   });
 
+  it('思考过程与工具分行,不混进正文', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-think',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '已写好 quicksort.ts',
+          status: 'completed',
+          createdAt: '',
+          thinking: '先看目录再落文件',
+          activities: [{ id: 't1', name: 'Write', arg: 'quicksort.ts', status: 'done' }],
+        }}
+      />,
+    );
+    expect(screen.getByText('思考过程')).toBeTruthy();
+    expect(screen.getByText('先看目录再落文件')).toBeTruthy();
+    expect(screen.getByText('Write')).toBeTruthy();
+    expect(screen.getByText('已写好 quicksort.ts')).toBeTruthy();
+  });
+
   it('超时消息把进行中的工具显示为失败,不再转圈', () => {
     render(
       <MessageBubble

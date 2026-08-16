@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type AgentConfigDto, type ApprovalDto, type MessageDto } from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
 import { useThreadStream } from '@/lib/use-thread-stream';
-import { applyStreamActivity, applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '@/lib/stream-messages';
+import { applyStreamActivity, applyStreamIncrement, applyStreamStart, applyStreamThinking, mergeCanonicalMessages, pipelinePhase } from '@/lib/stream-messages';
 import { agentName } from '@/lib/persona';
 import { approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '@/lib/parse-message';
 
@@ -38,6 +38,15 @@ export function ChatArea({
       setStreamed((prev) => applyStreamActivity(prev, lastEvent, threadId));
       return;
     }
+    if (lastEvent.type === 'start') {
+      setStreamed((prev) => applyStreamStart(prev, lastEvent, threadId));
+      return;
+    }
+    if (lastEvent.type === 'thinking') {
+      setStreamed((prev) => applyStreamThinking(prev, lastEvent, threadId));
+      return;
+    }
+    if (lastEvent.type !== 'increment') return;
     setStreamed((prev) => applyStreamIncrement(prev, lastEvent, threadId));
   }, [lastEvent, threadId]);
   useEffect(() => {

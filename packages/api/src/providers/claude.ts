@@ -57,7 +57,7 @@ export class ClaudeAdapter implements AgentService {
           const line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
           const delta = accumulator.push(line);
-          emitParsedLine(input, delta, accumulator.takeActivities());
+          emitParsedLine(input, delta, accumulator.takeActivities(), accumulator.takeThinking());
         }
       });
       child.on('close', () => resolve());

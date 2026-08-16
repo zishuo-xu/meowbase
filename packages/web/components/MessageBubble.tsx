@@ -5,6 +5,7 @@ import { parseMessage, type ApprovalUiStatus } from '@/lib/parse-message';
 import { ApprovalCardBlock } from './ApprovalCardBlock';
 import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
 import { CliProcessBlock } from './CliProcessBlock';
+import { ThinkingBlock } from './ThinkingBlock';
 
 export function MessageBubble({
   message,
@@ -93,17 +94,22 @@ export function MessageBubble({
             {displayName}
           </div>
         )}
-        <div className="whitespace-pre-wrap break-words">
-          {parsed.text}
-          {message.status === 'streaming' && (
-            <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
-          )}
-        </div>
+        {message.thinking && (
+          <ThinkingBlock content={message.thinking} streaming={message.status === 'streaming'} />
+        )}
         {message.activities && message.activities.length > 0 && (
           <CliProcessBlock
-            activities={message.activities}
+            activities={message.activities.filter((a) => a.name !== '思考')}
             ended={message.status === 'failed' || message.status === 'terminated'}
           />
+        )}
+        {(parsed.text || message.status === 'streaming') && (
+          <div className="whitespace-pre-wrap break-words">
+            {parsed.text}
+            {message.status === 'streaming' && (
+              <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />
+            )}
+          </div>
         )}
         {(message.status === 'failed' || message.status === 'terminated') && message.error && (
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>

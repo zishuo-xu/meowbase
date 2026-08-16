@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MessageDto } from '../api';
-import { applyStreamActivity, applyStreamIncrement, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
+import { applyStreamActivity, applyStreamIncrement, applyStreamStart, applyStreamThinking, mergeCanonicalMessages, pipelinePhase } from '../stream-messages';
 
 function msg(partial: Partial<MessageDto> & Pick<MessageDto, 'id' | 'role' | 'content'>): MessageDto {
   return {
@@ -31,6 +31,33 @@ describe('applyStreamIncrement', () => {
     expect(next[1]?.agentId).toBe('claude');
     expect(next[1]?.content).toBe('墨墨来了');
     expect(next[1]?.status).toBe('streaming');
+  });
+});
+
+describe('applyStreamStart', () => {
+  it('未知 messageId 新建空气泡', () => {
+    const next = applyStreamStart(
+      [msg({ id: 'u1', role: 'user', content: 'hi' })],
+      { messageId: 'a1', agentId: 'claude' },
+      't1',
+    );
+    expect(next[1]?.id).toBe('a1');
+    expect(next[1]?.content).toBe('');
+    expect(next[1]?.status).toBe('streaming');
+    expect(next[1]?.agentId).toBe('claude');
+  });
+});
+
+describe('applyStreamThinking', () => {
+  it('思考增量单独累积,不进正文', () => {
+    const first = applyStreamThinking(
+      [msg({ id: 'u1', role: 'user', content: 'hi' })],
+      { messageId: 'a1', delta: '先看目录', agentId: 'claude' },
+      't1',
+    );
+    const next = applyStreamThinking(first, { messageId: 'a1', delta: '再写文件' }, 't1');
+    expect(next[1]?.thinking).toBe('先看目录再写文件');
+    expect(next[1]?.content).toBe('');
   });
 });
 

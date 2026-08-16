@@ -4,7 +4,9 @@ import { baseUrl, type ToolActivity } from './api';
 
 export type StreamEvent =
   | { type: 'increment'; messageId: string; delta: string; agentId?: string }
-  | { type: 'activity'; messageId: string; activity: ToolActivity; agentId?: string };
+  | { type: 'activity'; messageId: string; activity: ToolActivity; agentId?: string }
+  | { type: 'start'; messageId: string; agentId?: string }
+  | { type: 'thinking'; messageId: string; delta: string; agentId?: string };
 
 export function useThreadStream(threadId: string | null): {
   lastEvent: StreamEvent | null;

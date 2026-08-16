@@ -57,6 +57,7 @@ describe('executeTurn', () => {
     const registry = createAgentRegistry([stubAgent('claude', '一二三')]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     const increments: string[] = [];
+    const starts: string[] = [];
     const final = await executeTurn({
       threadId: thread.id,
       content: 'hi',
@@ -64,8 +65,11 @@ describe('executeTurn', () => {
         stores,
         registry,
         onIncrement: (_tid, _mid, delta) => increments.push(delta),
+        onStart: (_tid, messageId, agentId) => starts.push(`${agentId}:${messageId}`),
       },
     });
+    expect(starts).toHaveLength(1);
+    expect(starts[0]?.startsWith('claude:')).toBe(true);
     expect(increments.join('')).toBe('一二三');
     expect(final.content).toBe('一二三');
     // 流式期间消息已逐段落库
@@ -104,6 +108,36 @@ describe('executeTurn', () => {
       { name: 'Write', status: 'done' },
     ]);
     expect(final.activities).toEqual([{ id: 't1', name: 'Write', arg: 'add.js', status: 'done' }]);
+  });
+
+  it('思考过程经 onThinking 推送并落库,不进 CLI 工具', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          input.onThinking?.('先看目录');
+          input.onActivity?.({ id: 't1', name: 'Read', arg: 'a.ts', status: 'done' });
+          input.onIncrement?.('写好了');
+          return { sessionId: 'sess-claude', content: '写好了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const thoughts: string[] = [];
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: {
+        stores,
+        registry,
+        onThinking: (_tid, _mid, delta) => thoughts.push(delta),
+      },
+    });
+    expect(thoughts.join('')).toBe('先看目录');
+    expect(final.thinking).toBe('先看目录');
+    expect(final.content).toBe('写好了');
+    expect(final.activities?.some((a) => a.name === '思考')).toBeFalsy();
   });
 
   it('超时后把未完成的工具标成 error', async () => {

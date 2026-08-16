@@ -6,6 +6,7 @@ export interface StreamJsonEvent {
   subtype?: string;
   sessionId?: string;
   textDelta?: string;
+  thinkingDelta?: string;
   resultText?: string;
   usage?: TokenUsage;
   isError?: boolean;
@@ -15,6 +16,7 @@ export interface StreamJsonEvent {
 interface RawBlock {
   type?: string;
   text?: unknown;
+  thinking?: unknown;
 }
 
 function extractTextDelta(message: unknown): string {
@@ -25,6 +27,17 @@ function extractTextDelta(message: unknown): string {
     .filter((b): b is RawBlock => typeof b === 'object' && b !== null)
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
     .map((b) => b.text as string)
+    .join('');
+}
+
+function extractThinkingDelta(message: unknown): string {
+  if (!message || typeof message !== 'object') return '';
+  const content = (message as { content?: unknown }).content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((b): b is RawBlock => typeof b === 'object' && b !== null)
+    .filter((b) => b.type === 'thinking' && typeof b.thinking === 'string')
+    .map((b) => b.thinking as string)
     .join('');
 }
 
@@ -56,10 +69,12 @@ export function parseStreamJsonLine(line: string): StreamJsonEvent | null {
   const activities = extractToolActivities(obj);
 
   if (obj.type === 'assistant') {
+    const thinkingDelta = extractThinkingDelta(obj.message);
     return {
       type: 'assistant',
       sessionId,
       textDelta: extractTextDelta(obj.message),
+      ...(thinkingDelta ? { thinkingDelta } : {}),
       ...(activities.length > 0 ? { activities } : {}),
     };
   }
@@ -83,6 +98,8 @@ export function parseStreamJsonLine(line: string): StreamJsonEvent | null {
 
 export class StreamAccumulator {
   private parts: string[] = [];
+  private thinkingParts: string[] = [];
+  private thinkingEmitted = 0;
   private pending: ToolActivity[] = [];
   private _sessionId?: string;
   private _usage?: TokenUsage;
@@ -95,6 +112,7 @@ export class StreamAccumulator {
     if (!event) return null;
     if (event.sessionId) this._sessionId = event.sessionId;
     if (event.activities?.length) this.pending.push(...event.activities);
+    if (event.thinkingDelta) this.thinkingParts.push(event.thinkingDelta);
     if (event.textDelta) this.parts.push(event.textDelta);
     if (event.type === 'result') {
       if (event.resultText) this.parts = [event.resultText];
@@ -109,6 +127,17 @@ export class StreamAccumulator {
 
   takeActivities(): ToolActivity[] {
     return drainActivities(this.pending);
+  }
+
+  takeThinking(): string | null {
+    const full = this.thinkingParts.join('');
+    const extra = full.slice(this.thinkingEmitted);
+    this.thinkingEmitted = full.length;
+    return extra.length > 0 ? extra : null;
+  }
+
+  get thinking(): string {
+    return this.thinkingParts.join('');
   }
 
   get content(): string {

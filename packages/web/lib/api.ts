@@ -31,6 +31,7 @@ export interface MessageDto {
   createdAt: string;
   error?: string;
   activities?: ToolActivity[];
+  thinking?: string;
 }
 
 export interface ToolActivity {

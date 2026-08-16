@@ -8,6 +8,7 @@ export interface AgentTurnInput {
   timeoutMs?: number;
   onIncrement?: (delta: string) => void;
   onActivity?: (activity: ToolActivity) => void;
+  onThinking?: (delta: string) => void;
 }
 
 export interface AgentTurnOutput {

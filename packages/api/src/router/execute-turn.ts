@@ -68,6 +68,8 @@ export interface TurnContext {
     activity: ToolActivity,
     agentId?: AgentId,
   ) => void;
+  onStart?: (threadId: string, messageId: string, agentId?: AgentId) => void;
+  onThinking?: (threadId: string, messageId: string, delta: string, agentId?: AgentId) => void;
 }
 
 interface SegmentRunResult {
@@ -393,7 +395,10 @@ async function runSegment(
       }),
     );
 
+    context.onStart?.(thread.id, assistantMessage.id, currentAgent);
+
     let accumulated = '';
+    let thinking = '';
     let activities: ToolActivity[] = [];
     const output = await service.runTurn({
       prompt,
@@ -405,6 +410,10 @@ async function runSegment(
         // 避免无锁 read-modify-write 并发覆盖(Redis 版竞态)
         accumulated += delta;
         context.onIncrement?.(thread.id, assistantMessage.id, delta, currentAgent);
+      },
+      onThinking: (delta) => {
+        thinking += delta;
+        context.onThinking?.(thread.id, assistantMessage.id, delta, currentAgent);
       },
       onActivity: (activity) => {
         activities = upsertToolActivity(activities, activity);
@@ -427,6 +436,7 @@ async function runSegment(
         ...(activities.length > 0
           ? { activities: finalizeActivities(activities, output.status === 'completed') }
           : {}),
+        ...(thinking ? { thinking } : {}),
       }),
     );
     lastOutput = output;

@@ -332,6 +332,12 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         onActivity: (tid, messageId, activity, agentId) => {
           emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
         },
+        onStart: (tid, messageId, agentId) => {
+          emitter.emit(`start:${tid}`, { messageId, agentId });
+        },
+        onThinking: (tid, messageId, delta, agentId) => {
+          emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
+        },
       },
     });
     return reply.code(200).send(message);
@@ -349,11 +355,21 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const onActivity = (payload: unknown) => {
       socket.send(JSON.stringify({ type: 'activity', ...(payload as object) }));
     };
+    const onStart = (payload: unknown) => {
+      socket.send(JSON.stringify({ type: 'start', ...(payload as object) }));
+    };
+    const onThinking = (payload: unknown) => {
+      socket.send(JSON.stringify({ type: 'thinking', ...(payload as object) }));
+    };
     emitter.on(`increment:${threadId}`, onIncrement);
     emitter.on(`activity:${threadId}`, onActivity);
+    emitter.on(`start:${threadId}`, onStart);
+    emitter.on(`thinking:${threadId}`, onThinking);
     socket.on('close', () => {
       emitter.off(`increment:${threadId}`, onIncrement);
       emitter.off(`activity:${threadId}`, onActivity);
+      emitter.off(`start:${threadId}`, onStart);
+      emitter.off(`thinking:${threadId}`, onThinking);
     });
   });
 

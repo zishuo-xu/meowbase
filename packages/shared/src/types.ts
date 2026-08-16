@@ -50,6 +50,8 @@ export interface Message {
   createdAt: string;
   /** CLI 工具过程(Read/Write/Bash 等),页面 CLI 块用 */
   activities?: ToolActivity[];
+  /** 模型思考过程,与对用户说的话分开 */
+  thinking?: string;
 }
 
 export type EvidenceKind = 'fact' | 'lesson' | 'decision';

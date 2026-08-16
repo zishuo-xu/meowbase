@@ -104,6 +104,37 @@ export function applyStreamActivity(
   ];
 }
 
+/** CLI 尚未吐字时先占位,避免页面只剩「干活」药丸 */
+export function applyStreamStart(
+  messages: MessageDto[],
+  event: { messageId: string; agentId?: string },
+  threadId: string,
+): MessageDto[] {
+  if (messages.some((m) => m.id === event.messageId)) return messages;
+  return [...messages, assistantShell(event, threadId, {})];
+}
+
+/** 思考增量单独累积,不进对用户说的话 */
+export function applyStreamThinking(
+  messages: MessageDto[],
+  event: { messageId: string; delta: string; agentId?: string },
+  threadId: string,
+): MessageDto[] {
+  const idx = messages.findIndex((m) => m.id === event.messageId);
+  if (idx >= 0) {
+    const current = messages[idx];
+    if (!current) return messages;
+    const next = [...messages];
+    next[idx] = {
+      ...current,
+      status: current.status === 'completed' ? current.status : 'streaming',
+      thinking: (current.thinking ?? '') + event.delta,
+    };
+    return next;
+  }
+  return [...messages, assistantShell(event, threadId, { thinking: event.delta })];
+}
+
 export type PipelinePhase = 'idle' | 'working' | 'reviewing';
 
 /** sending 未结束时:已有写手回复则视为审查中,避免气泡已出还一直「干活」 */
@@ -145,12 +176,18 @@ export function mergeCanonicalMessages(
     if (!s) return m;
     const activities =
       (s.activities?.length ?? 0) > (m.activities?.length ?? 0) ? s.activities : m.activities;
+    const thinking =
+      (s.thinking?.length ?? 0) > (m.thinking?.length ?? 0) ? s.thinking : m.thinking;
     if (s.content.length <= m.content.length) {
-      return activities ? { ...m, activities } : m;
+      return {
+        ...m,
+        ...(activities ? { activities } : {}),
+        ...(thinking ? { thinking } : {}),
+      };
     }
     const settled =
       m.status === 'completed' || m.status === 'failed' || m.status === 'terminated';
-    return { ...m, content: s.content, status: settled ? m.status : s.status, activities };
+    return { ...m, content: s.content, status: settled ? m.status : s.status, activities, thinking };
   });
   const ids = new Set(canonical.map((m) => m.id));
   for (const s of local) {

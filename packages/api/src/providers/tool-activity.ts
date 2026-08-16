@@ -114,10 +114,13 @@ export function emitParsedLine(
   input: {
     onIncrement?: (delta: string) => void;
     onActivity?: (activity: ToolActivity) => void;
+    onThinking?: (delta: string) => void;
   },
   delta: string | null,
   activities: ToolActivity[],
+  thinking?: string | null,
 ): void {
+  if (thinking) input.onThinking?.(thinking);
   if (delta) input.onIncrement?.(delta);
   for (const activity of activities) input.onActivity?.(activity);
 }

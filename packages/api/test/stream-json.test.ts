@@ -15,6 +15,14 @@ function resultLine(): Record<string, unknown> {
 }
 
 describe('parseStreamJsonLine', () => {
+  it('解析 assistant 思考块,不混进正文', () => {
+    const event = parseStreamJsonLine(
+      '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"先写测试再实现"}]},"session_id":"s1"}',
+    );
+    expect(event?.thinkingDelta).toBe('先写测试再实现');
+    expect(event?.textDelta).toBe('');
+  });
+
   it('解析 assistant 增量文本', () => {
     const event = parseStreamJsonLine(
       '{"type":"assistant","message":{"content":[{"type":"text","text":"你好"}]},"session_id":"s1"}',
@@ -60,6 +68,25 @@ describe('StreamAccumulator', () => {
     acc.push('{"type":"result","subtype":"error_max_turns","is_error":true,"result":"x","session_id":"s"}');
     expect(acc.status).toBe('failed');
     expect(acc.error).toBe('error_max_turns');
+  });
+
+  it('thinking_tokens 不进入 CLI 工具列表', () => {
+    const acc = new StreamAccumulator();
+    acc.push('{"type":"system","subtype":"thinking_tokens","session_id":"s","estimated_tokens":3}');
+    expect(acc.takeActivities()).toEqual([]);
+    expect(acc.takeThinking()).toBeNull();
+  });
+
+  it('thinking 块进入 takeThinking', () => {
+    const acc = new StreamAccumulator();
+    acc.push(
+      '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"先看目录"}]},"session_id":"s"}',
+    );
+    acc.push(
+      '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"再写文件"}]},"session_id":"s"}',
+    );
+    expect(acc.takeThinking()).toBe('先看目录再写文件');
+    expect(acc.takeThinking()).toBeNull();
   });
 
   it('tool_use 行进入 takeActivities', () => {

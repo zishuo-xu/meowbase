@@ -123,6 +123,7 @@ describe('HTTP 集成', () => {
     ws.close();
 
     const events = received.map((raw) => JSON.parse(raw) as { type: string; delta?: string });
+    expect(events.some((e) => e.type === 'start')).toBe(true);
     expect(events.filter((e) => e.type === 'increment').map((e) => e.delta).join('')).toBe(
       '你好,我是 claude。',
     );
