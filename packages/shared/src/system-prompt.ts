@@ -9,7 +9,8 @@ export function buildSystemPrompt(input: {
   if (input.profile) {
     const p = input.profile;
     parts.push(
-      `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。`,
+      `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。` +
+        `\n团队协作:需要其他成员协助时,在回复末尾另起一行用 @claude/@gemini/@opencode 交接任务。`,
     );
   }
   if (input.skills && input.skills.length > 0) {

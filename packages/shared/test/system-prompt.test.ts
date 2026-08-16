@@ -27,6 +27,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('你是 墨墨,主力写手');
     expect(prompt).toContain('性格:沉稳细致');
     expect(prompt).toContain('擅长:架构设计、TypeScript');
+    expect(prompt).toContain('交接任务');
   });
 
   it('仅引用:拼出团队记忆段', () => {

@@ -380,3 +380,100 @@ describe('executeTurn 审批流', () => {
     expect((await stores.approvals.get(card.id))?.rejectReason).toBe('边界没覆盖');
   });
 });
+
+describe('executeTurn 多角色协作', () => {
+  it('分段接力:一条消息 @ 两个角色按顺序执行', async () => {
+    const stores = createMemoryStores();
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(`claude:${input.prompt}`);
+          return { sessionId: 's1', content: '墨墨写好了', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn(input) {
+          prompts.push(`opencode:${input.prompt}`);
+          return { sessionId: 's2', content: '团团审完了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '@claude 写个函数 @opencode 审查它',
+      context: { stores, registry },
+    });
+    expect(prompts).toEqual(['claude:写个函数', 'opencode:审查它']);
+    expect(final.agentId).toBe('opencode');
+
+    const messages = await stores.messages.list(thread.id);
+    const assistants = messages.filter((m) => m.role === 'assistant');
+    expect(assistants.map((m) => m.agentId)).toEqual(['claude', 'opencode']);
+  });
+
+  it('A2A 接力:回复行首 @ 自动续跑,后角能看到前角输出', async () => {
+    const stores = createMemoryStores();
+    const opencodePrompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return {
+            sessionId: 's1',
+            content: '代码写完了。\n@opencode 请审查这段代码\n注意边界条件。',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn(input) {
+          opencodePrompts.push(input.prompt);
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id, content: '@claude 写代码', context: { stores, registry },
+    });
+    expect(final.agentId).toBe('opencode');
+    // 后角 prompt 包含前角输出
+    expect(opencodePrompts[0]).toContain('代码写完了');
+    expect(opencodePrompts[0]).toContain('请审查这段代码');
+    const messages = await stores.messages.list(thread.id);
+    const assistants = messages.filter((m) => m.role === 'assistant');
+    expect(assistants.map((m) => m.agentId)).toEqual(['claude', 'opencode']);
+    const note = messages.find((m) => m.role === 'system' && m.content.includes('接力'));
+    expect(note?.content).toContain('@opencode');
+  });
+
+  it('A2A 防环:已出场角色不再重复接力', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return { sessionId: 's1', content: '@opencode 你来', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls.push('opencode');
+          return { sessionId: 's2', content: '@claude 你再看看', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
+    // claude → opencode → (claude 已出场,停止)
+    expect(calls).toEqual(['claude', 'opencode']);
+  });
+});

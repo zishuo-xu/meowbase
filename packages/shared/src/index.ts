@@ -31,3 +31,5 @@ export {
 export { buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
+export type { A2AHandoff } from './a2a.js';
+export { parseA2AHandoff } from './a2a.js';
