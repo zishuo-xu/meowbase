@@ -52,6 +52,8 @@ export interface AgentSpec {
   handoffTo?: AgentId;
   /** 何时必须交接;`{to}` 替换成对手 @名 */
   handoff?: string[];
+  /** 怎样算做完;`{to}` 替换成对手 @名 */
+  doneWhen?: string[];
 }
 
 export interface Config {
@@ -96,11 +98,16 @@ export const DEFAULT_MODELS: ModelPreset[] = [
   },
 ];
 
-function handoffFromRoster(id: AgentId): { handoffTo?: AgentId; handoff?: string[] } {
+function handoffFromRoster(id: AgentId): {
+  handoffTo?: AgentId;
+  handoff?: string[];
+  doneWhen?: string[];
+} {
   const row = DEFAULT_ROSTER.find((m) => m.agentId === id);
   return {
     ...(row?.handoffTo ? { handoffTo: row.handoffTo } : {}),
     ...(row?.handoff ? { handoff: [...row.handoff] } : {}),
+    ...(row?.doneWhen ? { doneWhen: [...row.doneWhen] } : {}),
   };
 }
 
@@ -161,6 +168,7 @@ export function cloneAgentSpec(spec: AgentSpec): AgentSpec {
     aliases: [...spec.aliases],
     expertise: [...spec.expertise],
     ...(spec.handoff ? { handoff: [...spec.handoff] } : {}),
+    ...(spec.doneWhen ? { doneWhen: [...spec.doneWhen] } : {}),
   };
 }
 
@@ -460,6 +468,7 @@ export function writeTeamFile(
       ...(a.baseUrl ? { baseUrl: a.baseUrl } : {}),
       ...(a.handoffTo ? { handoffTo: a.handoffTo } : {}),
       ...(a.handoff && a.handoff.length > 0 ? { handoff: a.handoff } : {}),
+      ...(a.doneWhen && a.doneWhen.length > 0 ? { doneWhen: a.doneWhen } : {}),
     })),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -574,6 +583,9 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
       ...(row.handoffTo && isAgentId(row.handoffTo) ? { handoffTo: row.handoffTo } : {}),
       ...(Array.isArray(row.handoff) && row.handoff.length > 0
         ? { handoff: row.handoff.map((line) => line.trim()).filter(Boolean) }
+        : {}),
+      ...(Array.isArray(row.doneWhen) && row.doneWhen.length > 0
+        ? { doneWhen: row.doneWhen.map((line) => line.trim()).filter(Boolean) }
         : {}),
     });
   }

@@ -34,7 +34,7 @@ describe('ClaudeAdapter', () => {
 });
 
 describe('ClaudeAdapter 参数', () => {
-  it('systemPrompt → --append-system-prompt;sessionId → --resume', async () => {
+  it('首轮 systemPrompt → --append-system-prompt;续聊只 --resume,避免身份叠进去', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-'));
     const recordFile = join(dir, 'args.json');
     process.env.RECORD_ARGS_FILE = recordFile;
@@ -46,11 +46,27 @@ describe('ClaudeAdapter 参数', () => {
       systemPrompt: '你是 墨墨',
     });
     const args = JSON.parse(readFileSync(recordFile, 'utf8')) as string[];
+    expect(args).not.toContain('--append-system-prompt');
+    expect(args).toContain('--resume');
+    expect(args[args.indexOf('--resume') + 1]).toBe('sess-old');
+    delete process.env.RECORD_ARGS_FILE;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('无 session 时带上 --append-system-prompt', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-sys-'));
+    const recordFile = join(dir, 'args.json');
+    process.env.RECORD_ARGS_FILE = recordFile;
+    const adapter = new ClaudeAdapter({ bin: ARGS_BIN });
+    await adapter.runTurn({
+      prompt: 'hi',
+      workdir: '/tmp',
+      systemPrompt: '你是 墨墨',
+    });
+    const args = JSON.parse(readFileSync(recordFile, 'utf8')) as string[];
     const promptIndex = args.indexOf('--append-system-prompt');
     expect(promptIndex).toBeGreaterThan(-1);
     expect(args[promptIndex + 1]).toBe('你是 墨墨');
-    expect(args).toContain('--resume');
-    expect(args[args.indexOf('--resume') + 1]).toBe('sess-old');
     delete process.env.RECORD_ARGS_FILE;
     rmSync(dir, { recursive: true, force: true });
   });

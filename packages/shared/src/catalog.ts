@@ -16,6 +16,8 @@ export interface TeamMember {
   handoffTo?: AgentId;
   /** 何时必须交接;`{to}` 替换成对手 @名 */
   handoff?: readonly string[];
+  /** 怎样算做完;`{to}` 替换成对手 @名 */
+  doneWhen?: readonly string[];
 }
 
 export const DEFAULT_ROSTER: readonly TeamMember[] = [
@@ -29,6 +31,11 @@ export const DEFAULT_ROSTER: readonly TeamMember[] = [
       '下一步明显属于别人的职责(审查/脚本落地)时,做完自己这段就交出去。',
       '你缺工具、缺第二视角、或遇到做不了的部分时。',
     ],
+    doneWhen: [
+      '对照任务:用户要的已经落在沙箱里,缺的直说并补上或交出去。',
+      '改了代码就自检:有测试先跑绿;跑不了就写明原因。没自检不要交 {to}。',
+      '需要审查时已经行首 {to} 写了任务,不要问人要不要交。',
+    ],
   },
   {
     agentId: 'gemini',
@@ -39,6 +46,11 @@ export const DEFAULT_ROSTER: readonly TeamMember[] = [
       '审查结束后,另起一行 {to} 给结论,必须写明「通过」或「需修改」;需修改时列出要点,不要问人,不要 @ 其他人。',
       '你自己写完代码后交 {to} 看一眼,不要自己审自己。',
     ],
+    doneWhen: [
+      '对照任务和 diff 下判断,不要空泛夸奖。',
+      '结论单独写明「通过」或「需修改」;需修改只列写手能改的要点。',
+      '审完交回 {to},不要问人下一步怎么办,不要再拉第三人。',
+    ],
   },
   {
     agentId: 'opencode',
@@ -48,6 +60,10 @@ export const DEFAULT_ROSTER: readonly TeamMember[] = [
     handoff: [
       '脚本或落地做完后,另起一行 {to} 请审查(不要自己审自己)。',
       '你缺第二视角、或遇到做不了的部分时。',
+    ],
+    doneWhen: [
+      '脚本或落地已在沙箱里跑过,或写明跑不了的限制。',
+      '做完另起一行 {to} 请审查,不要问人要不要交。',
     ],
   },
 ];

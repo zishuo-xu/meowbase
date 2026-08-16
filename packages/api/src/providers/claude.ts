@@ -29,7 +29,9 @@ export class ClaudeAdapter implements AgentService {
     ];
     if (model) args.push('--model', model);
     if (input.sessionId) args.push('--resume', input.sessionId);
-    if (input.systemPrompt) args.push('--append-system-prompt', input.systemPrompt);
+    if (input.systemPrompt && !input.sessionId) {
+      args.push('--append-system-prompt', input.systemPrompt);
+    }
     args.push(input.prompt);
 
     const accumulator = new StreamAccumulator();

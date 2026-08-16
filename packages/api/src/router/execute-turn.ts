@@ -219,6 +219,7 @@ export async function executeTurn(input: {
           role: a.role,
           handoffTo: a.handoffTo,
           handoff: a.handoff,
+          doneWhen: a.doneWhen,
         }))
       : profiles.length > 0
         ? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }))
@@ -355,12 +356,9 @@ async function runSegment(
     }
     visited.add(currentAgent);
 
-    const isNewSession = !thread.sessions[currentAgent];
-    const stored = isNewSession
-      ? ((await context.stores.profiles.get(currentAgent)) ?? undefined)
-      : undefined;
+    const stored = (await context.stores.profiles.get(currentAgent)) ?? undefined;
     const spec = context.agents?.find((a) => a.id === currentAgent);
-    const profile = isNewSession ? overlayProfile(stored, spec) : undefined;
+    const profile = overlayProfile(stored, spec);
     const matchedSkills = await matchSkills(currentTask, await context.stores.skills.list());
     const systemPrompt = buildSystemPrompt({
       profile,

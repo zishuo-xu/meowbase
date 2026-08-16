@@ -7,3 +7,4 @@ meowbase.secrets.json
 .DS_Store
 work/
 output/
+.playwright-cli/

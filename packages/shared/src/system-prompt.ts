@@ -18,24 +18,27 @@ function mentionTo(
   return peer ? `@${peer.name}` : '@另一位成员';
 }
 
+function fillTo(lines: readonly string[], to: string): string {
+  return lines.map((line) => `- ${line.replaceAll('{to}', to)}`).join('\n');
+}
+
 function workflowFor(
   selfAgentId: AgentId | undefined,
   team: readonly TeamMember[],
 ): string {
   const self = team.find((m) => m.agentId === selfAgentId);
-  const lines = self?.handoff ?? [];
-  if (lines.length === 0) {
-    return (
-      `何时必须交接:\n` +
-      `- 下一步明显属于别人的职责时,做完自己这段就交出去。\n`
-    );
-  }
   const to = mentionTo(self, team);
-  return (
-    `何时必须交接:\n` +
-    lines.map((line) => `- ${line.replaceAll('{to}', to)}`).join('\n') +
-    '\n'
-  );
+  const handoff = self?.handoff ?? [];
+  const doneWhen = self?.doneWhen ?? [];
+  const handoffBlock =
+    handoff.length > 0
+      ? `何时必须交接:\n${fillTo(handoff, to)}\n`
+      : `何时必须交接:\n- 下一步明显属于别人的职责时,做完自己这段就交出去。\n`;
+  const doneBlock =
+    doneWhen.length > 0
+      ? `怎样算做完:\n${fillTo(doneWhen, to)}\n`
+      : `怎样算做完:\n- 本职做完,该交的已经行首交接,不要把下一步丢给人。\n`;
+  return `${handoffBlock}${doneBlock}`;
 }
 
 export function buildA2AProtocol(
@@ -44,7 +47,11 @@ export function buildA2AProtocol(
 ): string {
   return (
     `团队成员:\n${rosterLines(team)}\n` +
-    `分工纪律:人只表达要做什么。要不要交接、交给谁,由你根据角色判断,不要问「要不要交给某某」。\n` +
+    `团队纪律:\n` +
+    `- 人只说目标。不要问「要不要交给某某」「要不要继续」「还要我做什么吗」。\n` +
+    `- 本职没做完不算完;做完就按交接条目交下一棒。\n` +
+    `- 改了文件必须先自检再交审查;没有对照任务和验证的改动不要交。\n` +
+    `分工纪律:要不要交接、交给谁,由你根据角色判断。\n` +
     workflowFor(selfAgentId, team) +
     `何时不要交接:简单问答、自我介绍、纯解释、已经在审别人的产出。\n` +
     `怎么交(交接规则):必须另起一行,行首写 @名字 或 @id,空格后写具体任务。句中的 @ 不会交接。不要 @ 自己。`

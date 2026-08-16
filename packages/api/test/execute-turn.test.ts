@@ -855,6 +855,42 @@ describe('executeTurn 多角色协作', () => {
     expect(note?.content).toContain('墨墨 → 团团');
   });
 
+  it('每一跳都注入身份和团队纪律,不因已有 session 漏掉', async () => {
+    const stores = createMemoryStores();
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.systemPrompt ?? '');
+          return {
+            sessionId: 's-claude',
+            content: prompts.length === 1 ? '写完了\n@gemini 请审查' : '已按意见改',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn(input) {
+          prompts.push(input.systemPrompt ?? '');
+          return { sessionId: 's-gemini', content: '## 结论\n需修改\n- 补测试', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude 写代码',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    expect(prompts.length).toBeGreaterThanOrEqual(2);
+    for (const prompt of prompts) {
+      expect(prompt).toContain('团队纪律');
+      expect(prompt).toMatch(/你是 (墨墨|闪闪)/);
+    }
+  });
+
   it('A2A 防环:已出场角色不再重复接力', async () => {
     const stores = createMemoryStores();
     const calls: string[] = [];

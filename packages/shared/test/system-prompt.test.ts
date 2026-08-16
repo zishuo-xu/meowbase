@@ -55,6 +55,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('@闪闪');
     expect(prompt).toContain('请审查');
     expect(prompt).not.toContain('@团团 请审查');
+    expect(prompt).toContain('团队纪律');
+    expect(prompt).toContain('要不要继续');
+    expect(prompt).toContain('怎样算做完');
+    expect(prompt).toContain('自检');
   });
 
   it('交接条目来自 team.handoff,{to} 填对手名字', () => {
@@ -75,6 +79,23 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('写完交 @团团 审一下');
     expect(prompt).not.toContain('{to}');
     expect(prompt).not.toContain('@闪闪');
+  });
+
+  it('怎样算做完来自 team.doneWhen', () => {
+    const prompt = buildSystemPrompt({
+      profile,
+      team: [
+        {
+          agentId: 'claude',
+          name: '墨墨',
+          role: '主架构师',
+          doneWhen: ['沙箱里有实现和测试'],
+        },
+      ],
+      evidenceRefs: [],
+    });
+    expect(prompt).toContain('怎样算做完');
+    expect(prompt).toContain('沙箱里有实现和测试');
   });
 
   it('闪闪:审完回墨墨,结论写明通过或需修改', () => {

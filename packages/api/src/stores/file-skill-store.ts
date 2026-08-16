@@ -9,6 +9,7 @@ interface ManifestSkill {
   description: string;
   triggers: string[];
   promptFile: string;
+  always?: boolean;
 }
 
 export class FileSkillStore implements SkillStore {
@@ -33,6 +34,7 @@ export class FileSkillStore implements SkillStore {
         description: item.description,
         triggers: item.triggers,
         prompt,
+        ...(item.always ? { always: true } : {}),
       });
     }
   }

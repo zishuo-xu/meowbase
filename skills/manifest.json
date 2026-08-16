@@ -8,6 +8,14 @@
       "promptFile": "tdd.md"
     },
     {
+      "id": "quality-gate",
+      "name": "自检门",
+      "description": "写完先自检再交审查",
+      "triggers": [],
+      "always": true,
+      "promptFile": "quality-gate.md"
+    },
+    {
       "id": "review",
       "name": "代码审查",
       "description": "按清单系统化审查代码",

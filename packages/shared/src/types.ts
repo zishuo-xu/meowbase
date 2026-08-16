@@ -84,6 +84,8 @@ export interface Skill {
   description: string;
   triggers: string[];
   prompt: string;
+  /** 无触发词也每轮注入,用于自检门这类常驻工序 */
+  always?: boolean;
 }
 
 export type ApprovalStatus = 'draft' | 'reviewing' | 'approved' | 'rejected' | 'applied';

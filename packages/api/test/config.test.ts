@@ -97,6 +97,7 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(agentSpec(cfg, 'claude').name).toBe('墨墨酱');
     expect(agentSpec(cfg, 'claude').handoffTo).toBe('gemini');
     expect(agentSpec(cfg, 'claude').handoff?.some((line) => line.includes('{to}'))).toBe(true);
+    expect(agentSpec(cfg, 'claude').doneWhen?.some((line) => line.includes('自检'))).toBe(true);
   });
 
   it('文件里的 handoffTo 覆盖默认审查官', () => {
