@@ -99,6 +99,9 @@ describe('TeamHub', () => {
         onSaveModels={onSaveModels}
       />,
     );
+    expect(screen.getByText('添加新模型')).toBeTruthy();
+    expect((screen.getByLabelText('显示名') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('模型 ID') as HTMLInputElement).value).toBe('');
     fireEvent.change(screen.getByLabelText('显示名'), { target: { value: 'Sonnet' } });
     fireEvent.change(screen.getByLabelText('协议'), { target: { value: 'anthropic' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'claude' }));

@@ -258,6 +258,10 @@ export function TeamHub({
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
                 对齐 clowder:先选协议再勾 CLI。OpenAI 兼容只能走 opencode;Claude 协议可走 claude / opencode。密钥仍由各 CLI 自己管。
               </p>
+              <div className="text-xs font-bold text-[var(--ink-soft)]">已登记</div>
+              {models.length === 0 && (
+                <p className="text-[11px] text-[var(--ink-soft)]">还没有模型,用下面的表单添加。</p>
+              )}
               {models.map((preset) => (
                 <div
                   key={preset.id}
@@ -303,6 +307,11 @@ export function TeamHub({
                   </div>
                 </div>
               ))}
+              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/40 p-3 space-y-3">
+                <div className="text-xs font-bold text-[var(--ink)]">添加新模型</div>
+                <p className="text-[11px] text-[var(--ink-soft)]">
+                  这是新增,不会改上面已登记的条目。
+                </p>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-xs text-[var(--ink-soft)]">
                   显示名
@@ -310,7 +319,7 @@ export function TeamHub({
                     className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--ink)]"
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
-                    placeholder="DeepSeek Flash"
+                    placeholder="例如 Kimi K2"
                   />
                 </label>
                 <label className="block text-xs text-[var(--ink-soft)]">
@@ -342,7 +351,7 @@ export function TeamHub({
                   className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
                   value={newModel}
                   onChange={(e) => setNewModel(e.target.value)}
-                  placeholder="opencode-go/deepseek-v4-flash"
+                  placeholder="例如 provider/model-id"
                 />
               </label>
               <fieldset className="text-xs text-[var(--ink-soft)]">
@@ -424,15 +433,16 @@ export function TeamHub({
                 >
                   加入目录
                 </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => onSaveModels?.(models)}
-                  className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
-                >
-                  保存模型目录
-                </button>
               </div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onSaveModels?.(models)}
+                className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+              >
+                保存模型目录
+              </button>
             </section>
           ) : (
             draft &&
