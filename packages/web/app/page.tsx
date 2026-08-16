@@ -167,7 +167,7 @@ export default function Home() {
               sending={sending}
               agents={agents}
               onApprove={(id) => sendCommand(`#approve ${id}`)}
-              onReject={(id) => sendCommand(`#reject ${id} 打回`)}
+              onReject={(id, reason) => sendCommand(`#reject ${id} ${reason}`)}
               onConfirmEvidence={(id) => sendCommand(`#confirm ${id}`)}
             />
             <ChatInput sending={sending} agents={agents} onSend={(c) => void send(c)} />

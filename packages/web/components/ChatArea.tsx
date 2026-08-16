@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import type { AgentConfigDto, MessageDto } from '@/lib/api';
+import { api, type AgentConfigDto, type ApprovalDto, type MessageDto } from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
 import { useThreadStream } from '@/lib/use-thread-stream';
 import { applyStreamIncrement, mergeCanonicalMessages } from '@/lib/stream-messages';
 import { agentName } from '@/lib/persona';
+import { approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '@/lib/parse-message';
 
 export function ChatArea({
   threadId,
@@ -20,11 +21,12 @@ export function ChatArea({
   sending?: boolean;
   agents?: AgentConfigDto[];
   onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  onReject: (id: string, reason: string) => void;
   onConfirmEvidence: (id: string) => void;
 }) {
   const { lastEvent } = useThreadStream(threadId);
   const [streamed, setStreamed] = useState<MessageDto[]>(messages);
+  const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,24 +37,49 @@ export function ChatArea({
     setStreamed((prev) => applyStreamIncrement(prev, lastEvent, threadId));
   }, [lastEvent, threadId]);
   useEffect(() => {
+    let cancelled = false;
+    void api
+      .listApprovals(threadId)
+      .then((list) => {
+        if (!cancelled) setApprovals(list);
+      })
+      .catch(() => {
+        if (!cancelled) setApprovals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, messages]);
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [streamed]);
 
   const waiting = Boolean(sending) && streamed.every((m) => m.status !== 'streaming');
+  const approvalById = new Map(approvals.map((card) => [card.id, card]));
+  const visible = streamed.filter((m) => !isHiddenChatMessage(m));
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto py-3">
-        {streamed.map((m) => (
-          <MessageBubble
-            key={m.id}
-            message={m}
-            agentName={agentName(m.agentId, agents)}
-            onApprove={onApprove}
-            onReject={onReject}
-            onConfirmEvidence={onConfirmEvidence}
-          />
-        ))}
+        {visible.map((m) => {
+          const parsed = parseMessage(m);
+          const card = parsed.approvalId ? approvalById.get(parsed.approvalId) : undefined;
+          const writerId = card?.writerAgentId ?? parsed.writerId;
+          const reviewerId = card?.reviewerAgentId ?? parsed.reviewerId;
+          return (
+            <MessageBubble
+              key={m.id}
+              message={m}
+              agentName={agentName(m.agentId, agents)}
+              writerName={writerId ? agentName(writerId, agents) : undefined}
+              reviewerName={reviewerId ? agentName(reviewerId, agents) : undefined}
+              approvalStatus={approvalStatusFromDto(card?.status) ?? parsed.approvalStatus}
+              onApprove={onApprove}
+              onReject={onReject}
+              onConfirmEvidence={onConfirmEvidence}
+            />
+          );
+        })}
         {waiting && (
           <div className="px-4 py-2 text-xs text-[var(--ink-soft)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 ring-1 ring-[var(--border)]">

@@ -88,13 +88,35 @@ describe('ApprovalCardBlock', () => {
         approvalId="ap_a1b2c3d4"
         stat="x.txt | 1 +"
         comment="通过"
+        writerName="墨墨"
+        reviewerName="团团"
         onApprove={onApprove}
         onReject={onReject}
       />,
     );
-    fireEvent.click(screen.getByText('批准'));
-    fireEvent.click(screen.getByText('打回'));
+    expect(screen.getByText('墨墨 写 · 团团 审')).toBeTruthy();
+    expect(screen.getByText('待你确认')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '批准落地' }));
     expect(onApprove).toHaveBeenCalledWith('ap_a1b2c3d4');
-    expect(onReject).toHaveBeenCalledWith('ap_a1b2c3d4');
+    fireEvent.click(screen.getByRole('button', { name: '打回' }));
+    fireEvent.change(screen.getByLabelText('打回理由'), { target: { value: '再改改' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认打回' }));
+    expect(onReject).toHaveBeenCalledWith('ap_a1b2c3d4', '再改改');
+  });
+
+  it('已落地时不再显示批准按钮', () => {
+    render(
+      <ApprovalCardBlock
+        approvalId="ap_a1b2c3d4"
+        stat="x.txt | 1 +"
+        comment="通过"
+        status="applied"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('已落地')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
   });
 });

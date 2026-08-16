@@ -1,21 +1,27 @@
 'use client';
 import type { MessageDto } from '@/lib/api';
 import { getPersona } from '@/lib/persona';
-import { parseMessage } from '@/lib/parse-message';
+import { parseMessage, type ApprovalUiStatus } from '@/lib/parse-message';
 import { ApprovalCardBlock } from './ApprovalCardBlock';
 import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
 
 export function MessageBubble({
   message,
   agentName,
+  writerName,
+  reviewerName,
+  approvalStatus,
   onApprove,
   onReject,
   onConfirmEvidence,
 }: {
   message: MessageDto;
   agentName?: string;
+  writerName?: string;
+  reviewerName?: string;
+  approvalStatus?: ApprovalUiStatus;
   onApprove?: (id: string) => void;
-  onReject?: (id: string) => void;
+  onReject?: (id: string, reason: string) => void;
   onConfirmEvidence?: (id: string) => void;
 }) {
   const parsed = parseMessage(message);
@@ -27,6 +33,9 @@ export function MessageBubble({
           approvalId={parsed.approvalId ?? ''}
           stat={parsed.stat ?? ''}
           comment={parsed.comment ?? ''}
+          writerName={writerName}
+          reviewerName={reviewerName}
+          status={approvalStatus ?? parsed.approvalStatus ?? 'pending'}
           onApprove={onApprove ?? (() => {})}
           onReject={onReject ?? (() => {})}
         />
