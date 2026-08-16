@@ -6,8 +6,26 @@ const profile: AgentProfile = {
   agentId: 'claude',
   name: '墨墨',
   personality: '沉稳细致',
-  role: '主力写手',
+  role: '主架构师',
   expertise: ['架构设计', 'TypeScript'],
+  createdAt: '2026-08-16T00:00:00.000Z',
+};
+
+const reviewerProfile: AgentProfile = {
+  agentId: 'gemini',
+  name: '闪闪',
+  personality: '严谨直接',
+  role: '审查官',
+  expertise: ['代码审查'],
+  createdAt: '2026-08-16T00:00:00.000Z',
+};
+
+const executorProfile: AgentProfile = {
+  agentId: 'opencode',
+  name: '团团',
+  personality: '圆润可靠',
+  role: '执行者',
+  expertise: ['脚本'],
   createdAt: '2026-08-16T00:00:00.000Z',
 };
 
@@ -24,7 +42,7 @@ const evidence: EvidenceEntry = {
 describe('buildSystemPrompt', () => {
   it('仅 profile:拼出身份段与团队交接规则', () => {
     const prompt = buildSystemPrompt({ profile, evidenceRefs: [] });
-    expect(prompt).toContain('你是 墨墨,主力写手');
+    expect(prompt).toContain('你是 墨墨,主架构师');
     expect(prompt).toContain('性格:沉稳细致');
     expect(prompt).toContain('擅长:架构设计、TypeScript');
     expect(prompt).toContain('团队成员:');
@@ -35,6 +53,25 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('何时必须交接');
     expect(prompt).toContain('不要问');
     expect(prompt).toContain('@闪闪');
+    expect(prompt).toContain('请审查');
+    expect(prompt).not.toContain('@团团 请审查');
+  });
+
+  it('闪闪:审完回墨墨,结论写明通过或需修改', () => {
+    const prompt = buildSystemPrompt({ profile: reviewerProfile, evidenceRefs: [] });
+    expect(prompt).toContain('你是 闪闪,审查官');
+    expect(prompt).toContain('@墨墨');
+    expect(prompt).toContain('通过');
+    expect(prompt).toContain('需修改');
+    expect(prompt).not.toContain('@团团 请审查');
+  });
+
+  it('团团:做完交闪闪审查', () => {
+    const prompt = buildSystemPrompt({ profile: executorProfile, evidenceRefs: [] });
+    expect(prompt).toContain('你是 团团,执行者');
+    expect(prompt).toContain('@闪闪');
+    expect(prompt).toContain('请审查');
+    expect(prompt).not.toContain('@墨墨 请审查');
   });
 
   it('显式 team 覆盖默认名册', () => {

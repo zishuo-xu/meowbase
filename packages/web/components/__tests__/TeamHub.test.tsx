@@ -18,7 +18,7 @@ const config: AppConfigDto = {
     {
       id: 'claude',
       name: '墨墨',
-      role: '主力写手',
+      role: '主架构师',
       aliases: ['墨墨', 'claude'],
       bin: 'claude',
       personality: '沉稳',

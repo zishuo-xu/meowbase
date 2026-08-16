@@ -1,8 +1,9 @@
 import type { AgentId } from './types.js';
 
+/** 默认审查官是闪闪;闪闪自己写则交墨墨。对方不在时退回第一个其他人。 */
 const PREFERRED_PAIRS: Record<AgentId, AgentId> = {
-  claude: 'opencode',
-  opencode: 'claude',
+  claude: 'gemini',
+  opencode: 'gemini',
   gemini: 'claude',
 };
 

@@ -37,7 +37,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 架构
 
 三层:模型(推理)→ Agent CLI(工具)→ 平台(路由/线程/记忆/技能/审批)。
-本仓库当前进度:M1–M5 已完成;三支 agent CLI 适配器齐了(claude / gemini / opencode)。自动审查默认仍是 claude ↔ opencode 配对,`@gemini`(闪闪)可直接呼叫。
+本仓库当前进度:M1–M5 已完成;三支 agent CLI 适配器齐了(claude / gemini / opencode)。定位:墨墨主架构师、闪闪审查官、团团执行者;写完默认交闪闪审。
 
 ## 审批流(M4)
 
@@ -93,7 +93,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 ## 多角色协作
 
-- **跨模型审查**:`@闪闪` 走 Gemini CLI(身份:审查官);写手改动触发的自动审查默认仍配对 团团(opencode)
+- **跨模型审查**:写手改动默认请闪闪审;墨墨写完应 `@闪闪`,团团做完也交闪闪
 - 分工由猫们自己协调,你不必当"路由器"
 
 ## 消息协议(M2)

@@ -15,7 +15,7 @@ export interface TeamMember {
 }
 
 export const DEFAULT_ROSTER: readonly TeamMember[] = [
-  { agentId: 'claude', name: '墨墨', role: '主力写手' },
+  { agentId: 'claude', name: '墨墨', role: '主架构师' },
   { agentId: 'gemini', name: '闪闪', role: '审查官' },
   { agentId: 'opencode', name: '团团', role: '执行者' },
 ];

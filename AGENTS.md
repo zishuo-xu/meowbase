@@ -6,6 +6,8 @@
 
 **meowbase(喵窝)**:参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT)架构自写的多 Agent 协作平台。让 Claude Code / opencode 等 agent CLI 像一支团队一样协作:路由、身份、记忆、技能、互审、审批。代码全部自写,架构思想借鉴 clowder。
 
+三只猫定位:墨墨主架构师(写完 `@闪闪`)、闪闪审查官(审完回墨墨)、团团执行者(做完交闪闪审)。
+
 ## 快速上手
 
 ```bash
