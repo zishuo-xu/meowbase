@@ -5,5 +5,6 @@ export function createAgentRegistry(services: AgentService[]): AgentRegistry {
   const byId = new Map<AgentId, AgentService>(services.map((s) => [s.agentId, s]));
   return {
     get: (agentId) => byId.get(agentId),
+    list: () => [...byId.keys()],
   };
 }

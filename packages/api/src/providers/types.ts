@@ -24,4 +24,5 @@ export interface AgentService {
 
 export interface AgentRegistry {
   get(agentId: AgentId): AgentService | undefined;
+  list(): AgentId[];
 }

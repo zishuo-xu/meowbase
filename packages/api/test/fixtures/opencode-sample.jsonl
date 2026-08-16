@@ -1,0 +1,3 @@
+{"type":"step_start","sessionID":"ses_fixture1","part":{"type":"step-start","messageID":"m1"}}
+{"type":"text","sessionID":"ses_fixture1","part":{"type":"text","text":"收到"}}
+{"type":"step_finish","sessionID":"ses_fixture1","part":{"type":"step-finish","reason":"stop","tokens":{"total":100,"input":6,"output":2,"reasoning":0,"cache":{"write":0,"read":90}}},"cost":0.00002}
