@@ -74,6 +74,20 @@ describe('describeBall', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });
 
+  it('升级后即使有句中@提示,顶栏仍是球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '@人 选A还是选B', status: 'completed' },
+          { role: 'system', content: '📋 球在人手里:墨墨请求拍板 — 选A还是选B' },
+          { role: 'system', content: '💡 @人 写在句中不会交接 — 请另起一行、行首写 @名字 再跟任务' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里:墨墨请求拍板 — 选A还是选B', tone: 'human' });
+  });
+
   it('猫行首 @人 升级:球在人手里', () => {
     expect(
       describeBall(
@@ -104,7 +118,7 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在人手里', tone: 'human' });
   });
 
-  it('已自动批准后等人开口', () => {
+  it('已自动批准后已落地等人开口', () => {
     expect(
       describeBall(
         [
@@ -116,8 +130,27 @@ describe('describeBall', () => {
         ],
         false,
         nameOf,
-      ).text,
-    ).toBe('等人开口');
+      ),
+    ).toEqual({ text: '已落地，等人开口', tone: 'human' });
+  });
+
+  it('人批准落地后不把球留在审查官手上', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'gemini', content: '结论:通过', status: 'completed' },
+          {
+            role: 'system',
+            content:
+              '📋 审批卡片 ap_a1b2c3d4(写:claude → 审:gemini)\n改动:add.ts\n审查意见:通过\n回复 #approve ap_a1b2c3d4 批准',
+          },
+          { role: 'user', content: '#approve ap_a1b2c3d4' },
+          { role: 'system', content: '✅ 已批准并落地: ap_a1b2c3d4' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '已落地，等人开口', tone: 'human' });
   });
 
   it('接力时间线按出场顺序,失败标在最后一棒', () => {
