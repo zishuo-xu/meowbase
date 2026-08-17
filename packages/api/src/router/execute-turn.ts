@@ -8,6 +8,7 @@ import {
   formatA2AHandoffPrompt,
   formatAbortedBallNote,
   formatDroppedBallNote,
+  formatFailedBallNote,
   matchSkills,
   parseA2AHandoff,
   parseApproveCommand,
@@ -480,6 +481,16 @@ async function runSegment(
         threadId: thread.id,
         role: 'system',
         content: formatAbortedBallNote(),
+        status: 'completed',
+      }),
+    );
+  } else if (lastOutput.status === 'failed' || lastOutput.status === 'terminated') {
+    turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'failed' });
+    await writeQueue(() =>
+      context.stores.messages.append({
+        threadId: thread.id,
+        role: 'system',
+        content: formatFailedBallNote(),
         status: 'completed',
       }),
     );

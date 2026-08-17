@@ -1,4 +1,5 @@
 import type { MessageStatus, TokenUsage } from '@meowbase/shared';
+import { extractJsonErrorMessage } from './cli-error.js';
 import { drainActivities, extractToolActivities, type ToolActivity } from './tool-activity.js';
 
 export class OpenCodeAccumulator {
@@ -22,6 +23,12 @@ export class OpenCodeAccumulator {
     }
     if (typeof obj.sessionID === 'string') this._sessionId = obj.sessionID;
     this.pending.push(...extractToolActivities(obj));
+
+    if (obj.type === 'error') {
+      this._status = 'failed';
+      this._error = extractJsonErrorMessage(obj) ?? 'opencode 执行失败';
+      return null;
+    }
 
     const part = obj.part as Record<string, unknown> | undefined;
     if (

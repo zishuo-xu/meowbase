@@ -26,6 +26,14 @@ describe('OpenCodeAdapter', () => {
     expect(output.usage?.outputTokens).toBe(4);
   });
 
+  it('stdout type=error 且退出码 1 时带上真实原因', async () => {
+    const failBin = join(import.meta.dirname, 'fixtures', 'fake-opencode-error.mjs');
+    const adapter = new OpenCodeAdapter({ bin: failBin });
+    const output = await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    expect(output.status).toBe('failed');
+    expect(output.error).toMatch(/hosted in China/);
+  });
+
   it('超时返回 terminated', async () => {
     const adapter = new OpenCodeAdapter({ bin: FAKE_BIN, timeoutMs: 1 });
     const output = await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });

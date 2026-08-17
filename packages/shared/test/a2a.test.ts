@@ -5,6 +5,7 @@ import {
   formatA2AHandoffPrompt,
   formatAbortedBallNote,
   formatDroppedBallNote,
+  formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
 } from '../src/a2a.js';
@@ -167,6 +168,8 @@ describe('捡球', () => {
   it('认出球还在地上,拼出交接命令', () => {
     expect(isDroppedBallNote('⚠️ 球还在地上:闪闪停棒了')).toBe(true);
     expect(isDroppedBallNote(formatAbortedBallNote())).toBe(true);
+    expect(isDroppedBallNote(formatFailedBallNote())).toBe(true);
+    expect(formatFailedBallNote()).toContain('失败');
     expect(isDroppedBallNote('🤝 接力:墨墨 → 闪闪')).toBe(false);
     expect(formatPickupCommand('闪闪')).toBe('@闪闪 接着做');
     expect(formatPickupCommand('@墨墨')).toBe('@墨墨 接着做');

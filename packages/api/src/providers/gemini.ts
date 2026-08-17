@@ -106,7 +106,11 @@ export class GeminiAdapter implements AgentService {
         content: accumulator.content,
         status: 'failed',
         usage: accumulator.usage,
-        error: formatCliExitError('gemini', exitCode, stderrChunks.join('')),
+        error: formatCliExitError(
+          'gemini',
+          exitCode,
+          stderrChunks.join('') || accumulator.error || '',
+        ),
       };
     }
     return {

@@ -51,6 +51,26 @@ describe('OpenCodeAccumulator', () => {
     expect(acc.content).toBe('审查通过');
   });
 
+  it('type=error 抽出 data.message,标记 failed', () => {
+    const acc = new OpenCodeAccumulator();
+    acc.push(
+      JSON.stringify({
+        type: 'error',
+        sessionID: 'ses_err',
+        error: {
+          name: 'APIError',
+          data: {
+            message:
+              'The latest version of this model is only available hosted in China and requires explicit opt in',
+          },
+        },
+      }),
+    );
+    expect(acc.sessionId).toBe('ses_err');
+    expect(acc.status).toBe('failed');
+    expect(acc.error).toMatch(/hosted in China/);
+  });
+
   it('tool part 进入 takeActivities', () => {
     const acc = new OpenCodeAccumulator();
     acc.push(

@@ -103,7 +103,11 @@ export class OpenCodeAdapter implements AgentService {
         content: accumulator.content,
         status: 'failed',
         usage: accumulator.usage,
-        error: formatCliExitError('opencode', exitCode, stderrChunks.join('')),
+        error: formatCliExitError(
+          'opencode',
+          exitCode,
+          stderrChunks.join('') || accumulator.error || '',
+        ),
       };
     }
     return {

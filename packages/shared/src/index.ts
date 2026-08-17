@@ -63,6 +63,7 @@ export {
   formatAbortedBallNote,
   formatA2AHandoffPrompt,
   formatDroppedBallNote,
+  formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
   parseA2AHandoff,

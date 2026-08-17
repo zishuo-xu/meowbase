@@ -162,6 +162,10 @@ export function formatAbortedBallNote(): string {
   return '⚠️ 本轮已中止。球还在地上:点下面交给下一只,或自己说。';
 }
 
+export function formatFailedBallNote(): string {
+  return '⚠️ 本轮失败。球还在地上:点下面交给下一只,或自己说。';
+}
+
 /** 人捡球:发出去就会走现有 @ 路由。 */
 export function formatPickupCommand(agentName: string): string {
   const name = agentName.replace(/^@/, '').trim();

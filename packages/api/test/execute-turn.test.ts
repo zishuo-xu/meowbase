@@ -127,6 +127,33 @@ describe('executeTurn', () => {
     expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(true);
   });
 
+  it('CLI 失败后停棒并提示球还在地上', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return {
+            sessionId: 's',
+            content: '',
+            status: 'failed',
+            error: 'opencode 退出码 1: hosted in China',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '写 add.ts',
+      context: { stores, registry },
+    });
+    expect(final.status).toBe('failed');
+    const messages = await stores.messages.list(thread.id);
+    const note = messages.find((m) => m.role === 'system' && m.content.includes('球还在地上'));
+    expect(note?.content).toContain('失败');
+  });
+
   it('流式增量累积并触发 onIncrement', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '一二三')]);
