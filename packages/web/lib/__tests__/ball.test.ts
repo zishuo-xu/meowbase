@@ -52,6 +52,19 @@ describe('describeBall', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });
 
+  it('猫行首 @人 升级:球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '@人 做不做', status: 'completed' },
+          { role: 'system', content: '📋 球在人手里:墨墨请求拍板 — 做不做' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里:墨墨请求拍板 — 做不做', tone: 'human' });
+  });
+
   it('待确认的审批卡:球在人手里', () => {
     expect(
       describeBall(

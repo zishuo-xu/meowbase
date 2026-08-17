@@ -62,6 +62,8 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('接(能干就干)');
     expect(prompt).toContain('退');
     expect(prompt).toContain('升');
+    expect(prompt).toContain('@人');
+    expect(prompt).toContain('@owner');
     expect(prompt).toContain('出口检查');
     expect(prompt).toContain('本轮命令和结果');
     expect(prompt).toContain('不能写通过');

@@ -1012,6 +1012,8 @@ describe('executeTurn 多角色协作', () => {
     expect(assistants.map((m) => m.agentId)).toEqual(['claude', 'opencode']);
     const note = messages.find((m) => m.role === 'system' && m.content.includes('接力'));
     expect(note?.content).toContain('墨墨 → 团团');
+    expect(note?.content).toContain('用户目标:');
+    expect(note?.content).toContain('任务: 请审查这段代码');
   });
 
   it('每一跳都注入身份和团队纪律,不因已有 session 漏掉', async () => {
@@ -1200,6 +1202,58 @@ describe('executeTurn 多角色协作', () => {
     expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(1);
     const hint = messages.find((m) => m.role === 'system' && m.content.includes('句中'));
     expect(hint?.content).toContain('@团团');
+  });
+
+  it('A2A 行首 @人 停链,球回人手里,不叫下一只猫', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return { sessionId: 's1', content: '方向定不了。\n@人 这个方案做不做', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          throw new Error('不应被叫到');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '@claude 写代码',
+      context: { stores, registry },
+    });
+    expect(final.agentId).toBe('claude');
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(1);
+    const note = messages.find((m) => m.role === 'system' && m.content.includes('球在人手里'));
+    expect(note?.content).toContain('墨墨请求拍板');
+    expect(note?.content).toContain('这个方案做不做');
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
+  });
+
+  it('审查官行首 @人 也升级,不按审查收棒吞掉', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          return { sessionId: 's1', content: '有产品取舍。\n@owner 先做快的还是稳的', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'gemini' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@gemini 审一下',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('闪闪请求拍板'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
   });
 
   it('A2A 链深可配置:maxDepth=1 不接力', async () => {

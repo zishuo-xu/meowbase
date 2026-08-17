@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   parseA2AHandoff,
   findInlineA2AMentions,
+  findInlineEscalateTokens,
   formatA2AHandoffPrompt,
+  formatA2ARelayNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
+  formatEscalatedBallNote,
   formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
+  isEscalatedBallNote,
+  parseA2ARelayNote,
 } from '../src/a2a.js';
 
 describe('parseA2AHandoff', () => {
@@ -37,6 +42,21 @@ describe('parseA2AHandoff', () => {
 
   it('任务为空不触发', () => {
     expect(parseA2AHandoff('@opencode', 'claude')).toBeNull();
+  });
+
+  it('行首 @人 / @owner 升给人,空任务也算', () => {
+    expect(parseA2AHandoff('方向定不了。\n@人 这个方案做不做', 'claude')).toEqual({
+      target: 'human',
+      task: '这个方案做不做',
+    });
+    expect(parseA2AHandoff('@owner', 'gemini')).toEqual({
+      target: 'human',
+      task: '请拍板',
+    });
+  });
+
+  it('句中 @人 不升级', () => {
+    expect(parseA2AHandoff('请 @人 拍板', 'claude')).toBeNull();
   });
 
   it('代码块里的 @ 不触发交接', () => {
@@ -161,6 +181,60 @@ describe('findInlineA2AMentions', () => {
   it('句中 @ 记为 inline,行首交接不算', () => {
     expect(findInlineA2AMentions('请 @团团 帮忙看看', 'claude')).toEqual(['opencode']);
     expect(findInlineA2AMentions('@团团 请审查这段代码', 'claude')).toEqual([]);
+  });
+});
+
+describe('findInlineEscalateTokens', () => {
+  it('句中 @人 记为 inline,行首升级不算', () => {
+    expect(findInlineEscalateTokens('请 @人 拍板')).toEqual(['人']);
+    expect(findInlineEscalateTokens('@人 这个方案做不做')).toEqual([]);
+  });
+});
+
+describe('formatA2ARelayNote', () => {
+  it('接力条带目标、文件、验证,给人点开', () => {
+    const note = formatA2ARelayNote({
+      fromName: '墨墨',
+      toName: '闪闪',
+      goal: '写 add.ts',
+      files: ['add.ts'],
+      task: '请审查 add.ts',
+      previousOutput: '已实际运行 `add(2,3)`,返回 5',
+    });
+    expect(note).toContain('🤝 接力:墨墨 → 闪闪');
+    expect(note).toContain('用户目标: 写 add.ts');
+    expect(note).toContain('改动文件: add.ts');
+    expect(note).toContain('验证: 有本轮命令和结果');
+    expect(note).toContain('任务: 请审查 add.ts');
+    expect(parseA2ARelayNote(note)).toEqual({
+      headline: '🤝 接力:墨墨 → 闪闪',
+      details: [
+        '用户目标: 写 add.ts',
+        '改动文件: add.ts',
+        '验证: 有本轮命令和结果',
+        '任务: 请审查 add.ts',
+      ],
+    });
+  });
+});
+
+describe('formatEscalatedBallNote', () => {
+  it('升级给人不是球掉地上', () => {
+    const note = formatEscalatedBallNote('墨墨', '这个方案做不做');
+    expect(note).toContain('球在人手里');
+    expect(note).toContain('墨墨请求拍板');
+    expect(note).toContain('这个方案做不做');
+    expect(isEscalatedBallNote(note)).toBe(true);
+    expect(isDroppedBallNote(note)).toBe(false);
+    expect(
+      formatDroppedBallNote({
+        stop: 'escalated',
+        lastContent: '@人 这个方案做不做',
+        speakerName: '墨墨',
+        role: '主架构师',
+        wasRelay: false,
+      }),
+    ).toBeNull();
   });
 });
 

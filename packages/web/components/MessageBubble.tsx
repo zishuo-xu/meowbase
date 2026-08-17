@@ -9,6 +9,8 @@ import { MarkdownBody } from './MarkdownBody';
 import { ThinkingBlock } from './ThinkingBlock';
 import { DroppedBallBlock } from './DroppedBallBlock';
 import { isDroppedBallNote } from '@/lib/ball';
+import { parseRelayNote } from '@/lib/relay-note';
+import { useState } from 'react';
 
 export function MessageBubble({
   message,
@@ -79,6 +81,10 @@ export function MessageBubble({
         <DroppedBallBlock text={text} agents={agents} onPass={onPassBall} onSpeak={onSpeak} />
       );
     }
+    const relay = parseRelayNote(text);
+    if (relay && relay.details.length > 0) {
+      return <RelayNoteBlock headline={relay.headline} details={relay.details} />;
+    }
     return (
       <div className="flex justify-center px-4 py-1">
         <span className="max-w-md rounded-full bg-black/5 px-3 py-1 text-xs text-[var(--ink-soft)]">
@@ -142,6 +148,29 @@ export function MessageBubble({
           <div className="mt-2 text-xs leading-relaxed text-red-700">失败: {message.error}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function RelayNoteBlock({ headline, details }: { headline: string; details: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex justify-center px-4 py-1">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="max-w-md rounded-2xl bg-black/5 px-3 py-1.5 text-left text-xs text-[var(--ink-soft)]"
+      >
+        <span>
+          {headline}
+          <span className="ml-1 text-[var(--ink-soft)]/70">{open ? '收起' : '交接包'}</span>
+        </span>
+        {open ? (
+          <span className="mt-1 block space-y-0.5 whitespace-pre-wrap">
+            {details.join('\n')}
+          </span>
+        ) : null}
+      </button>
     </div>
   );
 }

@@ -23,6 +23,26 @@ describe('MessageBubble', () => {
     expect(screen.getByText('墨墨')).toBeTruthy();
   });
 
+  it('接力条可点开交接包', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-relay',
+          threadId: 't',
+          role: 'system',
+          content: '🤝 接力:墨墨 → 闪闪\n用户目标: 写 add.ts\n任务: 请审查 add.ts',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    expect(screen.getByText(/🤝 接力:墨墨 → 闪闪/)).toBeTruthy();
+    expect(screen.queryByText(/用户目标: 写 add.ts/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /交接包/ }));
+    expect(screen.getByText(/用户目标: 写 add.ts/)).toBeTruthy();
+    expect(screen.getByText(/任务: 请审查 add.ts/)).toBeTruthy();
+  });
+
   it('球还在地上可点交给某只猫', () => {
     const onPass = vi.fn();
     const onSpeak = vi.fn();

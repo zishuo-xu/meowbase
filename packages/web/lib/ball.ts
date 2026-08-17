@@ -44,6 +44,9 @@ export function describeBall(
   if (last?.role === 'system' && isPendingApprovalNote(last.content)) {
     return { text: '球在人手里', tone: 'human' };
   }
+  if (last?.role === 'system' && isEscalatedBallNote(last.content)) {
+    return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
+  }
   if (last?.role === 'assistant' && last.agentId) {
     return {
       text: `球在${nameOf(last.agentId)}手上`,
@@ -59,6 +62,10 @@ export function describeBall(
 
 export function isDroppedBallNote(text: string): boolean {
   return text.includes('球还在地上');
+}
+
+export function isEscalatedBallNote(text: string): boolean {
+  return text.includes('球在人手里') && text.includes('请求拍板');
 }
 
 /** 审批卡等人点批准/打回,还没自动落地。 */

@@ -57,15 +57,21 @@ export {
   parseReviewVerdict,
 } from './review-verdict.js';
 export { hasVerificationEvidence, hasVerificationLimit } from './verification.js';
-export type { A2AHandoff, A2AHandoffExtras, A2AStopKind, DroppedBallInput } from './a2a.js';
+export type { A2AHandoff, A2AHandoffExtras, A2AHandoffTarget, A2AStopKind, DroppedBallInput } from './a2a.js';
 export {
   findInlineA2AMentions,
+  findInlineEscalateTokens,
   formatAbortedBallNote,
   formatA2AHandoffPrompt,
+  formatA2ARelayNote,
   formatDroppedBallNote,
+  formatEscalatedBallNote,
   formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
+  isEscalatedBallNote,
+  isHumanEscalateToken,
   parseA2AHandoff,
+  parseA2ARelayNote,
 } from './a2a.js';
 export { isPlaceholderTitle, titleFromUserMessage, TITLE_MAX_LEN } from './thread-title.js';

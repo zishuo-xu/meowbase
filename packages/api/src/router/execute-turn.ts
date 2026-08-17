@@ -5,9 +5,12 @@ import {
   DEFAULT_ROSTER,
   displayName,
   findInlineA2AMentions,
+  findInlineEscalateTokens,
   formatA2AHandoffPrompt,
+  formatA2ARelayNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
+  formatEscalatedBallNote,
   formatFailedBallNote,
   isPlaceholderTitle,
   matchSkills,
@@ -377,7 +380,12 @@ async function runSegment(
   let prevContent = '';
   let fromAgent: AgentId | undefined;
   let firstAgent: AgentId = segment.agentId;
-  let stop: { kind: A2AStopKind; blockedTarget?: AgentId; hadInlineHint?: boolean } | undefined;
+  let stop: {
+    kind: A2AStopKind;
+    blockedTarget?: AgentId;
+    hadInlineHint?: boolean;
+    escalateTask?: string;
+  } | undefined;
 
   for (let hop = 0; hop < maxDepth; hop++) {
     if (!context.registry.get(currentAgent)) {
@@ -426,6 +434,11 @@ async function runSegment(
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
     if (context.signal?.aborted || lastOutput.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
+    if (handoff?.target === 'human') {
+      turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'escalated' });
+      stop = { kind: 'escalated', escalateTask: handoff.task };
+      break;
+    }
     if (handoff && isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)) {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'reviewer-closeout' });
       stop = { kind: 'reviewer-closeout' };
@@ -434,18 +447,22 @@ async function runSegment(
     if (!handoff) {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent });
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
-      if (inline.length > 0) {
-        const labels = inline.map((id) => `@${displayName(id, catalog)}`).join('、');
+      const inlineHuman = findInlineEscalateTokens(prevContent);
+      const labels = [
+        ...inline.map((id) => `@${displayName(id, catalog)}`),
+        ...inlineHuman.map((token) => `@${token}`),
+      ];
+      if (labels.length > 0) {
         await writeQueue(() =>
           context.stores.messages.append({
             threadId: thread.id,
             role: 'system',
-            content: `💡 ${labels} 写在句中不会交接 — 请另起一行、行首写 @名字 再跟任务`,
+            content: `💡 ${labels.join('、')} 写在句中不会交接 — 请另起一行、行首写 @名字 再跟任务`,
             status: 'completed',
           }),
         );
       }
-      stop = { kind: 'no-handoff', hadInlineHint: inline.length > 0 };
+      stop = { kind: 'no-handoff', hadInlineHint: labels.length > 0 };
       break;
     }
     if (visited.has(handoff.target) || !context.registry.get(handoff.target)) {
@@ -463,11 +480,19 @@ async function runSegment(
       );
       break;
     }
+    const relayFiles = await listHandoffFiles(thread.workdir);
     await writeQueue(() =>
       context.stores.messages.append({
         threadId: thread.id,
         role: 'system',
-        content: `🤝 接力:${displayName(currentAgent, catalog)} → ${displayName(handoff.target, catalog)}`,
+        content: formatA2ARelayNote({
+          fromName: displayName(currentAgent, catalog),
+          toName: displayName(handoff.target, catalog),
+          goal: segment.text,
+          files: relayFiles,
+          task: handoff.task,
+          previousOutput: prevContent,
+        }),
         status: 'completed',
       }),
     );
@@ -504,19 +529,24 @@ async function runSegment(
       }),
     );
   } else if (lastOutput.status === 'completed' && stop) {
-    const note = formatDroppedBallNote({
-      stop: stop.kind,
-      lastContent: prevContent,
-      speakerName: displayName(currentAgent, catalog),
-      role: team.find((m) => m.agentId === currentAgent)?.role,
-      wasRelay: Boolean(fromAgent),
-      hadInlineHint: stop.hadInlineHint,
-      blockedTargetName: stop.blockedTarget
-        ? displayName(stop.blockedTarget, catalog)
-        : undefined,
-    });
+    const note =
+      stop.kind === 'escalated'
+        ? formatEscalatedBallNote(displayName(currentAgent, catalog), stop.escalateTask)
+        : formatDroppedBallNote({
+            stop: stop.kind,
+            lastContent: prevContent,
+            speakerName: displayName(currentAgent, catalog),
+            role: team.find((m) => m.agentId === currentAgent)?.role,
+            wasRelay: Boolean(fromAgent),
+            hadInlineHint: stop.hadInlineHint,
+            blockedTargetName: stop.blockedTarget
+              ? displayName(stop.blockedTarget, catalog)
+              : undefined,
+          });
     if (note) {
-      turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'dropped-ball' });
+      if (stop.kind !== 'escalated') {
+        turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'dropped-ball' });
+      }
       await writeQueue(() =>
         context.stores.messages.append({
           threadId: thread.id,
