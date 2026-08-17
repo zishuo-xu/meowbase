@@ -9,6 +9,7 @@ import {
   formatAbortedBallNote,
   formatDroppedBallNote,
   formatFailedBallNote,
+  isPlaceholderTitle,
   matchSkills,
   parseA2AHandoff,
   parseApproveCommand,
@@ -17,6 +18,7 @@ import {
   parseLearnCommand,
   parseRejectCommand,
   resolveTurnTargets,
+  titleFromUserMessage,
   parseReviewVerdict,
   allowsAutoApprove,
   gateReviewVerdict,
@@ -232,6 +234,13 @@ export async function executeTurn(input: {
         : [...DEFAULT_ROSTER];
   const maxDepth = context.a2aMaxDepth ?? MAX_A2A_DEPTH;
   const history = await context.stores.messages.list(threadId);
+  if (
+    history.filter((m) => m.role === 'user').length === 1 &&
+    isPlaceholderTitle(thread.title)
+  ) {
+    const nextTitle = titleFromUserMessage(content);
+    if (nextTitle) await context.stores.threads.rename(threadId, nextTitle);
+  }
   const priorUsers = history.filter((m) => m.role === 'user').slice(0, -1);
   const lastSpeakerId = [...history]
     .reverse()

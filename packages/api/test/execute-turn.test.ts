@@ -41,6 +41,36 @@ describe('executeTurn', () => {
     expect(final.status).toBe('completed');
   });
 
+  it('首条用户消息把占位标题换成任务摘要', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '好')]);
+    const thread = await stores.threads.create({ title: '8/17 19:28', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 在沙箱写 add.ts',
+      context: { stores, registry },
+    });
+    expect((await stores.threads.get(thread.id))?.title).toBe('在沙箱写 add.ts');
+    await executeTurn({
+      threadId: thread.id,
+      content: '再改一下',
+      context: { stores, registry },
+    });
+    expect((await stores.threads.get(thread.id))?.title).toBe('在沙箱写 add.ts');
+  });
+
+  it('人手起的标题不被首条消息覆盖', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '好')]);
+    const thread = await stores.threads.create({ title: '验证球权', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '你是谁',
+      context: { stores, registry },
+    });
+    expect((await stores.threads.get(thread.id))?.title).toBe('验证球权');
+  });
+
   it('无 mention 走 primaryAgentId', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '默认')]);

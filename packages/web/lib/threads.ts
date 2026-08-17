@@ -13,6 +13,20 @@ export function defaultSessionTitle(now = new Date()): string {
   });
 }
 
+export function isPlaceholderTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t || t === '新会话' || t === '新线程') return true;
+  return /^(?:\d{4}[/\-年])?\d{1,2}\s*[/\-月]\s*\d{1,2}/.test(t);
+}
+
+export function titleFromUserMessage(content: string, max = 24): string | null {
+  const cleaned = content.replace(/@\S+\s*/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return null;
+  if (cleaned.length <= max) return cleaned;
+  const sliced = cleaned.slice(0, max).replace(/[，,。.\s]+$/u, '').trimEnd();
+  return sliced ? `${sliced}…` : null;
+}
+
 export function sortThreadsByCreated<T extends { createdAt: string }>(threads: T[]): T[] {
   return [...threads].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }

@@ -68,3 +68,4 @@ export {
   isDroppedBallNote,
   parseA2AHandoff,
 } from './a2a.js';
+export { isPlaceholderTitle, titleFromUserMessage, TITLE_MAX_LEN } from './thread-title.js';

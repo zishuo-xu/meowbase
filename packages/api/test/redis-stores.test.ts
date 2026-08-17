@@ -31,6 +31,8 @@ describe('Redis 存储', () => {
     expect((await threads.get(thread.id))?.title).toBe(title);
     await threads.setSession(thread.id, 'claude', 'sess-9');
     expect((await threads.get(thread.id))?.sessions.claude).toBe('sess-9');
+    await threads.rename(thread.id, '在沙箱写 add.ts');
+    expect((await threads.get(thread.id))?.title).toBe('在沙箱写 add.ts');
     expect(await threads.delete(thread.id)).toBe(true);
     expect(await threads.get(thread.id)).toBeNull();
   });

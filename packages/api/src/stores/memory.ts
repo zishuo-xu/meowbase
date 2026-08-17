@@ -54,6 +54,13 @@ export class InMemoryThreadStore implements ThreadStore {
     thread.sessions[agentId] = sessionId;
   }
 
+  async rename(id: string, title: string): Promise<Thread | null> {
+    const thread = this.threads.get(id);
+    if (!thread) return null;
+    thread.title = title;
+    return thread;
+  }
+
   async delete(id: string): Promise<boolean> {
     return this.threads.delete(id);
   }

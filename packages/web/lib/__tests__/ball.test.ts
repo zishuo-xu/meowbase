@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeBall, formatPickupCommand, isDroppedBallNote } from '../ball';
+import { describeBall, describeRelayTimeline, formatPickupCommand, isDroppedBallNote } from '../ball';
 
 const nameOf = (id?: string) =>
   id === 'gemini' ? '闪闪' : id === 'opencode' ? '团团' : id === 'claude' ? '墨墨' : '猫';
@@ -50,6 +50,44 @@ describe('describeBall', () => {
 
   it('空线程等人开口', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
+  });
+
+  it('接力时间线按出场顺序,失败标在最后一棒', () => {
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'user', content: '@墨墨 写 add.ts' },
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          { role: 'assistant', agentId: 'gemini', content: '', status: 'failed' },
+          { role: 'system', content: '⚠️ 本轮失败。球还在地上:点下面交给下一只' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual([
+      { name: '墨墨', agentId: 'claude', status: 'done' },
+      { name: '闪闪', agentId: 'gemini', status: 'failed' },
+    ]);
+  });
+
+  it('停棒但没失败时最后一棒标成 dropped', () => {
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          { role: 'assistant', agentId: 'gemini', content: '看了一下', status: 'completed' },
+          { role: 'system', content: '⚠️ 球还在地上:闪闪停棒了' },
+        ],
+        false,
+        nameOf,
+      ).map((h) => h.status),
+    ).toEqual(['done', 'dropped']);
+  });
+
+  it('空线程没有时间线', () => {
+    expect(describeRelayTimeline([], false, nameOf)).toEqual([]);
   });
 
   it('捡球命令走现有 @ 路由', () => {

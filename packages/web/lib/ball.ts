@@ -61,3 +61,59 @@ export function isDroppedBallNote(text: string): boolean {
 export function formatPickupCommand(agentName: string): string {
   return `@${agentName.replace(/^@/, '').trim()} 接着做`;
 }
+
+export type RelayHopStatus = 'done' | 'active' | 'failed' | 'dropped';
+
+export interface RelayHop {
+  name: string;
+  agentId?: string;
+  status: RelayHopStatus;
+}
+
+/** 从消息还原本轮接力链,只读,不改路由。 */
+export function describeRelayTimeline(
+  messages: readonly BallMessage[],
+  sending: boolean,
+  nameOf: (agentId?: string) => string,
+): RelayHop[] {
+  const hops: RelayHop[] = [];
+
+  const touch = (name: string, status: RelayHopStatus, agentId?: string) => {
+    const last = hops[hops.length - 1];
+    if (last && (last.name === name || (agentId && last.agentId === agentId))) {
+      last.status = status;
+      if (agentId) last.agentId = agentId;
+      return;
+    }
+    hops.push({ name, ...(agentId ? { agentId } : {}), status });
+  };
+
+  for (const message of messages) {
+    if (message.role === 'assistant' && message.agentId) {
+      const status: RelayHopStatus =
+        message.status === 'failed' || message.status === 'terminated'
+          ? 'failed'
+          : message.status === 'streaming'
+            ? 'active'
+            : 'done';
+      touch(nameOf(message.agentId), status, message.agentId);
+      continue;
+    }
+    if (message.role === 'system' && message.content.includes('接力:')) {
+      const to = message.content.split('→').pop()?.trim();
+      if (to) touch(to, 'active');
+      continue;
+    }
+    if (message.role === 'system' && message.content.includes('球还在地上')) {
+      const last = hops[hops.length - 1];
+      if (last && last.status === 'done') last.status = 'dropped';
+    }
+  }
+
+  if (sending) {
+    const last = hops[hops.length - 1];
+    if (last && last.status !== 'failed') last.status = 'active';
+  }
+
+  return hops;
+}

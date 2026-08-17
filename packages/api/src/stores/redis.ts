@@ -92,6 +92,14 @@ export class RedisThreadStore implements ThreadStore {
     await this.redis.hset(threadKey(threadId), 'sessions', JSON.stringify(thread.sessions));
   }
 
+  async rename(id: string, title: string): Promise<Thread | null> {
+    const thread = await this.hydrate(id);
+    if (!thread) return null;
+    thread.title = title;
+    await this.redis.hset(threadKey(id), 'title', title);
+    return thread;
+  }
+
   async delete(id: string): Promise<boolean> {
     const existed = await this.hydrate(id);
     if (!existed) return false;

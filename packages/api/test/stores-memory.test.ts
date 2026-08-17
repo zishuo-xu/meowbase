@@ -12,6 +12,15 @@ describe('内存存储', () => {
     expect(await threads.get('不存在')).toBeNull();
   });
 
+  it('rename 改标题', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: '8/17 19:28', primaryAgentId: 'claude' });
+    const renamed = await threads.rename(thread.id, '在沙箱写 add.ts');
+    expect(renamed?.title).toBe('在沙箱写 add.ts');
+    expect((await threads.get(thread.id))?.title).toBe('在沙箱写 add.ts');
+    expect(await threads.rename('不存在', 'x')).toBeNull();
+  });
+
   it('setSession 更新会话映射', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });

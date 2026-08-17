@@ -8,8 +8,9 @@ import { ChatInput } from '@/components/ChatInput';
 import { TeamHub } from '@/components/TeamHub';
 import { EvidenceRail } from '@/components/EvidenceRail';
 import { CatAvatar } from '@/components/CatAvatar';
-import { describeBall, formatPickupCommand } from '@/lib/ball';
-import { defaultSessionTitle } from '@/lib/threads';
+import { describeBall, describeRelayTimeline, formatPickupCommand } from '@/lib/ball';
+import { defaultSessionTitle, isPlaceholderTitle, titleFromUserMessage } from '@/lib/threads';
+import { RelayTimeline } from '@/components/RelayTimeline';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
   id,
@@ -95,6 +96,16 @@ export default function Home() {
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
+      const nextTitle = titleFromUserMessage(content);
+      if (nextTitle) {
+        setThreads((prev) =>
+          prev.map((thread) =>
+            thread.id === activeId && isPlaceholderTitle(thread.title)
+              ? { ...thread, title: nextTitle }
+              : thread,
+          ),
+        );
+      }
       try {
         await api.sendMessage(activeId, content);
         const [msgs, ev] = await Promise.all([
@@ -103,6 +114,7 @@ export default function Home() {
         ]);
         setMessages(msgs);
         setEvidence(ev);
+        await refreshThreads();
         setError(null);
       } catch (err) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
@@ -111,7 +123,7 @@ export default function Home() {
         setSending(false);
       }
     },
-    [activeId, sending],
+    [activeId, sending, refreshThreads],
   );
 
   const sendCommand = useCallback(
@@ -183,6 +195,11 @@ export default function Home() {
                 ? describeBall(messages, sending, (id) => agentName(id, agents)).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
+            {activeId ? (
+              <RelayTimeline
+                hops={describeRelayTimeline(messages, sending, (id) => agentName(id, agents))}
+              />
+            ) : null}
           </div>
           <div className="flex items-center gap-3">
             <div className="flex -space-x-1.5">
