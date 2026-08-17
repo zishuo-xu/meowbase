@@ -31,7 +31,7 @@ packages/
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
 scripts/      smoke.ts(真实冒烟)、fixtures/(fake CLI,测试/演示用)
 work/         线程沙箱目录(git 仓库,gitignore 忽略)
-docs/         设计文档(specs/)+ 实现计划(plans/)+ A2A 协作说明(A2A.md)
+docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
 
 ## 架构核心(30 秒版)
@@ -46,6 +46,8 @@ docs/         设计文档(specs/)+ 实现计划(plans/)+ A2A 协作说明(A2A.m
 5. `packages/web/components/` —— UI 组件
 
 猫怎么交棒、交接包带什么、每只猫自己的 CLI 会话、线程沙箱和证据怎么共享，见 [docs/A2A.md](docs/A2A.md)。
+
+新功能先写 [docs/features/](docs/features/)（为什么、怎么做、面试能讲），再改代码。文档地图见 [docs/README.md](docs/README.md)。
 
 ## 消息协议(用户可用)
 
@@ -71,7 +73,7 @@ docs/         设计文档(specs/)+ 实现计划(plans/)+ A2A 协作说明(A2A.m
 - 业务逻辑只依赖 `stores/ports.ts` 接口,禁止直接 import ioredis
 - **计划先对照 clowder**:提出下一步前先看他们公开设计怎么做同一件事,只拿语义和踩坑,不抄源码,不搬邮箱/SOP/MCP
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
-- **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`,不要留到下次
+- **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - 测试:`pnpm test`(shared 48 + api 70 + web 24 ≈ 142);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
