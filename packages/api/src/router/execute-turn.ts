@@ -11,6 +11,8 @@ import {
   formatAbortedBallNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
+  formatExitNudgeNote,
+  formatExitNudgePrompt,
   formatFreezeBallNote,
   formatFailedBallNote,
   isPlaceholderTitle,
@@ -30,6 +32,8 @@ import {
   parseReviewVerdict,
   allowsAutoApprove,
   gateReviewVerdict,
+  hasExplicitReviewVerdict,
+  shouldNudgeExit,
   type A2AStopKind,
   type PendingHop,
   isHumanEscalateToken,
@@ -595,7 +599,56 @@ async function runSegment(
 
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
     if (context.signal?.aborted || lastOutput.status !== 'completed') break;
-    const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
+    let handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
+    if (!handoff) {
+      const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
+      const inlineHuman = findInlineEscalateTokens(prevContent);
+      const labels = [
+        ...inline.map((id) => `@${displayName(id, catalog)}`),
+        ...inlineHuman.map((token) => `@${token}`),
+      ];
+      const member = team.find((m) => m.agentId === currentAgent);
+      const isReviewer = isReviewerRole(member?.role);
+      if (
+        shouldNudgeExit({
+          wasRelay: Boolean(fromAgent),
+          hadInlineHint: labels.length > 0,
+          isReviewer,
+          hasExplicitVerdict: hasExplicitReviewVerdict(prevContent),
+          hasDiff: (await listHandoffFiles(thread.workdir)).length > 0,
+        })
+      ) {
+        const handoffName = member?.handoffTo
+          ? displayName(member.handoffTo, catalog)
+          : undefined;
+        await writeQueue(() =>
+          context.stores.messages.append({
+            threadId: thread.id,
+            role: 'system',
+            content: formatExitNudgeNote(displayName(currentAgent, catalog)),
+            status: 'completed',
+          }),
+        );
+        turnLog('a2a nudge', { thread: thread.id, from: currentAgent });
+        const nudged = await runAgentTurn(
+          context,
+          thread,
+          currentAgent,
+          formatExitNudgePrompt({
+            previousOutput: prevContent,
+            handoffName,
+            isReviewer,
+          }),
+          systemPrompt,
+          writeQueue,
+        );
+        lastAssistant = nudged.assistant;
+        lastOutput = nudged.output;
+        prevContent = nudged.content;
+        if (context.signal?.aborted || lastOutput.status !== 'completed') break;
+        handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
+      }
+    }
     if (handoff?.target === 'human') {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'escalated' });
       stop = { kind: 'escalated', escalateTask: handoff.task };

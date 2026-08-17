@@ -280,3 +280,46 @@ export function formatPickupCommand(agentName: string): string {
   const name = agentName.replace(/^@/, '').trim();
   return `@${name} 接着做`;
 }
+
+export interface ExitNudgeInput {
+  wasRelay: boolean;
+  hadInlineHint: boolean;
+  isReviewer: boolean;
+  hasExplicitVerdict: boolean;
+  hasDiff: boolean;
+}
+
+/** 该交棒却没出口时,再问同一只;问答收尾和已写结论不问。 */
+export function shouldNudgeExit(input: ExitNudgeInput): boolean {
+  if (input.hasExplicitVerdict) return false;
+  if (input.wasRelay) return true;
+  if (input.hadInlineHint) return true;
+  if (input.hasDiff) return true;
+  if (input.isReviewer) return true;
+  return false;
+}
+
+export function formatExitNudgeNote(speakerName: string): string {
+  return `📬 出口未明:${speakerName}停棒了但没有行首交给下一棒或 @人。平台再问一次。`;
+}
+
+export function isExitNudgeNote(text: string): boolean {
+  return text.includes('出口未明') && text.includes('再问一次');
+}
+
+export function formatExitNudgePrompt(input: {
+  previousOutput: string;
+  handoffName?: string;
+  isReviewer: boolean;
+}): string {
+  const next = input.handoffName ? `@${input.handoffName}` : '@下一只';
+  const closeout = input.isReviewer
+    ? '审查官:写出「通过」或「需修改」即停,不要再 @。或行首 @人 升级。'
+    : `三选一:接(做完再行首 ${next} 跟任务)/退(另起一行 ${next} 跟任务)/升(行首 @人 写要拍板的事)。不要问人要不要继续。`;
+  return [
+    '【出口补问】上一棒没有行首交给下一只,也没有 @人。平台只再问一次,不替你选下一棒。',
+    closeout,
+    '上一棒原话:',
+    clipBody(input.previousOutput),
+  ].join('\n');
+}

@@ -51,7 +51,7 @@
 - **追问「和 clowder 有何不同」**：图一样（三层 + 路由 + 隔离 + 包 + 证据）。机器不同：他们后来是邮箱和 MCP；我们是一条 `executeTurn` 跑完。图可以像，第二心脏可以后加。
 - **追问「上下文怎么独立」**：线程 / 每猫 session / 当跳 system prompt 三层。漏一层就串台。
 - **踩坑**：opencode 必须 `--dir` 钉沙箱，否则文件写到仓库根；审批 diff 要丢掉 `node_modules`。
-- **若继续往 clowder 靠**：第一刀是人能离开，见 [async-a2a.md](async-a2a.md)。
+- **若继续往 clowder 靠**：漏传先补问同一只，见 [exit-nudge.md](exit-nudge.md)。
 
 ## 代码入口
 

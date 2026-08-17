@@ -11,10 +11,14 @@ import {
   formatFreezeBallNote,
   formatFailedBallNote,
   formatPickupCommand,
+  formatExitNudgeNote,
+  formatExitNudgePrompt,
   isDroppedBallNote,
   isEscalatedBallNote,
+  isExitNudgeNote,
   isFreezeBallNote,
   parseA2ARelayNote,
+  shouldNudgeExit,
   shouldResumePending,
 } from '../src/a2a.js';
 
@@ -269,6 +273,80 @@ describe('formatFreezeBallNote', () => {
     expect(note).toContain('已拉闸');
     expect(isDroppedBallNote(note)).toBe(false);
     expect(isEscalatedBallNote(note)).toBe(false);
+  });
+});
+
+describe('出口补问', () => {
+  it('问答收尾不问,该交棒才问', () => {
+    expect(
+      shouldNudgeExit({
+        wasRelay: false,
+        hadInlineHint: false,
+        isReviewer: false,
+        hasExplicitVerdict: false,
+        hasDiff: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldNudgeExit({
+        wasRelay: false,
+        hadInlineHint: false,
+        isReviewer: false,
+        hasExplicitVerdict: false,
+        hasDiff: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldNudgeExit({
+        wasRelay: true,
+        hadInlineHint: false,
+        isReviewer: true,
+        hasExplicitVerdict: false,
+        hasDiff: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldNudgeExit({
+        wasRelay: true,
+        hadInlineHint: false,
+        isReviewer: true,
+        hasExplicitVerdict: true,
+        hasDiff: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldNudgeExit({
+        wasRelay: true,
+        hadInlineHint: false,
+        isReviewer: false,
+        hasExplicitVerdict: true,
+        hasDiff: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldNudgeExit({
+        wasRelay: false,
+        hadInlineHint: true,
+        isReviewer: false,
+        hasExplicitVerdict: false,
+        hasDiff: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('补问句给人看,prompt 不替猫写 @', () => {
+    const note = formatExitNudgeNote('墨墨');
+    expect(isExitNudgeNote(note)).toBe(true);
+    expect(note).toContain('墨墨');
+    const prompt = formatExitNudgePrompt({
+      previousOutput: '写完了,请闪闪看',
+      handoffName: '闪闪',
+      isReviewer: false,
+    });
+    expect(prompt).toContain('只再问一次');
+    expect(prompt).toContain('写完了,请闪闪看');
+    expect(prompt).toContain('@闪闪');
+    expect(prompt).toContain('@人');
   });
 });
 

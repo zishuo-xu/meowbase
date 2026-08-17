@@ -754,10 +754,11 @@ describe('executeTurn 审批流', () => {
       threadId: thread.id, content: '写个文件', context: { stores, registry },
     });
 
-    expect(writerCalls).toBe(2);
+    expect(writerCalls).toBe(3);
     expect(reviewRound).toBe(2);
-    expect(writerPrompts[1]).toContain('需修改');
-    expect(writerPrompts[1]).toContain('审查');
+    expect(writerPrompts[1]).toContain('出口补问');
+    expect(writerPrompts[2]).toContain('需修改');
+    expect(writerPrompts[2]).toContain('审查');
 
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.content.includes('🤝 打回:'))).toBe(true);
@@ -802,7 +803,7 @@ describe('executeTurn 审批流', () => {
       threadId: thread.id, content: '写个文件', context: { stores, registry },
     });
 
-    expect(writerCalls).toBe(1 + MAX_REVIEW_FIX_ROUNDS);
+    expect(writerCalls).toBe(2 + MAX_REVIEW_FIX_ROUNDS);
     expect(reviewRound).toBe(1 + MAX_REVIEW_FIX_ROUNDS);
     const card = (await stores.approvals.list(thread.id))[0];
     expect(card?.status).toBe('reviewing');
@@ -1302,6 +1303,7 @@ describe('executeTurn 多角色协作', () => {
 
   it('收了棒却没有结论也不交接,提示球还在地上', async () => {
     const stores = createMemoryStores();
+    let geminiCalls = 0;
     const registry = createAgentRegistry([
       {
         agentId: 'claude',
@@ -1312,6 +1314,7 @@ describe('executeTurn 多角色协作', () => {
       {
         agentId: 'gemini',
         async runTurn() {
+          geminiCalls += 1;
           return { sessionId: 's2', content: '看了一下还行', status: 'completed' };
         },
       },
@@ -1327,22 +1330,80 @@ describe('executeTurn 多角色协作', () => {
       content: '继续',
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
+    expect(geminiCalls).toBe(2);
     const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('出口未明'))).toBe(true);
     const note = messages.find((m) => m.role === 'system' && m.content.includes('球还在地上'));
     expect(note?.content).toContain('闪闪');
   });
 
   it('简单问答不提示球还在地上', async () => {
     const stores = createMemoryStores();
-    const registry = createAgentRegistry([stubAgent('claude', '我是墨墨')]);
+    let calls = 0;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls += 1;
+          return { sessionId: 's1', content: '我是墨墨', status: 'completed' };
+        },
+      },
+    ]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     await executeTurn({
       threadId: thread.id,
       content: '你是谁',
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
+    expect(calls).toBe(1);
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
+    expect(messages.some((m) => m.content.includes('出口未明'))).toBe(false);
+  });
+
+  it('有 diff 忘了交棒,补问一次后行首 @ 则交接', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-nudge-'));
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.prompt);
+          return {
+            sessionId: 's1',
+            content: prompts.length === 1 ? '写好了' : '补交。\n@gemini 请审查 add.ts',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          throw new Error('本轮不应跑闪闪');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    writeFileSync(join(thread.workdir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain('出口补问');
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('出口未明'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('🤝 接力'))).toBe(true);
+    expect((await stores.threads.get(thread.id))?.pendingHop?.to).toBe('gemini');
+    rmSync(workdirBase, { recursive: true, force: true });
   });
 
   it('A2A 防环:已出场角色不再重复接力', async () => {
@@ -1389,7 +1450,7 @@ describe('executeTurn 多角色协作', () => {
         agentId: 'opencode',
         async runTurn() {
           calls.push('opencode');
-          return { sessionId: 's2', content: '好', status: 'completed' };
+          return { sessionId: 's2', content: '做好了。通过', status: 'completed' };
         },
       },
     ]);
@@ -1405,10 +1466,12 @@ describe('executeTurn 多角色协作', () => {
 
   it('A2A 句中 @ 不交接,留下提示', async () => {
     const stores = createMemoryStores();
+    let claudeCalls = 0;
     const registry = createAgentRegistry([
       {
         agentId: 'claude',
         async runTurn() {
+          claudeCalls += 1;
           return { sessionId: 's1', content: '写完了,请 @团团 审查。', status: 'completed' };
         },
       },
@@ -1421,8 +1484,10 @@ describe('executeTurn 多角色协作', () => {
     ]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
+    expect(claudeCalls).toBe(2);
     const messages = await stores.messages.list(thread.id);
-    expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(1);
+    expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(2);
+    expect(messages.some((m) => m.content.includes('出口未明'))).toBe(true);
     const hint = messages.find((m) => m.role === 'system' && m.content.includes('句中'));
     expect(hint?.content).toContain('@团团');
   });

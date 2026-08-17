@@ -60,7 +60,14 @@ export {
   parseReviewVerdict,
 } from './review-verdict.js';
 export { hasVerificationEvidence, hasVerificationLimit } from './verification.js';
-export type { A2AHandoff, A2AHandoffExtras, A2AHandoffTarget, A2AStopKind, DroppedBallInput } from './a2a.js';
+export type {
+  A2AHandoff,
+  A2AHandoffExtras,
+  A2AHandoffTarget,
+  A2AStopKind,
+  DroppedBallInput,
+  ExitNudgeInput,
+} from './a2a.js';
 export {
   findInlineA2AMentions,
   findInlineEscalateTokens,
@@ -69,15 +76,19 @@ export {
   formatA2ARelayNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
+  formatExitNudgeNote,
+  formatExitNudgePrompt,
   formatFreezeBallNote,
   formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
   isEscalatedBallNote,
+  isExitNudgeNote,
   isFreezeBallNote,
   isHumanEscalateToken,
   parseA2AHandoff,
   parseA2ARelayNote,
+  shouldNudgeExit,
   shouldResumePending,
 } from './a2a.js';
 export { isPlaceholderTitle, titleFromUserMessage, TITLE_MAX_LEN } from './thread-title.js';
