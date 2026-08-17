@@ -1,7 +1,7 @@
 # Meowbase 设计文档
 
 - 日期:2026-08-16
-- 状态:已批准(用户确认开工);**M1–M5 已落地**,A2A 机械层可演示。M6(演示脚本/简历文案)进行中,见 [docs/DEMO.md](../../DEMO.md)
+- 状态:已批准(用户确认开工);**M1–M6 已落地**。A2A 机械层可演示;证据可按「之前约定」召回;人可整行 `星星罐子` 拉闸。演示与口播见 [docs/DEMO.md](../../DEMO.md)
 - 参考架构:[clowder-ai](https://github.com/zts212653/clowder-ai)(MIT)— 仅借鉴架构模式,代码全部自写
 
 ## 1. 背景与目标
@@ -154,7 +154,7 @@ stores/
 | M3 | Skills 框架(manifest + 按需加载) | 触发关键词后技能 prompt 出现在会话中 |
 | M4 | 跨模型互审 + 审批流 | 写/审/批/落地全流程走通 |
 | M5 | Web UI(Next.js 聊天 + 审批卡片 + WebSocket) | 浏览器完整演示 |
-| M6 | 打磨:测试补全、README、演示脚本、简历文案 | 可上简历 |
+| M6 | 打磨:测试补全、README、演示脚本、简历文案 | 可上简历(见 docs/DEMO.md) |
 
 ## 9. 成功标准(Definition of Done)
 
