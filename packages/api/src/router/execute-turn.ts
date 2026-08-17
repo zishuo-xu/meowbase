@@ -291,31 +291,8 @@ export async function executeTurn(input: {
   const pending = thread.pendingHop;
   if (pending) {
     if (shouldResumePending(content, pending.to, catalog)) {
-      turnLog('pending resume', { thread: threadId, to: pending.to });
-      await context.stores.threads.setPendingHop(threadId, null);
-      const lastResult = await runSegment(
-        context,
-        thread,
-        { agentId: pending.to, text: pending.goal },
-        refs,
-        new Set<AgentId>(),
-        writeQueue,
-        catalog,
-        team,
-        maxDepth,
-        pending,
-      );
-      return settleTurn({
-        threadId,
-        context,
-        thread,
-        learn,
-        lastResult,
-        writeQueue,
-        catalog,
-        team,
-        refs,
-      });
+      const followed = await resumePendingTurn({ threadId, context, learn, refs });
+      if (followed) return followed;
     }
     await context.stores.threads.setPendingHop(threadId, null);
     if (userEscalates(content)) {
@@ -391,6 +368,88 @@ export async function executeTurn(input: {
   });
 }
 
+/** 不追加用户消息,取出 pending 跑下一跳。没有 pending 则 null。 */
+export async function resumePendingTurn(input: {
+  threadId: string;
+  context: TurnContext;
+  learn?: ReturnType<typeof parseLearnCommand>;
+  refs?: EvidenceEntry[];
+}): Promise<Message | null> {
+  const { threadId, context } = input;
+  const thread = await context.stores.threads.get(threadId);
+  if (!thread?.pendingHop) return null;
+  thread.workdir = resolve(thread.workdir);
+  const pending = thread.pendingHop;
+  const roster = await loadRoster(context);
+  await context.stores.threads.setPendingHop(threadId, null);
+  turnLog('pending follow', { thread: threadId, to: pending.to });
+  const lastResult = await runSegment(
+    context,
+    thread,
+    { agentId: pending.to, text: pending.goal },
+    input.refs ?? [],
+    new Set<AgentId>(),
+    createWriteQueue(),
+    roster.catalog,
+    roster.team,
+    roster.maxDepth,
+    pending,
+  );
+  return settleTurn({
+    threadId,
+    context,
+    thread,
+    learn: input.learn,
+    lastResult,
+    writeQueue: createWriteQueue(),
+    catalog: roster.catalog,
+    team: roster.team,
+    refs: input.refs ?? [],
+  });
+}
+
+/** 平台自己把 pending 跟完,直到没下一跳、升级、或链深用尽。 */
+export async function followPendingChain(input: {
+  threadId: string;
+  context: TurnContext;
+}): Promise<void> {
+  const max = input.context.a2aMaxDepth ?? MAX_A2A_DEPTH;
+  for (let i = 0; i < max; i++) {
+    if (input.context.signal?.aborted) return;
+    const ran = await resumePendingTurn(input);
+    if (!ran) return;
+  }
+}
+
+async function loadRoster(context: TurnContext): Promise<{
+  catalog: MentionCatalog;
+  team: TeamMember[];
+  maxDepth: number;
+}> {
+  const profiles = await context.stores.profiles.list();
+  const members =
+    context.agents?.map((a) => ({
+      agentId: a.id,
+      name: a.name,
+      aliases: a.aliases,
+    })) ?? profiles.map((p) => ({ agentId: p.agentId, name: p.name }));
+  const catalog = buildMentionCatalog(members);
+  const team: TeamMember[] =
+    context.agents && context.agents.length > 0
+      ? context.agents.map((a) => ({
+          agentId: a.id,
+          name: a.name,
+          role: a.role,
+          handoffTo: a.handoffTo,
+          handoff: a.handoff,
+          doneWhen: a.doneWhen,
+        }))
+      : profiles.length > 0
+        ? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }))
+        : [...DEFAULT_ROSTER];
+  return { catalog, team, maxDepth: context.a2aMaxDepth ?? MAX_A2A_DEPTH };
+}
+
 function userEscalates(content: string): boolean {
   for (const line of content.split('\n')) {
     const match = line.match(/^\s*@(\S+)/);
@@ -403,7 +462,7 @@ async function settleTurn(input: {
   threadId: string;
   context: TurnContext;
   thread: ThreadRuntime;
-  learn: ReturnType<typeof parseLearnCommand>;
+  learn?: ReturnType<typeof parseLearnCommand>;
   lastResult: SegmentRunResult;
   writeQueue: WriteQueue;
   catalog: MentionCatalog;

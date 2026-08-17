@@ -187,7 +187,7 @@ export function formatA2ARelayNote(input: {
     files.length > 0 ? `改动文件: ${files.join(', ')}` : undefined,
     verified ? '验证: 有本轮命令和结果' : '验证: 未附带,下一棒需自跑',
     input.task ? `任务: ${clipBody(input.task, 80)}` : undefined,
-    '下一棒待你开口',
+    '下一棒平台接着跑',
   ]
     .filter((line): line is string => line != null)
     .join('\n');

@@ -3,7 +3,7 @@ import { createMemoryStores } from '../src/stores/factories.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
-import { executeTurn, MAX_REVIEW_FIX_ROUNDS } from '../src/router/execute-turn.js';
+import { executeTurn, followPendingChain, MAX_REVIEW_FIX_ROUNDS } from '../src/router/execute-turn.js';
 import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1088,7 +1088,7 @@ describe('executeTurn 多角色协作', () => {
     expect(calls).toEqual(['claude']);
     expect((await stores.threads.get(thread.id))?.pendingHop?.to).toBe('opencode');
     const messages = await stores.messages.list(thread.id);
-    expect(messages.some((m) => m.content.includes('下一棒待你开口'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('下一棒平台接着跑'))).toBe(true);
 
     const second = await executeTurn({
       threadId: thread.id, content: '继续', context: { stores, registry },
@@ -1099,6 +1099,39 @@ describe('executeTurn 多角色协作', () => {
     expect(opencodePrompts[0]).toContain('代码写完了');
     expect(opencodePrompts[0]).toContain('请审查这段代码');
     expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+  });
+
+  it('交棒后平台自己续跑,不必再发继续', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return {
+            sessionId: 's1',
+            content: '写完了。\n@opencode 请审查',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls.push('opencode');
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const ctx = { stores, registry };
+    await executeTurn({ threadId: thread.id, content: '@claude 写代码', context: ctx });
+    expect(calls).toEqual(['claude']);
+    await followPendingChain({ threadId: thread.id, context: ctx });
+    expect(calls).toEqual(['claude', 'opencode']);
+    const users = (await stores.messages.list(thread.id)).filter((m) => m.role === 'user');
+    expect(users).toHaveLength(1);
   });
 
   it('多 @ 同题并行:每个目标收到同一消息', async () => {

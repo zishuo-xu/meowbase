@@ -7,7 +7,7 @@
 
 ## 门（各一句）
 
-- **功能**：墨墨行首 `@闪闪` 后，人立刻看到球在闪闪；闪闪稍后才跑
+- **功能**：墨墨行首 `@闪闪` 后，人立刻看到球在闪闪；闪闪由平台接着跑（见 [auto-follow-pending.md](auto-follow-pending.md)）
 - **价值**：人不用盯着一条消息跑完整串
 - **愿景**：仍是邮差，球权可见
 - **落点**：`executeTurn` 写/读一条 pending hop。不新开路由器
@@ -20,8 +20,8 @@
 
 1. 当前跳解析到行首 `@下一只` → 把已有交接包存成 pending，本轮返回。
 2. 顶栏持球者 = pending 的目标（`@人` 仍立即停，不进 pending）。
-3. 人再发消息或点继续 → 仍进 `executeTurn`，取出 pending 当这一跳。
-4. 验收：交棒后本轮不再调用下一只 `runTurn`；再触发时闪闪吃的还是那份包。
+3. 下一跳由 [auto-follow-pending.md](auto-follow-pending.md) 平台自己跑；人发「继续」仍可手动续。
+4. 验收：交棒后本轮 `executeTurn` 不再调用下一只；`followPendingChain` 才跑，吃的还是那份包。
 
 先写这条失败测试，再改存储端口 + `executeTurn` 收尾/开头。
 

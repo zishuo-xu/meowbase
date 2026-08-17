@@ -33,7 +33,7 @@ import {
   resolvePresetBin,
   syncAgentsWithCatalog,
 } from '../config.js';
-import { executeTurn } from '../router/execute-turn.js';
+import { executeTurn, followPendingChain, type TurnContext } from '../router/execute-turn.js';
 import { gitInit } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
 
@@ -344,33 +344,38 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     }
     const ac = new AbortController();
     runningTurns.set(threadId, ac);
+    const context: TurnContext = {
+      stores: deps.stores,
+      registry: deps.registry,
+      a2aMaxDepth: live.a2aMaxDepth,
+      agents: live.agents.length > 0 ? live.agents : deps.agents,
+      signal: ac.signal,
+      onIncrement: (tid, messageId, delta, agentId) => {
+        emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
+      },
+      onActivity: (tid, messageId, activity, agentId) => {
+        emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
+      },
+      onStart: (tid, messageId, agentId) => {
+        emitter.emit(`start:${tid}`, { messageId, agentId });
+      },
+      onThinking: (tid, messageId, delta, agentId) => {
+        emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
+      },
+    };
     try {
       const message = await executeTurn({
         threadId,
         content,
-        context: {
-          stores: deps.stores,
-          registry: deps.registry,
-          a2aMaxDepth: live.a2aMaxDepth,
-          agents: live.agents.length > 0 ? live.agents : deps.agents,
-          signal: ac.signal,
-          onIncrement: (tid, messageId, delta, agentId) => {
-            emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
-          },
-          onActivity: (tid, messageId, activity, agentId) => {
-            emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
-          },
-          onStart: (tid, messageId, agentId) => {
-            emitter.emit(`start:${tid}`, { messageId, agentId });
-          },
-          onThinking: (tid, messageId, delta, agentId) => {
-            emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
-          },
-        },
+        context,
+      });
+      void followPendingChain({ threadId, context }).finally(() => {
+        if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
       });
       return reply.code(200).send(message);
-    } finally {
+    } catch (err) {
       if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
+      throw err;
     }
   });
 
