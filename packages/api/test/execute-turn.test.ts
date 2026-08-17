@@ -890,6 +890,38 @@ describe('executeTurn 审批流', () => {
     expect(card?.status).toBe('reviewing');
   });
 
+  it('有 pending 时本轮不跑自动审查', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    let geminiCalls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '写好了。\n@gemini 请审查这份代码\n重点看边界。'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          geminiCalls += 1;
+          return { sessionId: 's-g', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+    expect(geminiCalls).toBe(0);
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
+    expect((await stores.messages.list(thread.id)).some((m) => m.content.includes('🤝 接力:'))).toBe(true);
+
+    await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
+    });
+    expect(geminiCalls).toBe(1);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewerAgentId).toBe('gemini');
+    expect(card?.reviewComment).toContain('通过');
+  });
+
   it('A2A 已审过则不再拉第三只猫', async () => {
     const stores = createMemoryStores([reviewSkill]);
     let opencodeCalls = 0;
@@ -914,6 +946,9 @@ describe('executeTurn 审批流', () => {
 
     await executeTurn({
       threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+    await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
     });
 
     expect(opencodeCalls).toBe(0);
@@ -968,6 +1003,10 @@ describe('executeTurn 审批流', () => {
 
     await executeTurn({
       threadId: thread.id, content: '写个文件', context: { stores, registry },
+    });
+    expect(geminiCalls).toBe(0);
+    await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
     });
 
     expect(opencodeCalls).toBe(0);

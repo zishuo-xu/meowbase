@@ -29,7 +29,7 @@
 
 - 跨线程邮箱、猫私聊
 - MCP `targetCats`、`hold_ball`
-- 自动审查怎么改排队（有 diff 仍按现审批，另开篇再拆）
+- 自动审查排队：已拆到 [defer-review-while-pending.md](defer-review-while-pending.md)
 
 ## 入口
 

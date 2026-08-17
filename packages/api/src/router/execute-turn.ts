@@ -428,7 +428,8 @@ async function settleTurn(input: {
     });
   }
 
-  if (lastOutput.status === 'completed') {
+  const waiting = (await context.stores.threads.get(threadId))?.pendingHop;
+  if (lastOutput.status === 'completed' && !waiting) {
     try {
       await gitAddAll(thread.workdir);
       const diff = await gitDiffHead(thread.workdir);

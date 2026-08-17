@@ -49,7 +49,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 ## 审批流(M4)
 
-- 写手 agent 改动文件后,平台自动生成审批卡片并请另一 agent 审查
+- 写手 agent 改动文件后,平台自动生成审批卡片并请另一 agent 审查。刚交棒、下一跳还没跑时本轮不建卡
 - 在卡片上点「批准落地」或「打回」(也可发 `#approve` / `#reject`)
 - `tsconfig.tsbuildinfo`、`.DS_Store` 等缓存文件不会出卡
 

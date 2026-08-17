@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在没有设计中；上一刀 [async-a2a.md](async-a2a.md) 已落地。
+`设计中` 同时最多一篇。现在没有设计中；上一刀 [defer-review-while-pending.md](defer-review-while-pending.md) 已落地。
 
 对照他们时看整条能力，落地只做最薄的一刀；同一特性以后再加厚，第一刀不要做成他们那么复杂。
 
@@ -23,3 +23,4 @@
 | [providers.md](providers.md) | 已落地 | 三家 CLI 一个 `runTurn` |
 | [skills.md](skills.md) | 已落地 | 触发词当轮注入 |
 | [async-a2a.md](async-a2a.md) | 已落地 | 交棒后本轮可先结束 |
+| [defer-review-while-pending.md](defer-review-while-pending.md) | 已落地 | 有 pending 时本轮不审 |
