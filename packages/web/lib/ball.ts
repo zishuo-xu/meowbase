@@ -38,7 +38,7 @@ export function describeBall(
     return { text: last.content.replace(/^⚠️\s*/, ''), tone: 'ground' };
   }
   if (last?.role === 'system' && last.content.includes('接力:')) {
-    const to = last.content.split('→').pop()?.trim();
+    const to = relayTargetName(last.content);
     return { text: to ? `球在${to}手上` : '接力中', tone: 'cat' };
   }
   if (last?.role === 'system' && isPendingApprovalNote(last.content)) {
@@ -75,6 +75,13 @@ export function isPendingApprovalNote(text: string): boolean {
 
 export function formatPickupCommand(agentName: string): string {
   return `@${agentName.replace(/^@/, '').trim()} 接着做`;
+}
+
+/** 只读接力条第一行的「→ 下一棒」,避免交接包正文糊进时间线。 */
+function relayTargetName(content: string): string | undefined {
+  const headline = content.split('\n')[0] ?? '';
+  if (!headline.includes('接力:')) return undefined;
+  return headline.split('→').pop()?.trim() || undefined;
 }
 
 export type RelayHopStatus = 'done' | 'active' | 'failed' | 'dropped';
@@ -115,7 +122,7 @@ export function describeRelayTimeline(
       continue;
     }
     if (message.role === 'system' && message.content.includes('接力:')) {
-      const to = message.content.split('→').pop()?.trim();
+      const to = relayTargetName(message.content);
       if (to) touch(to, 'active');
       continue;
     }

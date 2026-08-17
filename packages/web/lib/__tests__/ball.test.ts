@@ -48,6 +48,28 @@ describe('describeBall', () => {
     ).toBe('球在闪闪手上');
   });
 
+  it('多行交接包只读第一行的下一棒,不把摘要糊进名字', () => {
+    const packet =
+      '🤝 接力:墨墨 → 闪闪\n用户目标: 写 add.ts\n验证: 未附带,下一棒需自跑\n任务: 请审查';
+    expect(describeBall([{ role: 'system', content: packet }], false, nameOf).text).toBe(
+      '球在闪闪手上',
+    );
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          { role: 'system', content: packet },
+          { role: 'assistant', agentId: 'gemini', content: '通过', status: 'completed' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual([
+      { name: '墨墨', agentId: 'claude', status: 'done' },
+      { name: '闪闪', agentId: 'gemini', status: 'done' },
+    ]);
+  });
+
   it('空线程等人开口', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });
