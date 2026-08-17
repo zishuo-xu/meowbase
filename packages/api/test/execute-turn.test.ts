@@ -923,6 +923,48 @@ describe('executeTurn 多角色协作', () => {
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
     expect(calls).toEqual(['claude', 'gemini']);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
+  });
+
+  it('收了棒却没有结论也不交接,提示球还在地上', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return { sessionId: 's1', content: '写完了\n@gemini 请审查', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          return { sessionId: 's2', content: '看了一下还行', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude 写 add.ts',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    const messages = await stores.messages.list(thread.id);
+    const note = messages.find((m) => m.role === 'system' && m.content.includes('球还在地上'));
+    expect(note?.content).toContain('闪闪');
+  });
+
+  it('简单问答不提示球还在地上', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '我是墨墨')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '你是谁',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
   });
 
   it('A2A 防环:已出场角色不再重复接力', async () => {
@@ -948,6 +990,9 @@ describe('executeTurn 多角色协作', () => {
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
     // claude → opencode → (claude 已出场,停止)
     expect(calls).toEqual(['claude', 'opencode']);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('想交给墨墨'))).toBe(true);
   });
 
   it('A2A 中文名接力:@团团 与 @opencode 等价', async () => {

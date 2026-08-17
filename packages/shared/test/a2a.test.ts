@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseA2AHandoff, findInlineA2AMentions, formatA2AHandoffPrompt } from '../src/a2a.js';
+import {
+  parseA2AHandoff,
+  findInlineA2AMentions,
+  formatA2AHandoffPrompt,
+  formatDroppedBallNote,
+} from '../src/a2a.js';
 
 describe('parseA2AHandoff', () => {
   it('行首 mention → 解析目标与任务', () => {
@@ -61,7 +66,78 @@ describe('formatA2AHandoffPrompt', () => {
   it('默认收棒不禁止交下一棒', () => {
     const prompt = formatA2AHandoffPrompt('墨墨', 'claude', '写完了', '请落地脚本');
     expect(prompt).toContain('交下一棒');
+    expect(prompt).toContain('接(能干就干)');
     expect(prompt).not.toContain('不要再 @ 任何人');
+  });
+});
+
+describe('formatDroppedBallNote', () => {
+  it('审查官写出通过或需修改不提示', () => {
+    expect(
+      formatDroppedBallNote({
+        stop: 'no-handoff',
+        lastContent: '## 结论\n通过',
+        speakerName: '闪闪',
+        role: '审查官',
+        wasRelay: true,
+      }),
+    ).toBeNull();
+    expect(
+      formatDroppedBallNote({
+        stop: 'reviewer-closeout',
+        lastContent: '## 结论\n需修改\n- 补测试',
+        speakerName: '闪闪',
+        role: '审查官',
+        wasRelay: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('简单问答不提示', () => {
+    expect(
+      formatDroppedBallNote({
+        stop: 'no-handoff',
+        lastContent: '我是墨墨',
+        speakerName: '墨墨',
+        role: '主架构师',
+        wasRelay: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('收了棒却停住、或想交却交不了,要让人看见', () => {
+    expect(
+      formatDroppedBallNote({
+        stop: 'no-handoff',
+        lastContent: '看了一下还行',
+        speakerName: '闪闪',
+        role: '审查官',
+        wasRelay: true,
+      }),
+    ).toContain('球还在地上');
+    expect(
+      formatDroppedBallNote({
+        stop: 'blocked',
+        lastContent: '@墨墨 你再看看',
+        speakerName: '团团',
+        role: '执行者',
+        wasRelay: true,
+        blockedTargetName: '墨墨',
+      }),
+    ).toContain('想交给墨墨');
+  });
+
+  it('句中 @ 已有提示时不再叠一句', () => {
+    expect(
+      formatDroppedBallNote({
+        stop: 'no-handoff',
+        lastContent: '请 @闪闪 审查',
+        speakerName: '墨墨',
+        role: '主架构师',
+        wasRelay: true,
+        hadInlineHint: true,
+      }),
+    ).toBeNull();
   });
 });
 

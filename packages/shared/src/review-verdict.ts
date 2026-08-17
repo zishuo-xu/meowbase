@@ -11,6 +11,12 @@ function extractConclusion(text: string): string | null {
   return null;
 }
 
+/** 正文或结论段里是否明确写了通过/需修改。没有关键词时 parseReviewVerdict 会默认 pass,不能用来判断「已经收棒」。 */
+export function hasExplicitReviewVerdict(text: string): boolean {
+  const source = extractConclusion(text) ?? text;
+  return REVISE_RE.test(source) || PASS_RE.test(source);
+}
+
 /** 从审查官输出里读结论:需修改则打回写手,通过才交给人。结论段里两个词都有时,取先出现的。 */
 export function parseReviewVerdict(text: string): ReviewVerdict {
   const source = extractConclusion(text) ?? text;

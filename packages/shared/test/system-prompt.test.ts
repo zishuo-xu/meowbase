@@ -59,6 +59,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('要不要继续');
     expect(prompt).toContain('怎样算做完');
     expect(prompt).toContain('自检');
+    expect(prompt).toContain('接(能干就干)');
+    expect(prompt).toContain('退');
+    expect(prompt).toContain('升');
+    expect(prompt).toContain('出口检查');
   });
 
   it('交接条目来自 team.handoff,{to} 填对手名字', () => {

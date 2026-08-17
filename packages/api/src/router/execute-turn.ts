@@ -6,6 +6,7 @@ import {
   displayName,
   findInlineA2AMentions,
   formatA2AHandoffPrompt,
+  formatDroppedBallNote,
   matchSkills,
   parseA2AHandoff,
   parseApproveCommand,
@@ -16,6 +17,7 @@ import {
   parseRejectCommand,
   parseReviewVerdict,
   allowsAutoApprove,
+  type A2AStopKind,
   selectReviewer,
   stripMentions,
 } from '@meowbase/shared';
@@ -349,6 +351,7 @@ async function runSegment(
   let prevContent = '';
   let fromAgent: AgentId | undefined;
   let firstAgent: AgentId = segment.agentId;
+  let stop: { kind: A2AStopKind; blockedTarget?: AgentId; hadInlineHint?: boolean } | undefined;
 
   for (let hop = 0; hop < maxDepth; hop++) {
     if (!context.registry.get(currentAgent)) {
@@ -399,6 +402,7 @@ async function runSegment(
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
     if (handoff && isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)) {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'reviewer-closeout' });
+      stop = { kind: 'reviewer-closeout' };
       break;
     }
     if (!handoff) {
@@ -415,9 +419,13 @@ async function runSegment(
           }),
         );
       }
+      stop = { kind: 'no-handoff', hadInlineHint: inline.length > 0 };
       break;
     }
-    if (visited.has(handoff.target) || !context.registry.get(handoff.target)) break;
+    if (visited.has(handoff.target) || !context.registry.get(handoff.target)) {
+      stop = { kind: 'blocked', blockedTarget: handoff.target };
+      break;
+    }
     if (hop + 1 >= maxDepth) {
       await writeQueue(() =>
         context.stores.messages.append({
@@ -449,6 +457,30 @@ async function runSegment(
   }
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');
+  if (lastOutput.status === 'completed' && stop) {
+    const note = formatDroppedBallNote({
+      stop: stop.kind,
+      lastContent: prevContent,
+      speakerName: displayName(currentAgent, catalog),
+      role: team.find((m) => m.agentId === currentAgent)?.role,
+      wasRelay: Boolean(fromAgent),
+      hadInlineHint: stop.hadInlineHint,
+      blockedTargetName: stop.blockedTarget
+        ? displayName(stop.blockedTarget, catalog)
+        : undefined,
+    });
+    if (note) {
+      turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'dropped-ball' });
+      await writeQueue(() =>
+        context.stores.messages.append({
+          threadId: thread.id,
+          role: 'system',
+          content: note,
+          status: 'completed',
+        }),
+      );
+    }
+  }
   return { lastAssistant, lastOutput, visited, firstAgent };
 }
 

@@ -5,6 +5,7 @@ import {
   type MentionCatalog,
   resolveAlias,
 } from './catalog.js';
+import { hasExplicitReviewVerdict } from './review-verdict.js';
 
 export interface A2AHandoff {
   target: AgentId;
@@ -103,7 +104,7 @@ export function formatA2AHandoffPrompt(
   const closeout =
     extras.closeout === 'reviewer'
       ? '结论必须单独写明「通过」或「需修改」。写完结论即停:不要问人要不要继续,不要再 @ 任何人。需修改由平台打回写手。'
-      : '做完按交接条目交下一棒。不要问人要不要继续。';
+      : '做完按交接条目交下一棒。接(能干就干)/退(行首 @ 对的那只)/升(要人拍板就停)。不要问人要不要继续。';
   return [
     `【A2A 交接包】`,
     `来自: ${fromName} (@${fromId})`,
@@ -119,4 +120,31 @@ export function formatA2AHandoffPrompt(
   ]
     .filter((line): line is string => line != null)
     .join('\n');
+}
+
+export type A2AStopKind = 'no-handoff' | 'reviewer-closeout' | 'blocked';
+
+export interface DroppedBallInput {
+  stop: A2AStopKind;
+  lastContent: string;
+  speakerName: string;
+  role?: string;
+  wasRelay: boolean;
+  hadInlineHint?: boolean;
+  blockedTargetName?: string;
+}
+
+/** 链停了但球没落地时给人看的一句;问答收尾和审查官明确结论不提示。 */
+export function formatDroppedBallNote(input: DroppedBallInput): string | null {
+  const reviewer = Boolean(input.role?.includes('审查'));
+  if (reviewer && hasExplicitReviewVerdict(input.lastContent)) return null;
+  if (input.hadInlineHint) return null;
+  if (input.stop === 'blocked') {
+    const to = input.blockedTargetName ?? '下一棒';
+    return `⚠️ 球还在地上:${input.speakerName}想交给${to},但这只猫本轮已经出场或不可用,接力已停。`;
+  }
+  if (input.stop === 'reviewer-closeout' || input.wasRelay) {
+    return `⚠️ 球还在地上:${input.speakerName}停棒了,但没有行首交给下一棒。需要对方动手时,另起一行 @名字 再跟任务。`;
+  }
+  return null;
 }
