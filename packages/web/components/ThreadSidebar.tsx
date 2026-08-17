@@ -8,12 +8,14 @@ import { CatAvatar } from './CatAvatar';
 function ThreadRow({
   thread,
   active,
+  pending,
   agents,
   onSelect,
   onDelete,
 }: {
   thread: ThreadDto;
   active: boolean;
+  pending?: boolean;
   agents?: AgentConfigDto[];
   onSelect: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -31,7 +33,14 @@ function ThreadRow({
         onClick={() => onSelect(thread.id)}
         className="min-w-0 flex-1 px-3 py-2.5 text-left"
       >
-        <div className="truncate text-sm font-medium">{thread.title}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="min-w-0 truncate text-sm font-medium">{thread.title}</div>
+          {pending ? (
+            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+              待确认
+            </span>
+          ) : null}
+        </div>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
           <CatAvatar
             agentId={thread.primaryAgentId}
@@ -73,6 +82,7 @@ export function ThreadSidebar({
   onCreate,
   onDelete,
   onOpenTeam,
+  pendingIds,
 }: {
   threads: ThreadDto[];
   activeId: string | null;
@@ -82,6 +92,7 @@ export function ThreadSidebar({
   onCreate: (title: string, primaryAgentId: string) => void;
   onDelete?: (id: string) => void;
   onOpenTeam?: (agentId?: string) => void;
+  pendingIds?: readonly string[];
 }) {
   const roster =
     agents && agents.length > 0
@@ -98,6 +109,7 @@ export function ThreadSidebar({
   const ordered = sortThreadsByCreated(threads);
   const visible = ordered.filter((t) => !isNoiseThreadTitle(t.title));
   const noise = ordered.filter((t) => isNoiseThreadTitle(t.title));
+  const pending = new Set(pendingIds ?? []);
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)]/70 backdrop-blur-sm">
@@ -124,6 +136,7 @@ export function ThreadSidebar({
             key={thread.id}
             thread={thread}
             active={thread.id === activeId}
+            pending={pending.has(thread.id)}
             agents={agents}
             onSelect={onSelect}
             onDelete={onDelete}
@@ -144,6 +157,7 @@ export function ThreadSidebar({
                   key={thread.id}
                   thread={thread}
                   active={thread.id === activeId}
+                  pending={pending.has(thread.id)}
                   agents={agents}
                   onSelect={onSelect}
                   onDelete={onDelete}

@@ -43,7 +43,7 @@ export function MessageBubble({
 
   if (parsed.kind === 'approval') {
     return (
-      <div className="flex justify-start px-4 py-2">
+      <div id={`approval-${parsed.approvalId ?? ''}`} className="flex justify-start px-4 py-2">
         <ApprovalCardBlock
           approvalId={parsed.approvalId ?? ''}
           stat={parsed.stat ?? ''}

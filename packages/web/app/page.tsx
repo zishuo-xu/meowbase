@@ -10,6 +10,7 @@ import { EvidenceRail } from '@/components/EvidenceRail';
 import { CatAvatar } from '@/components/CatAvatar';
 import { describeBall, describeRelayTimeline, formatPickupCommand } from '@/lib/ball';
 import { defaultSessionTitle, isPlaceholderTitle, titleFromUserMessage } from '@/lib/threads';
+import { pendingThreadIds } from '@/lib/approvals';
 import { RelayTimeline } from '@/components/RelayTimeline';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
@@ -34,12 +35,15 @@ export default function Home() {
   const [evidence, setEvidence] = useState<EvidenceDto[]>([]);
   const [insert, setInsert] = useState<{ id: number; text: string } | null>(null);
   const [focusSeq, setFocusSeq] = useState(0);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
 
   const refreshThreads = useCallback(async () => {
     try {
-      setThreads(await api.listThreads());
+      const [list, cards] = await Promise.all([api.listThreads(), api.listApprovals()]);
+      setThreads(list);
+      setPendingIds(pendingThreadIds(cards));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载会话失败');
@@ -191,6 +195,7 @@ export default function Home() {
         onCreate={(title, agent) => void createThread(title, agent)}
         onDelete={(id) => void deleteThread(id)}
         onOpenTeam={openHub}
+        pendingIds={pendingIds}
       />
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)]/75 px-5 py-3 backdrop-blur-sm">

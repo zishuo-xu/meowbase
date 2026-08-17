@@ -72,8 +72,18 @@ export function ChatArea({
     };
   }, [threadId, messages]);
   useEffect(() => {
+    if (!sending) {
+      const pending = approvals.find(
+        (card) => card.status === 'draft' || card.status === 'reviewing',
+      );
+      const el = pending ? document.getElementById(`approval-${pending.id}`) : null;
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+    }
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [streamed]);
+  }, [streamed, approvals, sending]);
   useEffect(() => {
     onViewMessages?.(streamed);
   }, [streamed, onViewMessages]);

@@ -49,4 +49,19 @@ describe('ThreadSidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除 redis-t' }));
     expect(onDelete).toHaveBeenCalledWith('b');
   });
+
+  it('有待批准卡片的会话标待确认', () => {
+    render(
+      <ThreadSidebar
+        threads={[thread('a', '在沙箱写 add.ts'), thread('b', '你是谁')]}
+        activeId="b"
+        pendingIds={['a']}
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('待确认')).toBeTruthy();
+    expect(screen.getByText('在沙箱写 add.ts').closest('button')?.textContent).toContain('待确认');
+    expect(screen.getByText('你是谁').closest('button')?.textContent).not.toContain('待确认');
+  });
 });

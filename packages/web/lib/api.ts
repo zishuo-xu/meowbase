@@ -154,8 +154,10 @@ export const api = {
     }),
   listMessages: (threadId: string) =>
     request<MessageDto[]>(`/api/threads/${threadId}/messages`),
-  listApprovals: (threadId: string) =>
-    request<ApprovalDto[]>(`/api/approvals?threadId=${threadId}`),
+  listApprovals: (threadId?: string) =>
+    request<ApprovalDto[]>(
+      threadId ? `/api/approvals?threadId=${threadId}` : '/api/approvals',
+    ),
   listEvidence: (threadId: string) =>
     request<EvidenceDto[]>(`/api/evidence?threadId=${threadId}`),
   deleteThread: (threadId: string) =>
