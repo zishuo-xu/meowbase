@@ -14,7 +14,7 @@
 
 一个运行在 agent CLI 之上的平台层,让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作:
 
-1. **线程消息 + @mention 多 Agent 路由** —— 每个线程独立上下文,`@claude`/`@gemini`/`@opencode` 把任务路由给对应 agent
+1. **线程消息 + @mention 多 Agent 路由** —— 每个线程独立上下文;人和猫都只认行首 `@名字`(中文名与 id 等价),句中 `@` 不路由
 2. **Provider 适配层** —— 统一接口驱动三个 CLI,stream-json 流式输出,跨模型归一化(token、耗时、会话 ID)
 3. **持久身份 + 共享记忆** —— agent 有名字/性格/角色,跨会话保持;团队共享证据库(事实/教训/决策)
 4. **Skills 按需加载** —— 技能清单(manifest),需要时才注入技能 prompt,不常驻上下文
@@ -79,7 +79,7 @@
 
 ### 4.2 路由与线程(`packages/api/src/router/`)
 
-- 消息入线程时解析 `@mention` → 路由到目标 agent 的独立 CLI 会话
+- 消息入线程时只解析行首 `@mention` → 路由到目标 agent 的独立 CLI 会话;各占一行的多个行首 `@` 为同题并行
 - 线程隔离:每个线程有独立 `threadId`、`sessionIds`(按 agent),上下文互不泄漏
 - 无 mention 时默认路由给线程创建时指定的"主 agent"(可配置)
 - **线程工作目录**:每个线程有独立目录 `work/<threadId>/`,CLI 在该目录内执行(借鉴 clowder 的 worktree 隔离思想);"diff 落地"即在此目录内应用改动

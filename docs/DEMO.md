@@ -5,9 +5,14 @@
 ## 你点哪里,期望看见什么
 
 1. 打开 http://localhost:3300,点 **+ 新会话**。
-2. 只说目标。要点某只猫就另起一行、行首写 `@墨墨`。句中提名字不会路由。例如:
+2. 只说目标,或另起一行点名。人和猫都只认**行首 `@`**。例如:
 
-   > 在沙箱写 add.ts,导出 add(a,b),写完自检。
+   ```
+   在沙箱写 add.ts,导出 add(a,b),写完自检。
+   @墨墨
+   ```
+
+   不写 `@` 则走线程主猫(默认墨墨)。句中提「闪闪」或「不要 `@闪闪`」都不会叫它。同题并行则 `@墨墨` 和 `@团团` 各占一行。
 
 3. 期望:
    - 侧栏标题变成任务摘要(不是时间戳)
@@ -30,7 +35,7 @@
 2. 平台管路由、线程、身份、记忆、技能、审批、审计。人拍板,猫推理。
 3. 心脏是一条 `executeTurn`:系统命令 → 多 @ 并行 → 同步 A2A → 沉淀 → diff 建卡拉审查。
 4. 交接对象在名册 `handoffTo`,不写 `if (claude)`。
-5. 行首 `@` 才交棒,句中 `@` 不当球权;`@人` 升级给你。
+5. 人和猫都是行首 `@` 才点名/交棒,句中 `@` 不当球权;`@人` 升级给你。
 6. 存储只依赖端口,Redis 可换。适配器统一 `runTurn`。
 7. 和 clowder 对齐的是语义:行首 mention、升级给人、交接包给人看。
 8. 不搬他们的邮箱、SOP、MCP、队列。我们是一场接力,不是猫窝操作系统。
@@ -56,7 +61,7 @@ THREAD=$(curl -sS -X POST localhost:3200/api/threads \
 
 curl -sS -X POST "localhost:3200/api/threads/$THREAD/messages" \
   -H 'content-type: application/json' \
-  -d '{"content":"在沙箱写 add.ts,导出 add(a,b),写完自检。"}'
+  -d '{"content":"在沙箱写 add.ts,导出 add(a,b),写完自检。\n@墨墨"}'
 # 等返回后看消息里的 ap_xxxxxxxx,再:
 # curl -sS -X POST "localhost:3200/api/threads/$THREAD/messages" \
 #   -H 'content-type: application/json' \
