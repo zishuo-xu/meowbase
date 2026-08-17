@@ -60,7 +60,10 @@ export { hasVerificationEvidence, hasVerificationLimit } from './verification.js
 export type { A2AHandoff, A2AHandoffExtras, A2AStopKind, DroppedBallInput } from './a2a.js';
 export {
   findInlineA2AMentions,
+  formatAbortedBallNote,
   formatA2AHandoffPrompt,
   formatDroppedBallNote,
+  formatPickupCommand,
+  isDroppedBallNote,
   parseA2AHandoff,
 } from './a2a.js';

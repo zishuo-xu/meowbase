@@ -23,6 +23,33 @@ describe('MessageBubble', () => {
     expect(screen.getByText('墨墨')).toBeTruthy();
   });
 
+  it('球还在地上可点交给某只猫', () => {
+    const onPass = vi.fn();
+    const onSpeak = vi.fn();
+    render(
+      <MessageBubble
+        onPassBall={onPass}
+        onSpeak={onSpeak}
+        agents={[
+          { id: 'claude', name: '墨墨' },
+          { id: 'gemini', name: '闪闪' },
+        ]}
+        message={{
+          id: 'm-ball',
+          threadId: 't',
+          role: 'system',
+          content: '⚠️ 球还在地上:闪闪停棒了',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '交给闪闪' }));
+    expect(onPass).toHaveBeenCalledWith('闪闪');
+    fireEvent.click(screen.getByRole('button', { name: '我来说' }));
+    expect(onSpeak).toHaveBeenCalled();
+  });
+
   it('气泡里的 #ev_ 可点引用', () => {
     const onCite = vi.fn();
     render(
@@ -261,7 +288,7 @@ describe('ApprovalCardBlock', () => {
     );
     expect(screen.getByText('已确认')).toBeTruthy();
     expect(screen.getByText('改动已确认')).toBeTruthy();
-    expect(screen.getByText('已记进这个线程的基线。')).toBeTruthy();
+    expect(screen.getByText('已记进这个会话的基线。')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
     expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
   });

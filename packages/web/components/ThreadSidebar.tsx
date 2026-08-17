@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { AgentConfigDto, ThreadDto } from '@/lib/api';
 import { AGENT_ORDER, agentName, getPersona } from '@/lib/persona';
-import { isNoiseThreadTitle, sortThreadsByCreated } from '@/lib/threads';
+import { defaultSessionTitle, isNoiseThreadTitle, sortThreadsByCreated } from '@/lib/threads';
 import { CatAvatar } from './CatAvatar';
 
 function ThreadRow({
@@ -112,10 +112,10 @@ export function ThreadSidebar({
           </div>
         </div>
         <button
-          onClick={() => onCreate(`新线程 ${threads.length + 1}`, primary)}
+          onClick={() => onCreate(defaultSessionTitle(), primary)}
           className="w-full rounded-2xl bg-[var(--accent)] px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)]"
         >
-          + 新线程
+          + 新会话
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-2">
@@ -153,7 +153,7 @@ export function ThreadSidebar({
         )}
         {visible.length === 0 && noise.length === 0 && (
           <div className="px-3 py-10 text-center text-xs leading-relaxed text-[var(--ink-soft)]">
-            还没有线程
+            还没有会话
             <br />
             点上面新建,和猫们开工
           </div>

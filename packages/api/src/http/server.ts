@@ -135,7 +135,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.post('/api/threads', async (request, reply) => {
     const body = request.body as { title?: string; primaryAgentId?: AgentId } | null;
     const thread = await deps.stores.threads.create({
-      title: body?.title?.trim() || '新线程',
+      title: body?.title?.trim() || '新会话',
       primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
       workdirBase: deps.workdirBase,
     });
@@ -325,6 +325,16 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return deps.stores.messages.list(threadId);
   });
 
+  const runningTurns = new Map<string, AbortController>();
+
+  app.post('/api/threads/:threadId/cancel', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const running = runningTurns.get(threadId);
+    if (!running) return reply.code(409).send({ error: '当前没有进行中的一轮' });
+    running.abort();
+    return { ok: true };
+  });
+
   app.post('/api/threads/:threadId/messages', async (request, reply) => {
     const { threadId } = request.params as { threadId: string };
     const body = request.body as { content?: string } | null;
@@ -332,29 +342,36 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (!content) {
       return reply.code(400).send({ error: 'content 不能为空' });
     }
-    const message = await executeTurn({
-      threadId,
-      content,
-      context: {
-        stores: deps.stores,
-        registry: deps.registry,
-        a2aMaxDepth: live.a2aMaxDepth,
-        agents: live.agents.length > 0 ? live.agents : deps.agents,
-        onIncrement: (tid, messageId, delta, agentId) => {
-          emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
+    const ac = new AbortController();
+    runningTurns.set(threadId, ac);
+    try {
+      const message = await executeTurn({
+        threadId,
+        content,
+        context: {
+          stores: deps.stores,
+          registry: deps.registry,
+          a2aMaxDepth: live.a2aMaxDepth,
+          agents: live.agents.length > 0 ? live.agents : deps.agents,
+          signal: ac.signal,
+          onIncrement: (tid, messageId, delta, agentId) => {
+            emitter.emit(`increment:${tid}`, { messageId, delta, agentId });
+          },
+          onActivity: (tid, messageId, activity, agentId) => {
+            emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
+          },
+          onStart: (tid, messageId, agentId) => {
+            emitter.emit(`start:${tid}`, { messageId, agentId });
+          },
+          onThinking: (tid, messageId, delta, agentId) => {
+            emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
+          },
         },
-        onActivity: (tid, messageId, activity, agentId) => {
-          emitter.emit(`activity:${tid}`, { messageId, activity, agentId });
-        },
-        onStart: (tid, messageId, agentId) => {
-          emitter.emit(`start:${tid}`, { messageId, agentId });
-        },
-        onThinking: (tid, messageId, delta, agentId) => {
-          emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
-        },
-      },
-    });
-    return reply.code(200).send(message);
+      });
+      return reply.code(200).send(message);
+    } finally {
+      if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
+    }
   });
 
   app.get('/api/ws', { websocket: true }, (socket: WebSocket, request) => {

@@ -13,6 +13,25 @@ import { DEFAULT_AGENTS } from '../src/config.js';
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-test-'));
 const FAKE_CLAUDE = join(import.meta.dirname, 'fixtures', 'fake-claude.mjs');
 
+const hangGemini: AgentService = {
+  agentId: 'gemini',
+  async runTurn(input) {
+    await new Promise<void>((resolve) => {
+      if (input.signal?.aborted) {
+        resolve();
+        return;
+      }
+      input.signal?.addEventListener('abort', () => resolve(), { once: true });
+    });
+    return {
+      sessionId: 'sess-hang',
+      content: '',
+      status: 'terminated',
+      error: '已中止',
+    };
+  },
+};
+
 const fakeClaude: AgentService = {
   agentId: 'claude',
   async runTurn(input) {
@@ -40,7 +59,7 @@ beforeAll(async () => {
   await ensureSeededProfiles(stores.profiles);
   server = await buildServer({
     stores,
-    registry: createAgentRegistry([fakeClaude]),
+    registry: createAgentRegistry([fakeClaude, hangGemini]),
     workdirBase,
     agents: DEFAULT_AGENTS,
     defaultAgentId: 'claude',
@@ -80,6 +99,36 @@ describe('HTTP 集成', () => {
     const listRes = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`);
     const messages = (await listRes.json()) as { role: string }[];
     expect(messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('POST /api/threads/:id/cancel 中止进行中的一轮', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '中止', primaryAgentId: 'claude' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+    const idle = await fetch(`${baseUrl}/api/threads/${thread.id}/cancel`, { method: 'POST' });
+    expect(idle.status).toBe(409);
+
+    const pending = fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '@gemini 挂住' }),
+    });
+    let cancelled = false;
+    for (let i = 0; i < 30; i++) {
+      const cancel = await fetch(`${baseUrl}/api/threads/${thread.id}/cancel`, { method: 'POST' });
+      if (cancel.status === 200) {
+        cancelled = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(cancelled).toBe(true);
+    const message = (await (await pending).json()) as { status: string; error?: string };
+    expect(message.status).toBe('terminated');
+    expect(message.error).toBe('已中止');
   });
 
   it('DELETE /api/threads/:id 删线程', async () => {

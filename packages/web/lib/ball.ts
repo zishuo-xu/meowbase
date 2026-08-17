@@ -53,3 +53,11 @@ export function describeBall(
   }
   return { text: '等人开口', tone: 'human' };
 }
+
+export function isDroppedBallNote(text: string): boolean {
+  return text.includes('球还在地上');
+}
+
+export function formatPickupCommand(agentName: string): string {
+  return `@${agentName.replace(/^@/, '').trim()} 接着做`;
+}

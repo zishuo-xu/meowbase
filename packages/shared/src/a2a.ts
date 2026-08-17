@@ -153,3 +153,17 @@ export function formatDroppedBallNote(input: DroppedBallInput): string | null {
   }
   return null;
 }
+
+export function isDroppedBallNote(text: string): boolean {
+  return text.includes('球还在地上');
+}
+
+export function formatAbortedBallNote(): string {
+  return '⚠️ 本轮已中止。球还在地上:点下面交给下一只,或自己说。';
+}
+
+/** 人捡球:发出去就会走现有 @ 路由。 */
+export function formatPickupCommand(agentName: string): string {
+  const name = agentName.replace(/^@/, '').trim();
+  return `@${name} 接着做`;
+}

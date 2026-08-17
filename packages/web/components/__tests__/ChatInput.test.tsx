@@ -28,6 +28,13 @@ describe('ChatInput', () => {
     expect((input as HTMLTextAreaElement).value).toBe('写个函数');
   });
 
+  it('sending 且有 onAbort 时显示中止', () => {
+    const onAbort = vi.fn();
+    render(<ChatInput sending onSend={vi.fn()} onAbort={onAbort} />);
+    fireEvent.click(screen.getByRole('button', { name: '中止' }));
+    expect(onAbort).toHaveBeenCalled();
+  });
+
   it('sending 时回车不提交', () => {
     const onSend = vi.fn();
     render(<ChatInput sending onSend={onSend} />);

@@ -9,6 +9,7 @@ export interface AgentTurnInput {
   onIncrement?: (delta: string) => void;
   onActivity?: (activity: ToolActivity) => void;
   onThinking?: (delta: string) => void;
+  signal?: AbortSignal;
 }
 
 export interface AgentTurnOutput {

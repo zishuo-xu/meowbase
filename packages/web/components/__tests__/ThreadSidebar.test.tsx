@@ -13,6 +13,24 @@ const thread = (id: string, title: string): ThreadDto => ({
 });
 
 describe('ThreadSidebar', () => {
+  it('新建按钮叫新会话,不叫新线程', () => {
+    const onCreate = vi.fn();
+    render(
+      <ThreadSidebar
+        threads={[]}
+        activeId={null}
+        onSelect={vi.fn()}
+        onCreate={onCreate}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '+ 新会话' })).toBeTruthy();
+    expect(screen.queryByText(/新线程/)).toBeNull();
+    expect(screen.getByText(/还没有会话/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(onCreate).toHaveBeenCalled();
+    expect(onCreate.mock.calls[0]?.[0]).not.toMatch(/线程/);
+  });
+
   it('默认藏起 redis 测试残留,可展开再删', () => {
     const onDelete = vi.fn();
     render(

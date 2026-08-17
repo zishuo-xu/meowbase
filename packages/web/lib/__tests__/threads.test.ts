@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { isNoiseThreadTitle, sortThreadsByCreated } from '../threads';
+import { defaultSessionTitle, isNoiseThreadTitle, sortThreadsByCreated } from '../threads';
 
 describe('isNoiseThreadTitle', () => {
   it('认出 redis 单测残留', () => {
     expect(isNoiseThreadTitle('redis-t')).toBe(true);
     expect(isNoiseThreadTitle('redis-m')).toBe(true);
     expect(isNoiseThreadTitle('验证球权')).toBe(false);
+  });
+});
+
+describe('defaultSessionTitle', () => {
+  it('用月日时间,不叫新线程', () => {
+    const title = defaultSessionTitle(new Date('2026-08-17T18:51:00+08:00'));
+    expect(title).toMatch(/8.*17/);
+    expect(title).not.toContain('线程');
   });
 });
 

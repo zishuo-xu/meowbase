@@ -3,7 +3,10 @@ import {
   parseA2AHandoff,
   findInlineA2AMentions,
   formatA2AHandoffPrompt,
+  formatAbortedBallNote,
   formatDroppedBallNote,
+  formatPickupCommand,
+  isDroppedBallNote,
 } from '../src/a2a.js';
 
 describe('parseA2AHandoff', () => {
@@ -157,5 +160,15 @@ describe('findInlineA2AMentions', () => {
   it('句中 @ 记为 inline,行首交接不算', () => {
     expect(findInlineA2AMentions('请 @团团 帮忙看看', 'claude')).toEqual(['opencode']);
     expect(findInlineA2AMentions('@团团 请审查这段代码', 'claude')).toEqual([]);
+  });
+});
+
+describe('捡球', () => {
+  it('认出球还在地上,拼出交接命令', () => {
+    expect(isDroppedBallNote('⚠️ 球还在地上:闪闪停棒了')).toBe(true);
+    expect(isDroppedBallNote(formatAbortedBallNote())).toBe(true);
+    expect(isDroppedBallNote('🤝 接力:墨墨 → 闪闪')).toBe(false);
+    expect(formatPickupCommand('闪闪')).toBe('@闪闪 接着做');
+    expect(formatPickupCommand('@墨墨')).toBe('@墨墨 接着做');
   });
 });

@@ -166,4 +166,6 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ content }),
     }),
+  cancelTurn: (threadId: string) =>
+    request<{ ok: boolean }>(`/api/threads/${threadId}/cancel`, { method: 'POST' }),
 };

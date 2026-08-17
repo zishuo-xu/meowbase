@@ -59,6 +59,18 @@ describe('api', () => {
       expect.stringContaining('/api/threads/t1'),
       expect.objectContaining({ method: 'DELETE' }),
     );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true }),
+      }),
+    );
+    await api.cancelTurn('t1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/threads/t1/cancel'),
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('非 2xx 抛错', async () => {

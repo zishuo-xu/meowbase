@@ -140,7 +140,7 @@ export function ApprovalCardBlock({
         </div>
       )}
       {status === 'applied' && (
-        <p className="text-xs text-[var(--accent-strong)]">已记进这个线程的基线。</p>
+        <p className="text-xs text-[var(--accent-strong)]">已记进这个会话的基线。</p>
       )}
       {status === 'rejected' && (
         <p className="text-xs text-red-700">没收下。文件还在沙箱里。</p>

@@ -6,6 +6,7 @@ import {
   displayName,
   findInlineA2AMentions,
   formatA2AHandoffPrompt,
+  formatAbortedBallNote,
   formatDroppedBallNote,
   matchSkills,
   parseA2AHandoff,
@@ -86,6 +87,7 @@ export interface TurnContext {
   ) => void;
   onStart?: (threadId: string, messageId: string, agentId?: AgentId) => void;
   onThinking?: (threadId: string, messageId: string, delta: string, agentId?: AgentId) => void;
+  signal?: AbortSignal;
 }
 
 interface SegmentRunResult {
@@ -412,7 +414,7 @@ async function runSegment(
     prevContent = hopResult.content;
 
     // A2A 接力:回复行首 @ 其他角色 → 交接;已出场/不可用/无任务则停
-    if (lastOutput.status !== 'completed') break;
+    if (context.signal?.aborted || lastOutput.status !== 'completed') break;
     const handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
     if (handoff && isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)) {
       turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'reviewer-closeout' });
@@ -471,7 +473,17 @@ async function runSegment(
   }
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');
-  if (lastOutput.status === 'completed' && stop) {
+  if (context.signal?.aborted || lastOutput.error === '已中止') {
+    turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'aborted' });
+    await writeQueue(() =>
+      context.stores.messages.append({
+        threadId: thread.id,
+        role: 'system',
+        content: formatAbortedBallNote(),
+        status: 'completed',
+      }),
+    );
+  } else if (lastOutput.status === 'completed' && stop) {
     const note = formatDroppedBallNote({
       stop: stop.kind,
       lastContent: prevContent,
@@ -543,6 +555,7 @@ async function runAgentTurn(
     systemPrompt,
     sessionId: thread.sessions[currentAgent],
     workdir: thread.workdir,
+    signal: context.signal,
     onIncrement: (delta) => {
       accumulated += delta;
       context.onIncrement?.(thread.id, assistantMessage.id, delta, currentAgent);

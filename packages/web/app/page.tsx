@@ -8,7 +8,8 @@ import { ChatInput } from '@/components/ChatInput';
 import { TeamHub } from '@/components/TeamHub';
 import { EvidenceRail } from '@/components/EvidenceRail';
 import { CatAvatar } from '@/components/CatAvatar';
-import { describeBall } from '@/lib/ball';
+import { describeBall, formatPickupCommand } from '@/lib/ball';
+import { defaultSessionTitle } from '@/lib/threads';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
   id,
@@ -30,6 +31,7 @@ export default function Home() {
   const [savingHub, setSavingHub] = useState(false);
   const [evidence, setEvidence] = useState<EvidenceDto[]>([]);
   const [insert, setInsert] = useState<{ id: number; text: string } | null>(null);
+  const [focusSeq, setFocusSeq] = useState(0);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
 
@@ -38,7 +40,7 @@ export default function Home() {
       setThreads(await api.listThreads());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载线程失败');
+      setError(err instanceof Error ? err.message : '加载会话失败');
     }
   }, []);
 
@@ -74,7 +76,7 @@ export default function Home() {
         await refreshThreads();
         await openThread(thread.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : '新建线程失败');
+        setError(err instanceof Error ? err.message : '新建会话失败');
       }
     },
     [openThread, refreshThreads],
@@ -123,9 +125,23 @@ export default function Home() {
     setInsert({ id: Date.now(), text: `#${id}` });
   }, []);
 
+  const passBall = useCallback(
+    (agentName: string) => {
+      void send(formatPickupCommand(agentName));
+    },
+    [send],
+  );
+
+  const abortTurn = useCallback(() => {
+    if (!activeId) return;
+    void api.cancelTurn(activeId).catch(() => {
+      /* 没有进行中的一轮时 409,忽略 */
+    });
+  }, [activeId]);
+
   const deleteThread = useCallback(
     async (id: string) => {
-      if (!window.confirm('删除这个线程？消息也会一起清掉。')) return;
+      if (!window.confirm('删除这个会话？消息也会一起清掉。')) return;
       try {
         await api.deleteThread(id);
         if (activeId === id) {
@@ -206,6 +222,8 @@ export default function Home() {
               onReject={(id, reason) => sendCommand(`#reject ${id} ${reason}`)}
               onConfirmEvidence={(id) => sendCommand(`#confirm ${id}`)}
               onCiteEvidence={citeEvidence}
+              onPassBall={passBall}
+              onSpeak={() => setFocusSeq((n) => n + 1)}
             />
             <EvidenceRail
               items={evidence}
@@ -217,6 +235,8 @@ export default function Home() {
               agents={agents}
               insert={insert}
               onInserted={() => setInsert(null)}
+              onAbort={abortTurn}
+              focusSeq={focusSeq}
               onSend={(c) => void send(c)}
             />
           </>
@@ -234,7 +254,7 @@ export default function Home() {
               ))}
             </div>
             <div>
-              <p className="text-base font-bold">选择或新建一个线程</p>
+              <p className="text-base font-bold">选择或新建一个会话</p>
               <p className="mt-1 max-w-sm text-sm leading-relaxed text-[var(--ink-soft)]">
                 不用点名哪只猫,不写 @ 会续上一只。说清楚要做什么,它们会自己交接。点头像可以改名字、模型和性格。
               </p>
@@ -242,7 +262,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() =>
-                void createThread('新线程 1', config?.defaultAgentId ?? 'claude')
+                void createThread(defaultSessionTitle(), config?.defaultAgentId ?? 'claude')
               }
               className="rounded-2xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[var(--accent-strong)]"
             >

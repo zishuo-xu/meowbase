@@ -97,6 +97,36 @@ describe('executeTurn', () => {
     expect(final.content).toBe('团团接着');
   });
 
+  it('中止本轮后停棒并提示球还在地上', async () => {
+    const stores = createMemoryStores();
+    const hang: AgentService = {
+      agentId: 'claude',
+      async runTurn(input) {
+        await new Promise<void>((resolve) => {
+          if (input.signal?.aborted) {
+            resolve();
+            return;
+          }
+          input.signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return { sessionId: 's', content: '', status: 'terminated', error: '已中止' };
+      },
+    };
+    const registry = createAgentRegistry([hang]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const ac = new AbortController();
+    const pending = executeTurn({
+      threadId: thread.id,
+      content: '先做这个',
+      context: { stores, registry, signal: ac.signal },
+    });
+    ac.abort();
+    const final = await pending;
+    expect(final.status).toBe('terminated');
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(true);
+  });
+
   it('流式增量累积并触发 onIncrement', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '一二三')]);

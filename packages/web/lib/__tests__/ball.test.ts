@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeBall } from '../ball';
+import { describeBall, formatPickupCommand, isDroppedBallNote } from '../ball';
 
 const nameOf = (id?: string) =>
   id === 'gemini' ? '闪闪' : id === 'opencode' ? '团团' : id === 'claude' ? '墨墨' : '猫';
@@ -50,5 +50,10 @@ describe('describeBall', () => {
 
   it('空线程等人开口', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
+  });
+
+  it('捡球命令走现有 @ 路由', () => {
+    expect(isDroppedBallNote('⚠️ 本轮已中止。球还在地上:点下面交给下一只')).toBe(true);
+    expect(formatPickupCommand('闪闪')).toBe('@闪闪 接着做');
   });
 });

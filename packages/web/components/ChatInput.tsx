@@ -21,12 +21,16 @@ export function ChatInput({
   agents,
   insert,
   onInserted,
+  onAbort,
+  focusSeq,
 }: {
   onSend: (content: string) => void;
   sending?: boolean;
   agents?: { id: string; name: string }[];
   insert?: { id: number; text: string } | null;
   onInserted?: () => void;
+  onAbort?: () => void;
+  focusSeq?: number;
 }) {
   const [value, setValue] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -48,6 +52,11 @@ export function ChatInput({
     });
     onInserted?.();
   }, [insert?.id, insert?.text, onInserted]);
+
+  useEffect(() => {
+    if (focusSeq == null) return;
+    textareaRef.current?.focus();
+  }, [focusSeq]);
 
   const updateMention = (val: string, pos: number) => {
     const q = getMentionQuery(val, pos);
@@ -177,13 +186,23 @@ export function ChatInput({
           placeholder="@墨墨 干活吧…(不写 @ 会续上一只 / 行首 @名字 换猫)"
           className="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-white px-3.5 py-2.5 text-sm shadow-inner outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-60"
         />
-        <button
-          onClick={submit}
-          disabled={sending}
-          className="rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
-        >
-          {sending ? '发送中' : '发送'}
-        </button>
+        {sending && onAbort ? (
+          <button
+            type="button"
+            onClick={onAbort}
+            className="rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-red-700 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
+          >
+            中止
+          </button>
+        ) : (
+          <button
+            onClick={submit}
+            disabled={sending}
+            className="rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+          >
+            {sending ? '发送中' : '发送'}
+          </button>
+        )}
       </div>
     </div>
   );

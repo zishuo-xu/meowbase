@@ -7,6 +7,8 @@ import { EvidenceSuggestionBlock } from './EvidenceSuggestionBlock';
 import { CliProcessBlock } from './CliProcessBlock';
 import { MarkdownBody } from './MarkdownBody';
 import { ThinkingBlock } from './ThinkingBlock';
+import { DroppedBallBlock } from './DroppedBallBlock';
+import { isDroppedBallNote } from '@/lib/ball';
 
 export function MessageBubble({
   message,
@@ -19,6 +21,9 @@ export function MessageBubble({
   onReject,
   onConfirmEvidence,
   onCiteEvidence,
+  agents,
+  onPassBall,
+  onSpeak,
 }: {
   message: MessageDto;
   agentName?: string;
@@ -30,6 +35,9 @@ export function MessageBubble({
   onReject?: (id: string, reason: string) => void;
   onConfirmEvidence?: (id: string) => void;
   onCiteEvidence?: (id: string) => void;
+  agents?: { id: string; name: string }[];
+  onPassBall?: (agentName: string) => void;
+  onSpeak?: () => void;
 }) {
   const parsed = parseMessage(message);
 
@@ -65,10 +73,16 @@ export function MessageBubble({
   }
 
   if (message.role === 'system') {
+    const text = parsed.text ?? message.content;
+    if (isDroppedBallNote(text) && onPassBall && agents && agents.length > 0) {
+      return (
+        <DroppedBallBlock text={text} agents={agents} onPass={onPassBall} onSpeak={onSpeak} />
+      );
+    }
     return (
       <div className="flex justify-center px-4 py-1">
         <span className="max-w-md rounded-full bg-black/5 px-3 py-1 text-xs text-[var(--ink-soft)]">
-          {parsed.text}
+          {text}
         </span>
       </div>
     );

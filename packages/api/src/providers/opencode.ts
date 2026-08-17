@@ -4,6 +4,7 @@ import { OpenCodeAccumulator } from './opencode-json.js';
 import { formatCliExitError } from './cli-error.js';
 import { spawnEnv } from './base-url.js';
 import { emitParsedLine } from './tool-activity.js';
+import { attachChildKillers } from './child-lifecycle.js';
 import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
 
 export class OpenCodeAdapter implements AgentService {
@@ -39,11 +40,7 @@ export class OpenCodeAdapter implements AgentService {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGTERM');
-    }, timeoutMs);
+    const killers = attachChildKillers(child, { timeoutMs, signal: input.signal });
 
     const stderrChunks: string[] = [];
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk.toString()));
@@ -70,10 +67,19 @@ export class OpenCodeAdapter implements AgentService {
         resolve();
       });
     });
-    clearTimeout(timer);
+    killers.clear();
 
     const sessionId = accumulator.sessionId ?? input.sessionId ?? '';
-    if (timedOut) {
+    if (killers.aborted()) {
+      return {
+        sessionId,
+        content: accumulator.content,
+        status: 'terminated',
+        usage: accumulator.usage,
+        error: '已中止',
+      };
+    }
+    if (killers.timedOut()) {
       return {
         sessionId,
         content: accumulator.content,
