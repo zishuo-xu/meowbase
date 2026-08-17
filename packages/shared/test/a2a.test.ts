@@ -15,6 +15,7 @@ import {
   isEscalatedBallNote,
   isFreezeBallNote,
   parseA2ARelayNote,
+  shouldResumePending,
 } from '../src/a2a.js';
 
 describe('parseA2AHandoff', () => {
@@ -223,8 +224,21 @@ describe('formatA2ARelayNote', () => {
         '改动文件: add.ts',
         '验证: 有本轮命令和结果',
         '任务: 请审查 add.ts',
+        '下一棒待你开口',
       ],
     });
+  });
+});
+
+describe('shouldResumePending', () => {
+  it('没点名或点名就是下一只则续跑', () => {
+    expect(shouldResumePending('继续', 'gemini')).toBe(true);
+    expect(shouldResumePending('@闪闪 接着做', 'gemini')).toBe(true);
+  });
+
+  it('点名另一只或行首 @人不续跑', () => {
+    expect(shouldResumePending('@墨墨 重做', 'gemini')).toBe(false);
+    expect(shouldResumePending('@人 我来拍板', 'gemini')).toBe(false);
   });
 });
 

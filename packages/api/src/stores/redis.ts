@@ -8,6 +8,7 @@ import type {
   ApprovalCard,
   EvidenceEntry,
   Message,
+  PendingHop,
   Thread,
 } from '@meowbase/shared';
 import type {
@@ -67,6 +68,9 @@ export class RedisThreadStore implements ThreadStore {
       primaryAgentId: (raw.primaryAgentId as AgentId) ?? 'claude',
       workdir: raw.workdir ?? '',
       sessions: JSON.parse(raw.sessions ?? '{}') as Partial<Record<AgentId, string>>,
+      ...(raw.pendingHop
+        ? { pendingHop: JSON.parse(raw.pendingHop) as PendingHop }
+        : {}),
       createdAt: raw.createdAt ?? '',
     };
   }
@@ -90,6 +94,16 @@ export class RedisThreadStore implements ThreadStore {
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     thread.sessions[agentId] = sessionId;
     await this.redis.hset(threadKey(threadId), 'sessions', JSON.stringify(thread.sessions));
+  }
+
+  async setPendingHop(threadId: string, hop: PendingHop | null): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (hop) {
+      await this.redis.hset(threadKey(threadId), 'pendingHop', JSON.stringify(hop));
+    } else {
+      await this.redis.hdel(threadKey(threadId), 'pendingHop');
+    }
   }
 
   async rename(id: string, title: string): Promise<Thread | null> {

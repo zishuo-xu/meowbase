@@ -5,6 +5,7 @@ import type {
   EvidenceEntry,
   EvidenceKind,
   Message,
+  PendingHop,
   Skill,
   Thread,
 } from '@meowbase/shared';
@@ -19,6 +20,7 @@ export interface ThreadStore {
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;
+  setPendingHop(threadId: string, hop: PendingHop | null): Promise<void>;
   rename(id: string, title: string): Promise<Thread | null>;
   delete(id: string): Promise<boolean>;
 }

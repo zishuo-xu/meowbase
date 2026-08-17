@@ -5,6 +5,7 @@ import {
   type MentionCatalog,
   resolveAlias,
 } from './catalog.js';
+import { extractMentionTargets } from './mention-targets.js';
 import { hasExplicitReviewVerdict } from './review-verdict.js';
 import { hasVerificationEvidence } from './verification.js';
 
@@ -186,9 +187,25 @@ export function formatA2ARelayNote(input: {
     files.length > 0 ? `改动文件: ${files.join(', ')}` : undefined,
     verified ? '验证: 有本轮命令和结果' : '验证: 未附带,下一棒需自跑',
     input.task ? `任务: ${clipBody(input.task, 80)}` : undefined,
+    '下一棒待你开口',
   ]
     .filter((line): line is string => line != null)
     .join('\n');
+}
+
+/** 有 pending 时:没点名叫别人就续跑下一跳;行首 @人 或点名另一只则不续。 */
+export function shouldResumePending(
+  content: string,
+  pendingTo: AgentId,
+  catalog: MentionCatalog = DEFAULT_CATALOG,
+): boolean {
+  for (const line of content.split('\n')) {
+    const match = line.match(LINE_START);
+    if (match && isHumanEscalateToken(match[1] ?? '')) return false;
+  }
+  const targets = extractMentionTargets(content, catalog);
+  if (targets.length === 0) return true;
+  return targets[0] === pendingTo;
 }
 
 export function parseA2ARelayNote(text: string): { headline: string; details: string[] } | null {

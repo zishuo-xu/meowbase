@@ -16,6 +16,7 @@ import {
   isPlaceholderTitle,
   matchSkills,
   parseA2AHandoff,
+  shouldResumePending,
   parseApproveCommand,
   parseConfirmCommand,
   parseEvidenceRefs,
@@ -30,6 +31,8 @@ import {
   allowsAutoApprove,
   gateReviewVerdict,
   type A2AStopKind,
+  type PendingHop,
+  isHumanEscalateToken,
   selectReviewer,
   stripMentions,
 } from '@meowbase/shared';
@@ -197,6 +200,7 @@ export async function executeTurn(input: {
 
   if (parseFreezeCommand(content)) {
     turnLog('freeze', { thread: threadId });
+    await context.stores.threads.setPendingHop(threadId, null);
     return context.stores.messages.append({
       threadId,
       role: 'system',
@@ -283,6 +287,47 @@ export async function executeTurn(input: {
     targets: targets.join(','),
     preview: clip(content),
   });
+  const writeQueue = createWriteQueue();
+  const pending = thread.pendingHop;
+  if (pending) {
+    if (shouldResumePending(content, pending.to, catalog)) {
+      turnLog('pending resume', { thread: threadId, to: pending.to });
+      await context.stores.threads.setPendingHop(threadId, null);
+      const lastResult = await runSegment(
+        context,
+        thread,
+        { agentId: pending.to, text: pending.goal },
+        refs,
+        new Set<AgentId>(),
+        writeQueue,
+        catalog,
+        team,
+        maxDepth,
+        pending,
+      );
+      return settleTurn({
+        threadId,
+        context,
+        thread,
+        learn,
+        lastResult,
+        writeQueue,
+        catalog,
+        team,
+        refs,
+      });
+    }
+    await context.stores.threads.setPendingHop(threadId, null);
+    if (userEscalates(content)) {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: formatEscalatedBallNote('你', '收回了下一棒'),
+        status: 'completed',
+      });
+    }
+  }
+
   const cleanMessage = stripMentions(content, catalog).trim();
   if (!cleanMessage) {
     return context.stores.messages.append({
@@ -293,7 +338,6 @@ export async function executeTurn(input: {
     });
   }
 
-  const writeQueue = createWriteQueue();
   const targetResults = await Promise.allSettled(
     targets.map(async (target) => {
       const visited = new Set<AgentId>();
@@ -334,9 +378,41 @@ export async function executeTurn(input: {
     });
   }
 
-  const { lastAssistant, lastOutput, visited, firstAgent: chainFirstAgent } = lastResult;
+  return settleTurn({
+    threadId,
+    context,
+    thread,
+    learn,
+    lastResult,
+    writeQueue,
+    catalog,
+    team,
+    refs,
+  });
+}
 
-  // #learn 沉淀:仅 completed 时生成 draft + 建议消息(内容取链上最终输出)
+function userEscalates(content: string): boolean {
+  for (const line of content.split('\n')) {
+    const match = line.match(/^\s*@(\S+)/);
+    if (match && isHumanEscalateToken(match[1] ?? '')) return true;
+  }
+  return false;
+}
+
+async function settleTurn(input: {
+  threadId: string;
+  context: TurnContext;
+  thread: ThreadRuntime;
+  learn: ReturnType<typeof parseLearnCommand>;
+  lastResult: SegmentRunResult;
+  writeQueue: WriteQueue;
+  catalog: MentionCatalog;
+  team: readonly TeamMember[];
+  refs: EvidenceEntry[];
+}): Promise<Message> {
+  const { threadId, context, thread, learn, lastResult, writeQueue, catalog, team, refs } = input;
+  const { lastAssistant, lastOutput, firstAgent: chainFirstAgent } = lastResult;
+
   if (learn && lastOutput.status === 'completed' && lastOutput.content) {
     const draft = await context.stores.evidence.createDraft({
       threadId,
@@ -352,7 +428,6 @@ export async function executeTurn(input: {
     });
   }
 
-  // 审批流:有 diff → 可见互审(需修改则打回写手再审) → 通过或轮次用尽才出卡片
   if (lastOutput.status === 'completed') {
     try {
       await gitAddAll(thread.workdir);
@@ -393,22 +468,26 @@ async function runSegment(
   catalog: MentionCatalog,
   team: readonly TeamMember[],
   maxDepth: number,
+  resume?: PendingHop,
 ): Promise<SegmentRunResult> {
   let lastAssistant: Message | null = null;
   let lastOutput: AgentTurnOutput | null = null;
-  let currentAgent: AgentId = segment.agentId;
-  let currentTask = segment.text;
-  let prevContent = '';
-  let fromAgent: AgentId | undefined;
-  let firstAgent: AgentId = segment.agentId;
+  let currentAgent: AgentId = resume?.to ?? segment.agentId;
+  let currentTask = resume?.task ?? segment.text;
+  let prevContent = resume?.previousOutput ?? '';
+  let fromAgent: AgentId | undefined = resume?.from;
+  let firstAgent: AgentId = resume?.firstAgent ?? segment.agentId;
   let stop: {
     kind: A2AStopKind;
     blockedTarget?: AgentId;
     hadInlineHint?: boolean;
     escalateTask?: string;
   } | undefined;
+  if (resume) {
+    for (const id of resume.visited) visited.add(id);
+  }
 
-  for (let hop = 0; hop < maxDepth; hop++) {
+  for (let hop = resume?.hop ?? 0; hop < maxDepth; hop++) {
     if (!context.registry.get(currentAgent)) {
       throw new Error(`没有可用的 agent: ${currentAgent}`);
     }
@@ -504,8 +583,19 @@ async function runSegment(
       break;
     }
     const relayFiles = await listHandoffFiles(thread.workdir);
-    await writeQueue(() =>
-      context.stores.messages.append({
+    const pendingHop: PendingHop = {
+      to: handoff.target,
+      from: currentAgent,
+      task: handoff.task,
+      goal: segment.text,
+      previousOutput: prevContent,
+      visited: [...visited],
+      firstAgent,
+      hop: hop + 1,
+    };
+    await writeQueue(async () => {
+      await context.stores.threads.setPendingHop(thread.id, pendingHop);
+      await context.stores.messages.append({
         threadId: thread.id,
         role: 'system',
         content: formatA2ARelayNote({
@@ -517,17 +607,15 @@ async function runSegment(
           previousOutput: prevContent,
         }),
         status: 'completed',
-      }),
-    );
-    turnLog('a2a', {
+      });
+    });
+    turnLog('a2a defer', {
       thread: thread.id,
       from: currentAgent,
       to: handoff.target,
       task: clip(handoff.task, 60),
     });
-    fromAgent = currentAgent;
-    currentAgent = handoff.target;
-    currentTask = handoff.task;
+    break;
   }
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');

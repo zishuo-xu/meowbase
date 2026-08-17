@@ -10,6 +10,7 @@ export type {
   MessageRole,
   MessageStatus,
   Skill,
+  PendingHop,
   Thread,
   TokenUsage,
   ToolActivity,
@@ -77,5 +78,6 @@ export {
   isHumanEscalateToken,
   parseA2AHandoff,
   parseA2ARelayNote,
+  shouldResumePending,
 } from './a2a.js';
 export { isPlaceholderTitle, titleFromUserMessage, TITLE_MAX_LEN } from './thread-title.js';

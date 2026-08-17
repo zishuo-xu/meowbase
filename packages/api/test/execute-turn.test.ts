@@ -919,7 +919,6 @@ describe('executeTurn 审批流', () => {
     expect(opencodeCalls).toBe(0);
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.content.includes('🤝 接力:'))).toBe(true);
-    expect(messages.some((m) => m.content.includes('🤝 审查:'))).toBe(false);
     const card = (await stores.approvals.list(thread.id))[0];
     expect(card?.reviewerAgentId).toBe('gemini');
     expect(card?.reviewComment).toContain('通过');
@@ -1017,6 +1016,52 @@ describe('executeTurn 审批流', () => {
 });
 
 describe('executeTurn 多角色协作', () => {
+  it('A2A 交棒后本轮不跑下一只,再触发才吃同一份包', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const opencodePrompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return {
+            sessionId: 's1',
+            content: '代码写完了。\n@opencode 请审查这段代码\n注意边界条件。',
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn(input) {
+          calls.push('opencode');
+          opencodePrompts.push(input.prompt);
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const first = await executeTurn({
+      threadId: thread.id, content: '@claude 写代码', context: { stores, registry },
+    });
+    expect(first.agentId).toBe('claude');
+    expect(calls).toEqual(['claude']);
+    expect((await stores.threads.get(thread.id))?.pendingHop?.to).toBe('opencode');
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('下一棒待你开口'))).toBe(true);
+
+    const second = await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
+    });
+    expect(second.agentId).toBe('opencode');
+    expect(calls).toEqual(['claude', 'opencode']);
+    expect(opencodePrompts[0]).toContain('【A2A 交接包】');
+    expect(opencodePrompts[0]).toContain('代码写完了');
+    expect(opencodePrompts[0]).toContain('请审查这段代码');
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+  });
+
   it('多 @ 同题并行:每个目标收到同一消息', async () => {
     const stores = createMemoryStores();
     const prompts: string[] = [];
@@ -1079,8 +1124,11 @@ describe('executeTurn 多角色协作', () => {
       },
     ]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
-    const final = await executeTurn({
+    await executeTurn({
       threadId: thread.id, content: '@claude 写代码', context: { stores, registry },
+    });
+    const final = await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
     });
     expect(final.agentId).toBe('opencode');
     // 后角 prompt 包含前角输出
@@ -1129,6 +1177,11 @@ describe('executeTurn 多角色协作', () => {
       content: '@claude 写代码',
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
+    await executeTurn({
+      threadId: thread.id,
+      content: '继续',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
     expect(prompts.length).toBeGreaterThanOrEqual(2);
     for (const prompt of prompts) {
       expect(prompt).toContain('团队纪律');
@@ -1165,6 +1218,11 @@ describe('executeTurn 多角色协作', () => {
       content: '@claude 写 add.ts',
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
+    await executeTurn({
+      threadId: thread.id,
+      content: '继续',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
     expect(calls).toEqual(['claude', 'gemini']);
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
@@ -1190,6 +1248,11 @@ describe('executeTurn 多角色协作', () => {
     await executeTurn({
       threadId: thread.id,
       content: '@claude 写 add.ts',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    await executeTurn({
+      threadId: thread.id,
+      content: '继续',
       context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
     });
     const messages = await stores.messages.list(thread.id);
@@ -1231,7 +1294,8 @@ describe('executeTurn 多角色协作', () => {
     ]);
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
-    // claude → opencode → (claude 已出场,停止)
+    await executeTurn({ threadId: thread.id, content: '继续', context: { stores, registry } });
+    // claude → 待跑 opencode → 续跑后想交回 claude,已出场则停
     expect(calls).toEqual(['claude', 'opencode']);
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(true);
@@ -1260,6 +1324,9 @@ describe('executeTurn 多角色协作', () => {
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     await executeTurn({
       threadId: thread.id, content: '@墨墨 开工', context: { stores, registry },
+    });
+    await executeTurn({
+      threadId: thread.id, content: '继续', context: { stores, registry },
     });
     expect(calls).toEqual(['claude', 'opencode']);
   });

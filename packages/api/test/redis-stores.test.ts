@@ -31,6 +31,19 @@ describe('Redis 存储', () => {
     expect((await threads.get(thread.id))?.title).toBe(title);
     await threads.setSession(thread.id, 'claude', 'sess-9');
     expect((await threads.get(thread.id))?.sessions.claude).toBe('sess-9');
+    await threads.setPendingHop(thread.id, {
+      to: 'gemini',
+      from: 'claude',
+      task: '请审查',
+      goal: '写 add.ts',
+      previousOutput: '写完了',
+      visited: ['claude'],
+      firstAgent: 'claude',
+      hop: 1,
+    });
+    expect((await threads.get(thread.id))?.pendingHop?.to).toBe('gemini');
+    await threads.setPendingHop(thread.id, null);
+    expect((await threads.get(thread.id))?.pendingHop).toBeUndefined();
     await threads.rename(thread.id, '在沙箱写 add.ts');
     expect((await threads.get(thread.id))?.title).toBe('在沙箱写 add.ts');
     expect(await threads.delete(thread.id)).toBe(true);

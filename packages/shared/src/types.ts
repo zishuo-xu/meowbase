@@ -2,6 +2,18 @@ export type AgentId = 'claude' | 'gemini' | 'opencode';
 
 export const AGENT_IDS: readonly AgentId[] = ['claude', 'gemini', 'opencode'];
 
+/** 已交棒、下一跳还没跑。线程内最多一条。 */
+export interface PendingHop {
+  to: AgentId;
+  from: AgentId;
+  task: string;
+  goal: string;
+  previousOutput: string;
+  visited: AgentId[];
+  firstAgent: AgentId;
+  hop: number;
+}
+
 export interface Thread {
   id: string;
   title: string;
@@ -10,6 +22,8 @@ export interface Thread {
   workdir: string;
   /** 每个 agent 的 CLI 会话 ID(用于 --resume) */
   sessions: Partial<Record<AgentId, string>>;
+  /** 交棒后本轮先结束时记下的下一跳 */
+  pendingHop?: PendingHop;
   createdAt: string;
 }
 

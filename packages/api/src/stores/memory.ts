@@ -7,6 +7,7 @@ import type {
   ApprovalCard,
   EvidenceEntry,
   Message,
+  PendingHop,
   Skill,
   Thread,
 } from '@meowbase/shared';
@@ -52,6 +53,13 @@ export class InMemoryThreadStore implements ThreadStore {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     thread.sessions[agentId] = sessionId;
+  }
+
+  async setPendingHop(threadId: string, hop: PendingHop | null): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (hop) thread.pendingHop = hop;
+    else delete thread.pendingHop;
   }
 
   async rename(id: string, title: string): Promise<Thread | null> {

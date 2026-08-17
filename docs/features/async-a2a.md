@@ -2,7 +2,7 @@
 
 异步 A2A 这条线他们很重。本篇是最薄的一刀：只延后下一跳。邮箱、MCP、hold_ball 以后加厚，不写进这一刀。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:公开 A2A 是异步消息。本篇只拿「人能离开」，不拿邮箱和 `hold_ball`。
 
 ## 门（各一句）
@@ -33,5 +33,6 @@
 
 ## 入口
 
-- 现行包：`packages/shared/src/a2a.ts`
-- 本篇落地后：pending 端口 + `execute-turn.ts`
+- 判断续跑：`packages/shared/src/a2a.ts` `shouldResumePending`
+- pending：`ThreadStore.setPendingHop`
+- 管线：`packages/api/src/router/execute-turn.ts`
