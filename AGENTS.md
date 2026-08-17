@@ -47,7 +47,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 猫怎么交棒、交接包带什么、每只猫自己的 CLI 会话、线程沙箱和证据怎么共享，见 [docs/A2A.md](docs/A2A.md)。
 
-新功能先写 [docs/features/](docs/features/)（为什么、怎么做、面试能讲），再改代码。文档地图见 [docs/README.md](docs/README.md)。
+一次一个特性：先写一篇 [docs/features/](docs/features/)（薄设计），做完再开下一篇。文档地图见 [docs/README.md](docs/README.md)。
 
 ## 消息协议(用户可用)
 

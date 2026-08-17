@@ -2,7 +2,7 @@
 
 对照 clowder 公开能力：他们是异步邮箱 + 结构化 packet + 线程隔离 + 共享证据。我们只拿语义，做成**同一轮里的同步接力**。不建 mailbox，不 MCP 派球，不把另一只猫的 CLI 会话读过来。
 
-为什么这样设计、面试怎么讲： [docs/features/a2a.md](features/a2a.md)。往异步靠的第一刀（未做）：[docs/features/async-a2a.md](features/async-a2a.md)。文档地图：[docs/README.md](README.md)。
+设计理由见 [features/a2a.md](features/a2a.md)。下一刀（设计中）：[features/async-a2a.md](features/async-a2a.md)。
 
 人在页面上看到的是一条线程。平台在底下拆成：谁该开口、这一棒带什么字、各猫自己的 CLI 记忆、大家共用的沙箱和证据。
 
