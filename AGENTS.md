@@ -31,7 +31,7 @@ packages/
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
 scripts/      smoke.ts(真实冒烟)、fixtures/(fake CLI,测试/演示用)
 work/         线程沙箱目录(git 仓库,gitignore 忽略)
-docs/         设计文档(specs/)+ 实现计划(plans/)
+docs/         设计文档(specs/)+ 实现计划(plans/)+ A2A 协作说明(A2A.md)
 ```
 
 ## 架构核心(30 秒版)
@@ -44,6 +44,8 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 3. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
 4. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
 5. `packages/web/components/` —— UI 组件
+
+猫怎么交棒、交接包带什么、每只猫自己的 CLI 会话、线程沙箱和证据怎么共享，见 [docs/A2A.md](docs/A2A.md)。
 
 ## 消息协议(用户可用)
 

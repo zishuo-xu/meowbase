@@ -52,6 +52,8 @@
 
 和 clowder 对齐的是行首 `@`、`@owner` 语义、交接包给人看、人能拉闸、证据能被问出来。我们不搬 mailbox、SOP Guardian、MCP、`hold_ball`、向量记忆网。
 
+猫怎么交互、传什么、各自记什么、公共记什么，见 [docs/A2A.md](A2A.md)。
+
 ## 用 curl 走同一圈
 
 ```bash

@@ -10,6 +10,7 @@ alwaysApply: true
 - `AGENTS.md` 消息协议表和踩坑
 - `README.md` 人怎么下任务 / 消息协议
 - `docs/DEMO.md` 点击路径和口播（和演示不一致的句子删掉）
+- `docs/A2A.md` 交棒 / 交接包 / 独立会话 / 公共证据（A2A 或记忆语义一变就改）
 
 旧计划稿（`docs/superpowers/plans/`）不改写历史。设计总稿若写了现行语义，同步一句。
 

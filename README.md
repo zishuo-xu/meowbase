@@ -2,7 +2,7 @@
 
 > **愿景**:让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
 >
-> **现状**:M1–M6 已闭环。人说目标 → 墨墨写+自检 → 行首交闪闪 → 审批卡 → 人批准落地。顶栏显示球在谁手上;`@人` 可升级拍板;接力条可点开交接包。说「之前约定」会召回已确认证据;整行 `星星罐子` 停棒。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。
+> **现状**:M1–M6 已闭环。人说目标 → 墨墨写+自检 → 行首交闪闪 → 审批卡 → 人批准落地。顶栏显示球在谁手上;`@人` 可升级拍板;接力条可点开交接包。说「之前约定」会召回已确认证据;整行 `星星罐子` 停棒。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。
 
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。
@@ -40,12 +40,12 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 | 落点 | 职责 |
 |---|---|
-| `executeTurn` | 一条消息的心脏:命令 → 多 @ 并行 → A2A 链 → 记忆 → diff 审批 |
+| `executeTurn` | 一条消息的心脏:命令 → 多 @ 并行 → A2A 链 → 记忆 → diff 审批。协作细节见 [docs/A2A.md](docs/A2A.md) |
 | `stores/ports.ts` | 业务只依赖接口,Redis 可换 |
 | 名册 `handoffTo` / `handoff` | 交给谁、何时交,写在配置里,不写 `if (墨墨)` |
 | Provider 适配器 | claude / gemini / opencode,统一 `runTurn` |
 
-定位:墨墨主架构师、闪闪审查官、团团执行者。写完默认交闪闪审。演示步骤见 [docs/DEMO.md](docs/DEMO.md)。
+定位:墨墨主架构师、闪闪审查官、团团执行者。写完默认交闪闪审。演示步骤见 [docs/DEMO.md](docs/DEMO.md)。A2A 怎么传信息、怎么隔离上下文，见 [docs/A2A.md](docs/A2A.md)。
 
 ## 审批流(M4)
 
@@ -107,6 +107,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 - 猫回复里行首 `@人` / `@owner` = **升级给人拍板**,停链,顶栏「球在人手里」
 - 句中写「请 @团团 看看」**不会交接**,系统会提示改成行首(提示不算球权)
 - 链深默认 3(可配),已出场的猫不再回来(防环)
+- 下一棒看到的是平台拼的交接包 + 同一沙箱,不是另一只猫的 CLI 聊天记录。展开见 [docs/A2A.md](docs/A2A.md)
 
 ## 多角色协作
 

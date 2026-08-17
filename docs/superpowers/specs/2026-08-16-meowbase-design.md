@@ -1,7 +1,7 @@
 # Meowbase 设计文档
 
 - 日期:2026-08-16
-- 状态:已批准(用户确认开工);**M1–M6 已落地**。A2A 机械层可演示;证据可按「之前约定」召回;人可整行 `星星罐子` 拉闸。演示与口播见 [docs/DEMO.md](../../DEMO.md)
+- 状态:已批准(用户确认开工);**M1–M6 已落地**。A2A 机械层可演示;证据可按「之前约定」召回;人可整行 `星星罐子` 拉闸。演示与口播见 [docs/DEMO.md](../../DEMO.md)。协作怎么传信息、怎么隔离上下文,见 [docs/A2A.md](../../A2A.md)
 - 参考架构:[clowder-ai](https://github.com/zts212653/clowder-ai)(MIT)— 仅借鉴架构模式,代码全部自写
 
 ## 1. 背景与目标
@@ -83,6 +83,7 @@
 - 线程隔离:每个线程有独立 `threadId`、`sessionIds`(按 agent),上下文互不泄漏
 - 无 mention 时默认路由给线程创建时指定的"主 agent"(可配置)
 - **线程工作目录**:每个线程有独立目录 `work/<threadId>/`,CLI 在该目录内执行(借鉴 clowder 的 worktree 隔离思想);"diff 落地"即在此目录内应用改动
+- A2A 是同一轮同步接力:下一棒吃交接包,不读对方 CLI 会话。现行语义见 [docs/A2A.md](../../A2A.md)
 
 ### 4.3 存储层(`packages/api/src/stores/`)
 
