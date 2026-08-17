@@ -63,6 +63,7 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 
 - TypeScript 严格模式,ESM,相对导入带 `.js` 后缀(NodeNext)
 - 业务逻辑只依赖 `stores/ports.ts` 接口,禁止直接 import ioredis
+- **计划先对照 clowder**:提出下一步前先看他们公开设计怎么做同一件事,只拿语义和踩坑,不抄源码,不搬邮箱/SOP/MCP
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - 测试:`pnpm test`(shared 48 + api 70 + web 24 ≈ 142);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
