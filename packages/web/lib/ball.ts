@@ -41,6 +41,9 @@ export function describeBall(
     const to = last.content.split('→').pop()?.trim();
     return { text: to ? `球在${to}手上` : '接力中', tone: 'cat' };
   }
+  if (last?.role === 'system' && isPendingApprovalNote(last.content)) {
+    return { text: '球在人手里', tone: 'human' };
+  }
   if (last?.role === 'assistant' && last.agentId) {
     return {
       text: `球在${nameOf(last.agentId)}手上`,
@@ -56,6 +59,11 @@ export function describeBall(
 
 export function isDroppedBallNote(text: string): boolean {
   return text.includes('球还在地上');
+}
+
+/** 审批卡等人点批准/打回,还没自动落地。 */
+export function isPendingApprovalNote(text: string): boolean {
+  return text.includes('审批卡片') && !text.includes('已自动批准') && !text.includes('已批准并落地');
 }
 
 export function formatPickupCommand(agentName: string): string {

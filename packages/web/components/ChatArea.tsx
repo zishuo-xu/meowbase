@@ -18,6 +18,7 @@ export function ChatArea({
   onCiteEvidence,
   onPassBall,
   onSpeak,
+  onViewMessages,
 }: {
   threadId: string;
   messages: MessageDto[];
@@ -29,6 +30,7 @@ export function ChatArea({
   onCiteEvidence?: (id: string) => void;
   onPassBall?: (agentName: string) => void;
   onSpeak?: () => void;
+  onViewMessages?: (messages: MessageDto[]) => void;
 }) {
   const { lastEvent } = useThreadStream(threadId);
   const [streamed, setStreamed] = useState<MessageDto[]>(messages);
@@ -72,6 +74,9 @@ export function ChatArea({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [streamed]);
+  useEffect(() => {
+    onViewMessages?.(streamed);
+  }, [streamed, onViewMessages]);
 
   const phase = pipelinePhase(streamed, Boolean(sending));
   const approvalById = new Map(approvals.map((card) => [card.id, card]));

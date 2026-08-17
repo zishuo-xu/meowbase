@@ -52,6 +52,39 @@ describe('describeBall', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });
 
+  it('待确认的审批卡:球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'gemini', content: '结论:通过', status: 'completed' },
+          {
+            role: 'system',
+            content:
+              '📋 审批卡片 ap_a1b2c3d4(写:claude → 审:gemini)\n改动:add.ts | 9 +\n审查意见:通过\n回复 #approve ap_a1b2c3d4 批准',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('已自动批准后等人开口', () => {
+    expect(
+      describeBall(
+        [
+          {
+            role: 'system',
+            content:
+              '🤖 审批卡片 ap_a1b2c3d4(写:claude → 审:gemini)\n改动:add.ts\n审查意见:通过\n✅ 已自动批准(autoApprove)',
+          },
+        ],
+        false,
+        nameOf,
+      ).text,
+    ).toBe('等人开口');
+  });
+
   it('接力时间线按出场顺序,失败标在最后一棒', () => {
     expect(
       describeRelayTimeline(
@@ -88,6 +121,22 @@ describe('describeBall', () => {
 
   it('空线程没有时间线', () => {
     expect(describeRelayTimeline([], false, nameOf)).toEqual([]);
+  });
+
+  it('发送中跟上正在开口的猫', () => {
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          { role: 'assistant', agentId: 'gemini', content: '审', status: 'streaming' },
+        ],
+        true,
+        nameOf,
+      ),
+    ).toEqual([
+      { name: '墨墨', agentId: 'claude', status: 'done' },
+      { name: '闪闪', agentId: 'gemini', status: 'active' },
+    ]);
   });
 
   it('捡球命令走现有 @ 路由', () => {

@@ -24,6 +24,7 @@ export default function Home() {
   const [threads, setThreads] = useState<ThreadDto[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDto[]>([]);
+  const [liveMessages, setLiveMessages] = useState<MessageDto[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfigDto | null>(null);
@@ -63,6 +64,7 @@ export default function Home() {
     try {
       const [msgs, ev] = await Promise.all([api.listMessages(id), api.listEvidence(id)]);
       setMessages(msgs);
+      setLiveMessages(msgs);
       setEvidence(ev);
       setError(null);
     } catch (err) {
@@ -113,6 +115,7 @@ export default function Home() {
           api.listEvidence(activeId),
         ]);
         setMessages(msgs);
+        setLiveMessages(msgs);
         setEvidence(ev);
         await refreshThreads();
         setError(null);
@@ -159,6 +162,7 @@ export default function Home() {
         if (activeId === id) {
           setActiveId(null);
           setMessages([]);
+          setLiveMessages([]);
           setEvidence([]);
         }
         await refreshThreads();
@@ -173,6 +177,8 @@ export default function Home() {
     setHubFocus(agentId);
     setHubOpen(true);
   };
+
+  const headerMessages = liveMessages.length > 0 ? liveMessages : messages;
 
   return (
     <main className="flex h-full">
@@ -192,12 +198,12 @@ export default function Home() {
             <h1 className="text-sm font-bold tracking-wide">meowbase · 喵窝</h1>
             <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
               {activeId
-                ? describeBall(messages, sending, (id) => agentName(id, agents)).text
+                ? describeBall(headerMessages, sending, (id) => agentName(id, agents)).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
             {activeId ? (
               <RelayTimeline
-                hops={describeRelayTimeline(messages, sending, (id) => agentName(id, agents))}
+                hops={describeRelayTimeline(headerMessages, sending, (id) => agentName(id, agents))}
               />
             ) : null}
           </div>
@@ -241,6 +247,7 @@ export default function Home() {
               onCiteEvidence={citeEvidence}
               onPassBall={passBall}
               onSpeak={() => setFocusSeq((n) => n + 1)}
+              onViewMessages={setLiveMessages}
             />
             <EvidenceRail
               items={evidence}
