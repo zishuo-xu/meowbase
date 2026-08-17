@@ -8,10 +8,12 @@ import {
   formatAbortedBallNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
+  formatFreezeBallNote,
   formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
   isEscalatedBallNote,
+  isFreezeBallNote,
   parseA2ARelayNote,
 } from '../src/a2a.js';
 
@@ -243,6 +245,16 @@ describe('formatEscalatedBallNote', () => {
         wasRelay: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe('formatFreezeBallNote', () => {
+  it('拉闸后球在人手里,不是掉地上', () => {
+    const note = formatFreezeBallNote();
+    expect(isFreezeBallNote(note)).toBe(true);
+    expect(note).toContain('已拉闸');
+    expect(isDroppedBallNote(note)).toBe(false);
+    expect(isEscalatedBallNote(note)).toBe(false);
   });
 });
 

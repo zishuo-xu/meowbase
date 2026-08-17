@@ -11,6 +11,7 @@ import {
   formatAbortedBallNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
+  formatFreezeBallNote,
   formatFailedBallNote,
   isPlaceholderTitle,
   matchSkills,
@@ -20,6 +21,9 @@ import {
   parseEvidenceRefs,
   parseLearnCommand,
   parseRejectCommand,
+  parseFreezeCommand,
+  matchEvidence,
+  wantsEvidenceRecall,
   resolveTurnTargets,
   titleFromUserMessage,
   parseReviewVerdict,
@@ -191,6 +195,16 @@ export async function executeTurn(input: {
     });
   }
 
+  if (parseFreezeCommand(content)) {
+    turnLog('freeze', { thread: threadId });
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: formatFreezeBallNote(),
+      status: 'completed',
+    });
+  }
+
   const reject = parseRejectCommand(content);
   if (reject) {
     turnLog('reject', { thread: threadId, id: reject.id, reason: clip(reject.reason, 40) });
@@ -212,6 +226,12 @@ export async function executeTurn(input: {
   for (const id of refIds) {
     const entry = await context.stores.evidence.get(id);
     if (entry?.status === 'confirmed') refs.push(entry);
+  }
+  if (wantsEvidenceRecall(content)) {
+    const recalled = matchEvidence(content, await context.stores.evidence.list());
+    for (const entry of recalled) {
+      if (!refs.some((item) => item.id === entry.id)) refs.push(entry);
+    }
   }
 
   // 多 @ 同题并行(对齐 clowder):每个目标收到同一消息;A2A 接力各自串行;失败隔离

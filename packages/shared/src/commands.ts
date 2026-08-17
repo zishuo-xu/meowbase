@@ -49,3 +49,10 @@ export function parseRejectCommand(content: string): { id: string; reason: strin
 export function generateApprovalId(): string {
   return `ap_${randomBytes(4).toString('hex')}`;
 }
+
+const FREEZE_LINE = /^\s*星星罐子\s*[。.!！]?\s*$/;
+
+/** 人对猫直接说「星星罐子」:整行触发,引用或句中夹带不触发。 */
+export function parseFreezeCommand(content: string): boolean {
+  return content.split('\n').some((line) => FREEZE_LINE.test(line));
+}

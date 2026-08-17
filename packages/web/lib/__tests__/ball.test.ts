@@ -88,6 +88,19 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在人手里:墨墨请求拍板 — 选A还是选B', tone: 'human' });
   });
 
+  it('星星罐子拉闸后等人开口', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '先改一版', status: 'completed' },
+          { role: 'system', content: '🛑 已拉闸:星星罐子。球在人手里,等你开口。' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '已拉闸，等人开口', tone: 'human' });
+  });
+
   it('猫行首 @人 升级:球在人手里', () => {
     expect(
       describeBall(

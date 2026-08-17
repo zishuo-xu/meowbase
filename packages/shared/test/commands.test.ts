@@ -3,6 +3,7 @@ import {
   generateEvidenceId,
   parseConfirmCommand,
   parseEvidenceRefs,
+  parseFreezeCommand,
   parseLearnCommand,
 } from '../src/commands.js';
 
@@ -47,5 +48,18 @@ describe('parseEvidenceRefs', () => {
 
   it('无引用返回空数组', () => {
     expect(parseEvidenceRefs('没有引用')).toEqual([]);
+  });
+});
+
+describe('parseFreezeCommand', () => {
+  it('整行星星罐子才拉闸', () => {
+    expect(parseFreezeCommand('星星罐子')).toBe(true);
+    expect(parseFreezeCommand('星星罐子。')).toBe(true);
+    expect(parseFreezeCommand('先看一眼\n星星罐子\n再说')).toBe(true);
+  });
+
+  it('句中或引用不拉闸', () => {
+    expect(parseFreezeCommand('不要说星星罐子')).toBe(false);
+    expect(parseFreezeCommand('他说「星星罐子」只是举例')).toBe(false);
   });
 });

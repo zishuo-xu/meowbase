@@ -28,6 +28,27 @@
       "description": "按流程定位并修复问题",
       "triggers": ["debug", "调试", "bug"],
       "promptFile": "debug.md"
+    },
+    {
+      "id": "scaffold",
+      "name": "脚手架",
+      "description": "人喊脚手架时停下来看产物是不是终态",
+      "triggers": ["脚手架"],
+      "promptFile": "scaffold.md"
+    },
+    {
+      "id": "detour",
+      "name": "绕路了",
+      "description": "人喊绕路了时回到目标直线",
+      "triggers": ["绕路了"],
+      "promptFile": "detour.md"
+    },
+    {
+      "id": "pact",
+      "name": "喵约",
+      "description": "人喊喵约时重读团队纪律并对照",
+      "triggers": ["喵约"],
+      "promptFile": "pact.md"
     }
   ]
 }

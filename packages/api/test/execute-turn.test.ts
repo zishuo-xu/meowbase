@@ -412,6 +412,62 @@ describe('executeTurn 消息协议与注入', () => {
     expect(receivedPrompt).toContain('关键事实: 事实内容');
   });
 
+  it('说之前约定时按关键词召回已确认证据,含跨线程', async () => {
+    const stores = createMemoryStores();
+    let receivedPrompt: string | undefined;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          receivedPrompt = input.systemPrompt;
+          return { sessionId: 'sess-new', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const other = await stores.threads.create({ title: 'old', primaryAgentId: 'claude' });
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const hit = await stores.evidence.createDraft({
+      threadId: other.id, kind: 'decision', title: '用户偏好 TypeScript', content: '喜欢 TypeScript',
+    });
+    const miss = await stores.evidence.createDraft({
+      threadId: other.id, kind: 'fact', title: 'LRU 容量', content: '默认 16',
+    });
+    await stores.evidence.confirm(hit.id);
+    await stores.evidence.confirm(miss.id);
+    await executeTurn({
+      threadId: thread.id,
+      content: '之前我们约定用 TypeScript,按那个来',
+      context: { stores, registry },
+    });
+    expect(receivedPrompt).toContain('团队记忆');
+    expect(receivedPrompt).toContain('用户偏好 TypeScript');
+    expect(receivedPrompt).not.toContain('LRU 容量');
+  });
+
+  it('星星罐子整行停棒,不调 agent', async () => {
+    const stores = createMemoryStores();
+    let agentCalled = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          agentCalled = true;
+          return { sessionId: '', content: '', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '星星罐子',
+      context: { stores, registry },
+    });
+    expect(agentCalled).toBe(false);
+    expect(final.role).toBe('system');
+    expect(final.content).toContain('已拉闸');
+    expect(final.content).toContain('星星罐子');
+  });
+
   it('新会话和 resume 都注入身份与交接规则', async () => {
     const stores = createMemoryStores();
     const prompts: (string | undefined)[] = [];

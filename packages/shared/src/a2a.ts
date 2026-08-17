@@ -242,6 +242,14 @@ export function isEscalatedBallNote(text: string): boolean {
   return text.includes('球在人手里') && text.includes('请求拍板');
 }
 
+export function formatFreezeBallNote(): string {
+  return '🛑 已拉闸:星星罐子。球在人手里,等你开口。';
+}
+
+export function isFreezeBallNote(text: string): boolean {
+  return text.includes('已拉闸') && text.includes('星星罐子');
+}
+
 export function formatAbortedBallNote(): string {
   return '⚠️ 本轮已中止。球还在地上:点下面交给下一只,或自己说。';
 }

@@ -45,7 +45,9 @@ export {
   parseEvidenceRefs,
   parseLearnCommand,
   parseRejectCommand,
+  parseFreezeCommand,
 } from './commands.js';
+export { matchEvidence, tokenizeEvidenceQuery, wantsEvidenceRecall } from './evidence-recall.js';
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
@@ -66,10 +68,12 @@ export {
   formatA2ARelayNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
+  formatFreezeBallNote,
   formatFailedBallNote,
   formatPickupCommand,
   isDroppedBallNote,
   isEscalatedBallNote,
+  isFreezeBallNote,
   isHumanEscalateToken,
   parseA2AHandoff,
   parseA2ARelayNote,

@@ -52,6 +52,9 @@ export function describeBall(
     if (last.role === 'system' && isPendingApprovalNote(last.content)) {
       return { text: '球在人手里', tone: 'human' };
     }
+    if (last.role === 'system' && isFreezeBallNote(last.content)) {
+      return { text: '已拉闸，等人开口', tone: 'human' };
+    }
     if (last.role === 'system' && isEscalatedBallNote(last.content)) {
       return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
     }
@@ -75,6 +78,10 @@ export function isDroppedBallNote(text: string): boolean {
 
 export function isEscalatedBallNote(text: string): boolean {
   return text.includes('球在人手里') && text.includes('请求拍板');
+}
+
+export function isFreezeBallNote(text: string): boolean {
+  return text.includes('已拉闸') && text.includes('星星罐子');
 }
 
 /** 审批卡等人点批准/打回,还没自动落地。 */
