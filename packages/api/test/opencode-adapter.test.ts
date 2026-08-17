@@ -55,6 +55,8 @@ describe('OpenCodeAdapter', () => {
     expect(runPrompt).toContain('你是 团团');
     expect(runPrompt).toContain('写 mul.js');
     expect(args).toContain('--thinking');
+    expect(args).toContain('--dir');
+    expect(args[args.indexOf('--dir') + 1]).toBe('/tmp');
     delete process.env.RECORD_ARGS_FILE;
     rmSync(dir, { recursive: true, force: true });
   });

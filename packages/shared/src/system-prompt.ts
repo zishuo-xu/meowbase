@@ -67,13 +67,15 @@ export function buildSystemPrompt(input: {
   team?: readonly TeamMember[];
   skills?: Skill[];
   evidenceRefs: EvidenceEntry[];
+  workdir?: string;
 }): string | undefined {
   const parts: string[] = [];
   if (input.profile) {
     const p = input.profile;
+    const pin = input.workdir ? `当前工作目录是 ${input.workdir}。` : '';
     parts.push(
       `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。` +
-        `\n工作区规则:所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。`,
+        `\n工作区规则:${pin}所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。不要上溯到平台仓库的 packages/。`,
     );
   }
   const team = input.team ?? (input.profile ? DEFAULT_ROSTER : undefined);

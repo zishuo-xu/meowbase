@@ -10,11 +10,21 @@ const SANDBOX_GITIGNORE = `*.tsbuildinfo
 Thumbs.db
 *.log
 .eslintcache
+node_modules/
 `;
 
-const NOISE_RESET_PATHS = ['*.tsbuildinfo', '.DS_Store', 'Thumbs.db', '*.log', '.eslintcache'];
+const NOISE_RESET_PATHS = [
+  '*.tsbuildinfo',
+  '.DS_Store',
+  'Thumbs.db',
+  '*.log',
+  '.eslintcache',
+  'node_modules',
+];
 
 export function isApprovalNoisePath(path: string): boolean {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  if (parts.includes('node_modules')) return true;
   const base = basename(path);
   if (base === '.DS_Store' || base === 'Thumbs.db' || base === '.eslintcache') return true;
   if (base.endsWith('.tsbuildinfo') || base.endsWith('.log')) return true;

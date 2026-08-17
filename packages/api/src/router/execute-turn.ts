@@ -143,6 +143,7 @@ export async function executeTurn(input: {
 
   const thread = await context.stores.threads.get(threadId);
   if (!thread) throw new Error(`线程不存在: ${threadId}`);
+  thread.workdir = resolve(thread.workdir);
 
   await context.stores.messages.append({
     threadId,
@@ -402,6 +403,7 @@ async function runSegment(
       team,
       skills: matchedSkills,
       evidenceRefs: refs,
+      workdir: thread.workdir,
     });
     const prompt = fromAgent
       ? formatA2AHandoffPrompt(
@@ -415,6 +417,7 @@ async function runSegment(
             closeout: isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)
               ? 'reviewer'
               : 'default',
+            workdir: thread.workdir,
           },
         )
       : currentTask;
@@ -658,9 +661,10 @@ async function runAgentTurn(
   return { assistant, output, content: output.content || accumulated };
 }
 
-function reviewPrompt(diff: { stat: string; text: string }): string {
+function reviewPrompt(diff: { stat: string; text: string }, workdir: string): string {
   return (
-    '请作为审查官审查以下代码改动,只审查线程工作目录中本次产生的改动,不要审查平台自身代码。' +
+    `请作为审查官审查以下代码改动。当前工作目录是 ${workdir}。` +
+    '只审查该目录中本次产生的改动,不要上溯或审查平台 packages/。' +
     '输出:问题列表→建议→结论(通过/需修改)。结论必须单独写明「通过」或「需修改」。' +
     '没看到或没亲手跑出命令+结果,不能写通过。' +
     '需修改时列出要点,不要问人,不要 @ 其他人(平台会按结论自动打回写手再审)。\n\n' +
@@ -708,6 +712,7 @@ async function runReviewFixThenCard(input: {
       team,
       skills: reviewSkill ? [reviewSkill] : [],
       evidenceRefs: [],
+      workdir: thread.workdir,
     });
 
     const runReview = async (): Promise<string> => {
@@ -723,7 +728,7 @@ async function runReviewFixThenCard(input: {
         context,
         thread,
         reviewerAgentId,
-        reviewPrompt(latestDiff),
+        reviewPrompt(latestDiff, thread.workdir),
         reviewerPrompt,
         writeQueue,
       );
@@ -757,6 +762,7 @@ async function runReviewFixThenCard(input: {
         reviewerAgentId,
         reviewComment,
         '审查结论为需修改。请只修复上述问题,改完不要问人,不要再 @ 审查官(平台会自动再审一轮)。',
+        { workdir: thread.workdir },
       );
       await runAgentTurn(
         context,
@@ -768,6 +774,7 @@ async function runReviewFixThenCard(input: {
           team,
           skills: fixSkills,
           evidenceRefs: refs,
+          workdir: thread.workdir,
         }),
         writeQueue,
       );

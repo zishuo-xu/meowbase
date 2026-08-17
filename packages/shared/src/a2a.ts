@@ -114,6 +114,7 @@ export interface A2AHandoffExtras {
   goal?: string;
   files?: string[];
   closeout?: 'reviewer' | 'default';
+  workdir?: string;
 }
 
 function stripHandoffLines(text: string): string {
@@ -153,7 +154,9 @@ export function formatA2AHandoffPrompt(
     verified
       ? '验证: 上一棒附了本轮命令和结果。'
       : '验证: 上一棒未附带本轮命令和结果;你必须自己跑一遍再下结论,没证据不能写通过。',
-    `沙箱: 只使用当前工作目录的相对路径,不要审或改平台仓库里的 packages/。`,
+    extras.workdir
+      ? `沙箱: 当前工作目录是 ${extras.workdir}。只使用该目录的相对路径,不要审或改平台仓库里的 packages/。`
+      : `沙箱: 只使用当前工作目录的相对路径,不要审或改平台仓库里的 packages/。`,
     `上一棒原话:\n${body}`,
     `---`,
     `【你的任务】`,

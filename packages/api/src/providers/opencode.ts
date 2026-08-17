@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import type { AgentId } from '@meowbase/shared';
 import { OpenCodeAccumulator } from './opencode-json.js';
 import { formatCliExitError } from './cli-error.js';
@@ -29,13 +30,14 @@ export class OpenCodeAdapter implements AgentService {
       ? `${input.systemPrompt}\n\n---\n${input.prompt}`
       : input.prompt;
 
-    const args = ['run', prompt, '--format', 'json', '--auto', '--thinking'];
+    const workdir = resolve(input.workdir);
+    const args = ['run', prompt, '--format', 'json', '--auto', '--thinking', '--dir', workdir];
     if (input.sessionId) args.push('--session', input.sessionId);
     args.push('-m', model);
 
     const accumulator = new OpenCodeAccumulator();
     const child = spawn(bin, args, {
-      cwd: input.workdir,
+      cwd: workdir,
       env: spawnEnv(this.opts.env),
       stdio: ['ignore', 'pipe', 'pipe'],
     });

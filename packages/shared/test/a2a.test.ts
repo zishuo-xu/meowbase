@@ -99,6 +99,14 @@ describe('formatA2AHandoffPrompt', () => {
     expect(prompt).toContain('上一棒附了本轮命令和结果');
   });
 
+  it('传入 workdir 时交接包钉死沙箱绝对路径', () => {
+    const prompt = formatA2AHandoffPrompt('墨墨', 'claude', '写完了', '请审查', {
+      workdir: '/tmp/meowbase-work/t1',
+    });
+    expect(prompt).toContain('当前工作目录是 /tmp/meowbase-work/t1');
+    expect(prompt).toContain('packages/');
+  });
+
   it('默认收棒不禁止交下一棒', () => {
     const prompt = formatA2AHandoffPrompt('墨墨', 'claude', '写完了', '请落地脚本');
     expect(prompt).toContain('交下一棒');

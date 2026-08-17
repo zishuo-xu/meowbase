@@ -77,7 +77,7 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
 4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。
 5. **gemini 适配器**:`stream-json` 事件是 `init`/`message`/`result`(不是 claude 的 assistant/result);无系统提示词参数,身份前置拼进 prompt;headless 写文件必须 `--approval-mode yolo`,否则会卡在审批。`--resume`/`-r` 接受 session UUID(init 事件的 `session_id`)。
-6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:线程工作目录有 package.json + 系统提示沙箱规则 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。
+6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:适配器传 `--dir` 绝对沙箱路径 + 线程工作目录有 package.json + 系统提示写明沙箱绝对路径 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。审批/交接 diff 忽略 `node_modules`。
 7. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
 8. **审批状态机**:`markApplied` 只接受 `approved` 状态,自动批准路径必须先 `approve()`。
 9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。

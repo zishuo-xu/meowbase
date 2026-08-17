@@ -40,6 +40,22 @@ describe('git 辅助函数', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('node_modules 不进入审批 diff 和交接文件列表', async () => {
+    expect(isApprovalNoisePath('node_modules')).toBe(true);
+    expect(isApprovalNoisePath('node_modules/typescript/package.json')).toBe(true);
+    expect(isApprovalNoisePath('src/app.ts')).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-git-nm-'));
+    await gitInit(dir);
+    writeFileSync(join(dir, 'lru.ts'), 'export const n = 1;\n');
+    mkdirSync(join(dir, 'node_modules', 'typescript'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'typescript', 'package.json'), '{"name":"typescript"}\n');
+    expect(await gitChangedPaths(dir)).toEqual(['lru.ts']);
+    const diff = await gitDiffHead(dir);
+    expect(diff?.stat).toContain('lru.ts');
+    expect(diff?.stat).not.toContain('node_modules');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('tsbuildinfo 等缓存文件不进入审批 diff', async () => {
     expect(isApprovalNoisePath('packages/web/tsconfig.tsbuildinfo')).toBe(true);
     expect(isApprovalNoisePath('src/app.ts')).toBe(false);

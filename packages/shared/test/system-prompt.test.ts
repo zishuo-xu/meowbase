@@ -151,6 +151,17 @@ describe('buildSystemPrompt', () => {
   it('都为空返回 undefined', () => {
     expect(buildSystemPrompt({ evidenceRefs: [] })).toBeUndefined();
   });
+
+  it('传入 workdir 时钉死线程沙箱绝对路径', () => {
+    const prompt = buildSystemPrompt({
+      profile,
+      evidenceRefs: [],
+      workdir: '/tmp/meowbase-work/t1',
+    });
+    expect(prompt).toContain('/tmp/meowbase-work/t1');
+    expect(prompt).toContain('不要上溯');
+    expect(prompt).toContain('packages/');
+  });
 });
 
 const skill: Skill = {
