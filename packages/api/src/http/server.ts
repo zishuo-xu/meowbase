@@ -144,7 +144,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     // 避免它上溯到仓库根导致文件写到沙箱外;且不污染 diff 基线
     writeFileSync(
       join(thread.workdir, 'package.json'),
-      JSON.stringify({ name: 'meowbase-thread', private: true }, null, 2),
+      JSON.stringify({ name: 'meowbase-thread', private: true, type: 'module' }, null, 2),
     );
     await gitInit(thread.workdir);
     return reply.code(201).send(thread);

@@ -71,6 +71,19 @@ describe('ClaudeAdapter 参数', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('headless 用 bypassPermissions,否则跑 node 会卡在审批', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-perm-'));
+    const recordFile = join(dir, 'args.json');
+    process.env.RECORD_ARGS_FILE = recordFile;
+    const adapter = new ClaudeAdapter({ bin: ARGS_BIN });
+    await adapter.runTurn({ prompt: 'hi', workdir: '/tmp' });
+    const args = JSON.parse(readFileSync(recordFile, 'utf8')) as string[];
+    expect(args).toContain('--permission-mode');
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('bypassPermissions');
+    delete process.env.RECORD_ARGS_FILE;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('配置了 model → --model', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-args-model-'));
     const recordFile = join(dir, 'args.json');

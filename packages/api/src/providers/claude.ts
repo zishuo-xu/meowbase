@@ -26,7 +26,7 @@ export class ClaudeAdapter implements AgentService {
       'stream-json',
       '--verbose',
       '--permission-mode',
-      'acceptEdits',
+      'bypassPermissions',
     ];
     if (model) args.push('--model', model);
     if (input.sessionId) args.push('--resume', input.sessionId);
