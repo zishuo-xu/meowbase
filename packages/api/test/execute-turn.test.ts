@@ -281,7 +281,7 @@ describe('executeTurn 消息协议与注入', () => {
     expect(receivedPrompt).toContain('关键事实: 事实内容');
   });
 
-  it('新会话注入 profile;resume 仍注入交接规则', async () => {
+  it('新会话和 resume 都注入身份与交接规则', async () => {
     const stores = createMemoryStores();
     const prompts: (string | undefined)[] = [];
     const registry = createAgentRegistry([
@@ -297,13 +297,11 @@ describe('executeTurn 消息协议与注入', () => {
     await stores.profiles.create({
       agentId: 'claude', name: '墨墨', personality: '沉稳', role: '写手', expertise: ['TS'],
     });
-    // 第一轮:新会话,应注入
     await executeTurn({ threadId: thread.id, content: 'hi', context: { stores, registry } });
     expect(prompts[0]).toContain('你是 墨墨');
     expect(prompts[0]).toContain('交接规则');
-    // 第二轮:已有 session,不再注入身份,但仍注入团队交接规则
     await executeTurn({ threadId: thread.id, content: 'hi again', context: { stores, registry } });
-    expect(prompts[1]).not.toContain('你是 墨墨');
+    expect(prompts[1]).toContain('你是 墨墨');
     expect(prompts[1]).toContain('交接规则');
   });
 
@@ -431,6 +429,7 @@ describe('executeTurn 审批流', () => {
     const messages = await stores.messages.list(thread.id);
     const cardMsg = messages.find((m) => m.role === 'system' && m.content.includes('审批卡片'));
     expect(cardMsg?.content).toContain('#approve');
+    expect(cardMsg?.content).toContain('结论不算通过');
     expect(messages.some((m) => m.role === 'assistant' && m.agentId === 'opencode')).toBe(true);
     expect(messages.some((m) => m.role === 'system' && m.content.includes('🤝 审查:'))).toBe(true);
   });
@@ -528,7 +527,7 @@ describe('executeTurn 审批流', () => {
           const content =
             reviewRound === 1
               ? '## 问题\n缺测试\n## 结论\n需修改'
-              : '## 结论\n通过';
+              : '已实际运行 `node -e "console.log(1)"` 输出 1\n## 结论\n通过';
           return { sessionId: 's-r', content, status: 'completed' };
         },
       },
@@ -612,7 +611,7 @@ describe('executeTurn 审批流', () => {
       {
         agentId: 'opencode',
         async runTurn() {
-          return { sessionId: 's', content: '审查通过', status: 'completed' };
+          return { sessionId: 's', content: '已实际运行 add(2,3),返回 5\n审查通过', status: 'completed' };
         },
       },
     ]);
@@ -629,6 +628,32 @@ describe('executeTurn 审批流', () => {
     const messages = await stores.messages.list(thread.id);
     const cardMsg = messages.find((m) => m.content.includes('审批卡片'));
     expect(cardMsg?.content).toContain('已自动批准');
+  });
+
+  it('写了通过但没有验证证据,不算通过也不能自动落地', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '完成'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return { sessionId: 's', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+    ]);
+    await stores.profiles.create({
+      agentId: 'claude', name: '墨墨', personality: 'x', role: '写手', expertise: [],
+      autoApprove: true,
+    });
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'bare.txt'), 'v1');
+
+    await executeTurn({ threadId: thread.id, content: '写个文件', context: { stores, registry } });
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.status).toBe('reviewing');
+    const cardMsg = (await stores.messages.list(thread.id)).find((m) => m.content.includes('审批卡片'));
+    expect(cardMsg?.content).toContain('结论不算通过');
+    expect(cardMsg?.content).not.toContain('已自动批准');
   });
 
   it('未开 autoApprove → 仍等待人工批准', async () => {
@@ -849,6 +874,7 @@ describe('executeTurn 多角色协作', () => {
     expect(opencodePrompts[0]).toContain('代码写完了');
     expect(opencodePrompts[0]).toContain('【你的任务】');
     expect(opencodePrompts[0]).toContain('【收棒】');
+    expect(opencodePrompts[0]).toContain('验证:');
     expect(opencodePrompts[0]).toContain('请审查这段代码');
     const messages = await stores.messages.list(thread.id);
     const assistants = messages.filter((m) => m.role === 'assistant');

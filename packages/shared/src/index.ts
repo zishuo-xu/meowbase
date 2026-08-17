@@ -40,8 +40,14 @@ export {
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
-export type { ReviewVerdict } from './review-verdict.js';
-export { allowsAutoApprove, hasExplicitReviewVerdict, parseReviewVerdict } from './review-verdict.js';
+export type { GatedVerdict, ReviewVerdict } from './review-verdict.js';
+export {
+  allowsAutoApprove,
+  gateReviewVerdict,
+  hasExplicitReviewVerdict,
+  parseReviewVerdict,
+} from './review-verdict.js';
+export { hasVerificationEvidence, hasVerificationLimit } from './verification.js';
 export type { A2AHandoff, A2AHandoffExtras, A2AStopKind, DroppedBallInput } from './a2a.js';
 export {
   findInlineA2AMentions,

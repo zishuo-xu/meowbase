@@ -17,6 +17,7 @@ import {
   parseRejectCommand,
   parseReviewVerdict,
   allowsAutoApprove,
+  gateReviewVerdict,
   type A2AStopKind,
   selectReviewer,
   stripMentions,
@@ -585,6 +586,7 @@ function reviewPrompt(diff: { stat: string; text: string }): string {
   return (
     '请作为审查官审查以下代码改动,只审查线程工作目录中本次产生的改动,不要审查平台自身代码。' +
     '输出:问题列表→建议→结论(通过/需修改)。结论必须单独写明「通过」或「需修改」。' +
+    '没看到或没亲手跑出命令+结果,不能写通过。' +
     '需修改时列出要点,不要问人,不要 @ 其他人(平台会按结论自动打回写手再审)。\n\n' +
     `${diff.stat}\n\n${diff.text}`
   );
@@ -708,8 +710,12 @@ async function runReviewFixThenCard(input: {
   });
   await context.stores.approvals.setReviewComment(card.id, reviewComment);
 
+  const writerTexts = (await context.stores.messages.list(threadId))
+    .filter((m) => m.role === 'assistant' && m.agentId === writerAgentId)
+    .map((m) => m.content);
+  const gated = gateReviewVerdict(reviewComment, writerTexts);
   const writerProfile = await context.stores.profiles.get(writerAgentId);
-  const autoApplied = allowsAutoApprove(reviewComment, writerProfile?.autoApprove);
+  const autoApplied = allowsAutoApprove(reviewComment, writerProfile?.autoApprove, writerTexts);
   if (autoApplied) {
     await context.stores.approvals.approve(card.id);
     try {
@@ -720,11 +726,12 @@ async function runReviewFixThenCard(input: {
     await context.stores.approvals.markApplied(card.id);
   }
 
-  const revise = parseReviewVerdict(reviewComment) === 'revise';
+  const revise = gated === 'revise';
+  const incomplete = gated === 'incomplete';
   turnLog('card', {
     thread: threadId,
     id: card.id,
-    verdict: parseReviewVerdict(reviewComment),
+    verdict: gated,
     auto: autoApplied,
     stat: clip(latestDiff.stat, 60),
   });
@@ -735,7 +742,9 @@ async function runReviewFixThenCard(input: {
       ? `🤖 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n✅ 已自动批准(autoApprove)`
       : revise
         ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n互审后仍需修改，请你决定是否落地。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
-        : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
+        : incomplete
+          ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n⚠️ 结论不算通过:没有本轮验证证据（命令+结果）。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
+          : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
     status: 'completed',
   });
 }

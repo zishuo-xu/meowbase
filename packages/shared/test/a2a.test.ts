@@ -60,7 +60,19 @@ describe('formatA2AHandoffPrompt', () => {
     expect(prompt).toContain('请审查 add.ts');
     expect(prompt).toContain('【收棒】');
     expect(prompt).toContain('不要再 @');
+    expect(prompt).toContain('没证据不能写通过');
+    expect(prompt).toContain('上一棒未附带本轮命令和结果');
     expect(prompt).not.toContain('@闪闪 请审查');
+  });
+
+  it('上一棒带了命令和结果时交接包标已验证', () => {
+    const prompt = formatA2AHandoffPrompt(
+      '墨墨',
+      'claude',
+      '已实际运行 `add(2,3)`,返回 5\n@闪闪 请审查',
+      '请审查',
+    );
+    expect(prompt).toContain('上一棒附了本轮命令和结果');
   });
 
   it('默认收棒不禁止交下一棒', () => {

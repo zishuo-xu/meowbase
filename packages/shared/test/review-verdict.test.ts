@@ -39,8 +39,9 @@ describe('allowsAutoApprove', () => {
     expect(allowsAutoApprove('结论:通过', false)).toBe(false);
   });
 
-  it('明确通过才自动落地', () => {
-    expect(allowsAutoApprove('审查通过', true)).toBe(true);
+  it('明确通过且有验证证据才自动落地', () => {
+    expect(allowsAutoApprove('已运行 `node -e 1` 输出 1\n审查通过', true)).toBe(true);
+    expect(allowsAutoApprove('审查通过', true)).toBe(false);
     expect(allowsAutoApprove('## 结论\n需修改', true)).toBe(false);
     expect(allowsAutoApprove('(审查无输出)', true)).toBe(false);
   });

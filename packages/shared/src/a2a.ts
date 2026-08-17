@@ -6,6 +6,7 @@ import {
   resolveAlias,
 } from './catalog.js';
 import { hasExplicitReviewVerdict } from './review-verdict.js';
+import { hasVerificationEvidence } from './verification.js';
 
 export interface A2AHandoff {
   target: AgentId;
@@ -103,13 +104,17 @@ export function formatA2AHandoffPrompt(
   const files = (extras.files ?? []).filter(Boolean);
   const closeout =
     extras.closeout === 'reviewer'
-      ? '结论必须单独写明「通过」或「需修改」。写完结论即停:不要问人要不要继续,不要再 @ 任何人。需修改由平台打回写手。'
-      : '做完按交接条目交下一棒。接(能干就干)/退(行首 @ 对的那只)/升(要人拍板就停)。不要问人要不要继续。';
+      ? '结论必须单独写明「通过」或「需修改」。没看到或没亲手跑出命令+结果,不能写通过。跑不了就写「跑不了:原因」并写需修改。写完结论即停:不要问人要不要继续,不要再 @ 任何人。需修改由平台打回写手。'
+      : '做完按交接条目交下一棒。交棒前尽量附上本轮命令和结果;没有证据也可以交,但下一棒不能当通过。接(能干就干)/退(行首 @ 对的那只)/升(要人拍板就停)。不要问人要不要继续。';
+  const verified = hasVerificationEvidence(previousOutput);
   return [
     `【A2A 交接包】`,
     `来自: ${fromName} (@${fromId})`,
     extras.goal ? `用户目标: ${extras.goal}` : undefined,
     files.length > 0 ? `改动文件: ${files.join(', ')}` : undefined,
+    verified
+      ? '验证: 上一棒附了本轮命令和结果。'
+      : '验证: 上一棒未附带本轮命令和结果;你必须自己跑一遍再下结论,没证据不能写通过。',
     `沙箱: 只使用当前工作目录的相对路径,不要审或改平台仓库里的 packages/。`,
     `上一棒原话:\n${body}`,
     `---`,

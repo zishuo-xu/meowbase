@@ -1,4 +1,7 @@
+import { hasVerificationEvidence } from './verification.js';
+
 export type ReviewVerdict = 'pass' | 'revise';
+export type GatedVerdict = ReviewVerdict | 'incomplete';
 
 const REVISE_RE = /需修改|不通过|未通过|请修复|CHANGES_REQUESTED|request changes/i;
 const PASS_RE = /通过|LGTM|可以合入|APPROVED/i;
@@ -27,9 +30,24 @@ export function parseReviewVerdict(text: string): ReviewVerdict {
   return 'pass';
 }
 
-/** 只有明确「通过」才允许 autoApprove;空意见或需修改都不能自动落地。 */
-export function allowsAutoApprove(text: string, autoApprove?: boolean): boolean {
+/** 通过必须带本轮验证证据(自己或上一棒的命令+结果);没证据不能当通过。不拦 @。 */
+export function gateReviewVerdict(
+  reviewText: string,
+  evidenceTexts: readonly string[] = [],
+): GatedVerdict {
+  if (parseReviewVerdict(reviewText) === 'revise') return 'revise';
+  const source = extractConclusion(reviewText) ?? reviewText;
+  if (!PASS_RE.test(source)) return 'incomplete';
+  const pool = [reviewText, ...evidenceTexts];
+  return pool.some((text) => hasVerificationEvidence(text)) ? 'pass' : 'incomplete';
+}
+
+/** 只有明确通过且有验证证据才允许 autoApprove。 */
+export function allowsAutoApprove(
+  text: string,
+  autoApprove?: boolean,
+  evidenceTexts: readonly string[] = [],
+): boolean {
   if (!autoApprove) return false;
-  const source = extractConclusion(text) ?? text;
-  return parseReviewVerdict(text) === 'pass' && PASS_RE.test(source);
+  return gateReviewVerdict(text, evidenceTexts) === 'pass';
 }
