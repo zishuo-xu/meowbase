@@ -15,6 +15,7 @@ export function ChatArea({
   onApprove,
   onReject,
   onConfirmEvidence,
+  onCiteEvidence,
 }: {
   threadId: string;
   messages: MessageDto[];
@@ -23,6 +24,7 @@ export function ChatArea({
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
   onConfirmEvidence: (id: string) => void;
+  onCiteEvidence?: (id: string) => void;
 }) {
   const { lastEvent } = useThreadStream(threadId);
   const [streamed, setStreamed] = useState<MessageDto[]>(messages);
@@ -93,6 +95,7 @@ export function ChatArea({
               onApprove={onApprove}
               onReject={onReject}
               onConfirmEvidence={onConfirmEvidence}
+              onCiteEvidence={onCiteEvidence}
             />
           );
         })}

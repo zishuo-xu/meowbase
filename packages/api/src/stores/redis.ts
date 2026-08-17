@@ -91,6 +91,13 @@ export class RedisThreadStore implements ThreadStore {
     thread.sessions[agentId] = sessionId;
     await this.redis.hset(threadKey(threadId), 'sessions', JSON.stringify(thread.sessions));
   }
+
+  async delete(id: string): Promise<boolean> {
+    const existed = await this.hydrate(id);
+    if (!existed) return false;
+    await this.redis.multi().del(threadKey(id)).srem('thread:index', id).exec();
+    return true;
+  }
 }
 
 export class RedisMessageStore implements MessageStore {
@@ -126,6 +133,10 @@ export class RedisMessageStore implements MessageStore {
 
   async list(threadId: string): Promise<Message[]> {
     return this.readAll(threadId);
+  }
+
+  async deleteAll(threadId: string): Promise<void> {
+    await this.redis.del(messageKey(threadId));
   }
 
   async patch(

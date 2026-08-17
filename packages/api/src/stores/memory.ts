@@ -53,6 +53,10 @@ export class InMemoryThreadStore implements ThreadStore {
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     thread.sessions[agentId] = sessionId;
   }
+
+  async delete(id: string): Promise<boolean> {
+    return this.threads.delete(id);
+  }
 }
 
 export class InMemoryMessageStore implements MessageStore {
@@ -87,6 +91,10 @@ export class InMemoryMessageStore implements MessageStore {
 
   async list(threadId: string): Promise<Message[]> {
     return [...this.listRaw(threadId)];
+  }
+
+  async deleteAll(threadId: string): Promise<void> {
+    this.messages.delete(threadId);
   }
 
   async patch(

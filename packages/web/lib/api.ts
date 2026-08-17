@@ -41,6 +41,16 @@ export interface ToolActivity {
   status: 'running' | 'done' | 'error';
 }
 
+export interface EvidenceDto {
+  id: string;
+  threadId: string;
+  kind: string;
+  title: string;
+  content: string;
+  status: 'draft' | 'confirmed';
+  createdAt: string;
+}
+
 export interface ApprovalDto {
   id: string;
   threadId: string;
@@ -146,6 +156,10 @@ export const api = {
     request<MessageDto[]>(`/api/threads/${threadId}/messages`),
   listApprovals: (threadId: string) =>
     request<ApprovalDto[]>(`/api/approvals?threadId=${threadId}`),
+  listEvidence: (threadId: string) =>
+    request<EvidenceDto[]>(`/api/evidence?threadId=${threadId}`),
+  deleteThread: (threadId: string) =>
+    request<{ ok: boolean }>(`/api/threads/${threadId}`, { method: 'DELETE' }),
   sendMessage: (threadId: string, content: string) =>
     request<MessageDto>(`/api/threads/${threadId}/messages`, {
       method: 'POST',

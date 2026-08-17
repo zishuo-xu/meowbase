@@ -26,7 +26,16 @@ export {
 } from './catalog.js';
 export type { Mention } from './mention.js';
 export { parseMentions, resolveTargetAgent } from './mention.js';
-export { parseMentionTargets, stripMentions } from './mention-targets.js';
+export {
+  extractMentionTargets,
+  lastMentionedAgent,
+  parseMentionTargets,
+  resolveTurnTargets,
+  stripMentions,
+  USER_MENTION_LOOKBACK,
+  USER_MENTION_MAX_AGE_MS,
+} from './mention-targets.js';
+export type { TurnTargetInput } from './mention-targets.js';
 export { mergeTokenUsage } from './token-usage.js';
 export {
   generateApprovalId,

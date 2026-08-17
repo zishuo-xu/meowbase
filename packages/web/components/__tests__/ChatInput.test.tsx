@@ -40,6 +40,20 @@ describe('ChatInput', () => {
     );
   });
 
+  it('insert 把 #ev_ 写进输入框', () => {
+    const onInserted = vi.fn();
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        insert={{ id: 1, text: '#ev_abcd1234' }}
+        onInserted={onInserted}
+      />,
+    );
+    const input = screen.getByPlaceholderText(/@墨墨/) as HTMLTextAreaElement;
+    expect(input.value).toContain('#ev_abcd1234');
+    expect(onInserted).toHaveBeenCalled();
+  });
+
   it('compositionstart 后回车不提交,compositionend 后回车才提交', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);

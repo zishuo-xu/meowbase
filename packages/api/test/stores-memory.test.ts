@@ -20,6 +20,19 @@ describe('内存存储', () => {
     expect(updated?.sessions.claude).toBe('sess-1');
   });
 
+  it('删除线程并清掉消息', async () => {
+    const { threads, messages } = createMemoryStores();
+    const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });
+    await messages.append({
+      threadId: thread.id, role: 'user', content: 'hi', status: 'completed',
+    });
+    expect(await threads.delete(thread.id)).toBe(true);
+    expect(await threads.get(thread.id)).toBeNull();
+    await messages.deleteAll(thread.id);
+    expect(await messages.list(thread.id)).toEqual([]);
+    expect(await threads.delete('不存在')).toBe(false);
+  });
+
   it('追加/读取/列表消息', async () => {
     const { threads, messages } = createMemoryStores();
     const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });

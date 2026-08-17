@@ -369,6 +369,22 @@ export function syncAgentsWithCatalog(agents: AgentSpec[], models: ModelPreset[]
   });
 }
 
+/** Hub 用顿号拼接别名时,避免把「墨墨、claude」存成一个 token。 */
+export function flattenNameList(
+  items: readonly string[],
+  opts: { stripAt?: boolean } = {},
+): string[] {
+  const stripAt = opts.stripAt !== false;
+  const out: string[] = [];
+  for (const item of items) {
+    for (const part of item.split(/[,，、]+/)) {
+      const token = (stripAt ? part.replace(/^@/, '') : part).trim();
+      if (token && !out.includes(token)) out.push(token);
+    }
+  }
+  return out;
+}
+
 export interface AgentPatchInput {
   name?: string;
   aliases?: string[];
@@ -390,10 +406,10 @@ export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentS
   if (typeof patch.personality === 'string') next.personality = patch.personality.trim();
   if (typeof patch.bin === 'string' && patch.bin.trim()) next.bin = patch.bin.trim();
   if (Array.isArray(patch.aliases) && patch.aliases.length > 0) {
-    next.aliases = patch.aliases.map((a) => a.replace(/^@/, '').trim()).filter(Boolean);
+    next.aliases = flattenNameList(patch.aliases);
   }
   if (Array.isArray(patch.expertise)) {
-    next.expertise = patch.expertise.map((e) => e.trim()).filter(Boolean);
+    next.expertise = flattenNameList(patch.expertise, { stripAt: false });
   }
   if (patch.model === null || patch.model === '') {
     delete next.model;
@@ -578,8 +594,8 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
       ...(parseModelProtocol(row.protocol) ? { protocol: parseModelProtocol(row.protocol) } : {}),
       ...('baseUrl' in row ? { baseUrl: row.baseUrl || undefined } : {}),
       ...('apiKey' in row ? { apiKey: row.apiKey || undefined } : {}),
-      ...(row.aliases && row.aliases.length > 0 ? { aliases: row.aliases.map((a) => a.replace(/^@/, '')) } : {}),
-      ...(row.expertise && row.expertise.length > 0 ? { expertise: row.expertise } : {}),
+      ...(row.aliases && row.aliases.length > 0 ? { aliases: flattenNameList(row.aliases) } : {}),
+      ...(row.expertise && row.expertise.length > 0 ? { expertise: flattenNameList(row.expertise, { stripAt: false }) } : {}),
       ...(row.handoffTo && isAgentId(row.handoffTo) ? { handoffTo: row.handoffTo } : {}),
       ...(Array.isArray(row.handoff) && row.handoff.length > 0
         ? { handoff: row.handoff.map((line) => line.trim()).filter(Boolean) }

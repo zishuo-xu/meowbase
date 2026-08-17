@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -151,6 +151,20 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get('/api/threads', async () => deps.stores.threads.list());
+
+  app.delete('/api/threads/:threadId', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const thread = await deps.stores.threads.get(threadId);
+    if (!thread) return reply.code(404).send({ error: `线程不存在: ${threadId}` });
+    await deps.stores.messages.deleteAll(threadId);
+    await deps.stores.threads.delete(threadId);
+    try {
+      rmSync(thread.workdir, { recursive: true, force: true });
+    } catch {
+      // 沙箱目录不在不影响删线程
+    }
+    return { ok: true };
+  });
 
   app.get('/api/profiles', async () => deps.stores.profiles.list());
 

@@ -1,12 +1,14 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type AgentConfigDto, type AppConfigDto, type MessageDto, type ThreadDto } from '@/lib/api';
-import { AGENT_ORDER, getPersona } from '@/lib/persona';
+import { api, type AgentConfigDto, type AppConfigDto, type EvidenceDto, type MessageDto, type ThreadDto } from '@/lib/api';
+import { AGENT_ORDER, agentName, getPersona } from '@/lib/persona';
 import { ThreadSidebar } from '@/components/ThreadSidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { ChatInput } from '@/components/ChatInput';
 import { TeamHub } from '@/components/TeamHub';
+import { EvidenceRail } from '@/components/EvidenceRail';
 import { CatAvatar } from '@/components/CatAvatar';
+import { describeBall } from '@/lib/ball';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
   id,
@@ -26,6 +28,8 @@ export default function Home() {
   const [hubOpen, setHubOpen] = useState(false);
   const [hubFocus, setHubFocus] = useState<string | undefined>();
   const [savingHub, setSavingHub] = useState(false);
+  const [evidence, setEvidence] = useState<EvidenceDto[]>([]);
+  const [insert, setInsert] = useState<{ id: number; text: string } | null>(null);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
 
@@ -54,7 +58,9 @@ export default function Home() {
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
     try {
-      setMessages(await api.listMessages(id));
+      const [msgs, ev] = await Promise.all([api.listMessages(id), api.listEvidence(id)]);
+      setMessages(msgs);
+      setEvidence(ev);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载消息失败');
@@ -89,7 +95,12 @@ export default function Home() {
       setMessages((prev) => [...prev, optimistic]);
       try {
         await api.sendMessage(activeId, content);
-        setMessages(await api.listMessages(activeId));
+        const [msgs, ev] = await Promise.all([
+          api.listMessages(activeId),
+          api.listEvidence(activeId),
+        ]);
+        setMessages(msgs);
+        setEvidence(ev);
         setError(null);
       } catch (err) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
@@ -108,6 +119,28 @@ export default function Home() {
     [send],
   );
 
+  const citeEvidence = useCallback((id: string) => {
+    setInsert({ id: Date.now(), text: `#${id}` });
+  }, []);
+
+  const deleteThread = useCallback(
+    async (id: string) => {
+      if (!window.confirm('删除这个线程？消息也会一起清掉。')) return;
+      try {
+        await api.deleteThread(id);
+        if (activeId === id) {
+          setActiveId(null);
+          setMessages([]);
+          setEvidence([]);
+        }
+        await refreshThreads();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '删除失败');
+      }
+    },
+    [activeId, refreshThreads],
+  );
+
   const openHub = (agentId?: string) => {
     setHubFocus(agentId);
     setHubOpen(true);
@@ -122,6 +155,7 @@ export default function Home() {
         defaultAgentId={config?.defaultAgentId}
         onSelect={(id) => void openThread(id)}
         onCreate={(title, agent) => void createThread(title, agent)}
+        onDelete={(id) => void deleteThread(id)}
         onOpenTeam={openHub}
       />
       <section className="flex min-w-0 flex-1 flex-col">
@@ -129,7 +163,9 @@ export default function Home() {
           <div>
             <h1 className="text-sm font-bold tracking-wide">meowbase · 喵窝</h1>
             <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
-              {agents.map((a) => a.name).join(' · ')} 就位 · 人只说目标
+              {activeId
+                ? describeBall(messages, sending, (id) => agentName(id, agents)).text
+                : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -169,8 +205,20 @@ export default function Home() {
               onApprove={(id) => sendCommand(`#approve ${id}`)}
               onReject={(id, reason) => sendCommand(`#reject ${id} ${reason}`)}
               onConfirmEvidence={(id) => sendCommand(`#confirm ${id}`)}
+              onCiteEvidence={citeEvidence}
             />
-            <ChatInput sending={sending} agents={agents} onSend={(c) => void send(c)} />
+            <EvidenceRail
+              items={evidence}
+              onCite={citeEvidence}
+              onConfirm={(id) => sendCommand(`#confirm ${id}`)}
+            />
+            <ChatInput
+              sending={sending}
+              agents={agents}
+              insert={insert}
+              onInserted={() => setInsert(null)}
+              onSend={(c) => void send(c)}
+            />
           </>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
@@ -188,7 +236,7 @@ export default function Home() {
             <div>
               <p className="text-base font-bold">选择或新建一个线程</p>
               <p className="mt-1 max-w-sm text-sm leading-relaxed text-[var(--ink-soft)]">
-                不用点名哪只猫。说清楚要做什么,它们会自己交接。点头像可以改名字、模型和性格。
+                不用点名哪只猫,不写 @ 会续上一只。说清楚要做什么,它们会自己交接。点头像可以改名字、模型和性格。
               </p>
             </div>
             <button

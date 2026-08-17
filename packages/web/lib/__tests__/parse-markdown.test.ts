@@ -27,6 +27,18 @@ describe('parseMarkdown', () => {
     });
   });
 
+  it('行内 #ev_ 拆成可点引用', () => {
+    const [para] = parseMarkdown('对照 #ev_abcd1234 再看');
+    expect(para).toEqual({
+      type: 'paragraph',
+      children: [
+        { type: 'text', text: '对照 ' },
+        { type: 'evidence', id: 'ev_abcd1234' },
+        { type: 'text', text: ' 再看' },
+      ],
+    });
+  });
+
   it('有序列表', () => {
     const [list] = parseMarkdown('1. 先写测试\n2. 再实现');
     expect(list).toEqual({

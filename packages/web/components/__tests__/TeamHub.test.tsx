@@ -65,7 +65,29 @@ describe('TeamHub', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存这只猫' }));
     expect(onSaveAgent).toHaveBeenCalledWith(
       'claude',
-      expect.objectContaining({ name: '墨墨酱' }),
+      expect.objectContaining({ name: '墨墨酱', aliases: ['墨墨', 'claude'] }),
+    );
+  });
+
+  it('顿号拼接的别名保存成两个 token', () => {
+    const onSaveAgent = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={onSaveAgent}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /墨墨/ }));
+    fireEvent.change(screen.getByLabelText('别名'), {
+      target: { value: '墨墨、claude、墨' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存这只猫' }));
+    expect(onSaveAgent).toHaveBeenCalledWith(
+      'claude',
+      expect.objectContaining({ aliases: ['墨墨', 'claude', '墨'] }),
     );
   });
 

@@ -18,6 +18,7 @@ export function MessageBubble({
   onApprove,
   onReject,
   onConfirmEvidence,
+  onCiteEvidence,
 }: {
   message: MessageDto;
   agentName?: string;
@@ -28,6 +29,7 @@ export function MessageBubble({
   onApprove?: (id: string) => void;
   onReject?: (id: string, reason: string) => void;
   onConfirmEvidence?: (id: string) => void;
+  onCiteEvidence?: (id: string) => void;
 }) {
   const parsed = parseMessage(message);
 
@@ -56,6 +58,7 @@ export function MessageBubble({
           evidenceId={parsed.evidenceId ?? ''}
           title={parsed.title ?? ''}
           onConfirm={onConfirmEvidence ?? (() => {})}
+          onCite={onCiteEvidence}
         />
       </div>
     );
@@ -113,6 +116,7 @@ export function MessageBubble({
         {parsed.text ? (
           <MarkdownBody
             text={parsed.text}
+            onEvidenceClick={onCiteEvidence}
             trailing={
               message.status === 'streaming' ? (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current align-middle opacity-60" />

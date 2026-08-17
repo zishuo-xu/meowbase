@@ -26,23 +26,32 @@ describe('Redis 存储', () => {
   it('线程 CRUD 与会话映射', async () => {
     if (!redis) return;
     const threads = createThreadStore(redis);
-    const thread = await threads.create({ title: 'redis-t', primaryAgentId: 'claude' });
-    expect((await threads.get(thread.id))?.title).toBe('redis-t');
+    const title = `redis-t-${Date.now()}`;
+    const thread = await threads.create({ title, primaryAgentId: 'claude' });
+    expect((await threads.get(thread.id))?.title).toBe(title);
     await threads.setSession(thread.id, 'claude', 'sess-9');
     expect((await threads.get(thread.id))?.sessions.claude).toBe('sess-9');
+    expect(await threads.delete(thread.id)).toBe(true);
+    expect(await threads.get(thread.id)).toBeNull();
   });
 
   it('消息追加与 patch', async () => {
     if (!redis) return;
     const threads = createThreadStore(redis);
     const messages = createMessageStore(redis);
-    const thread = await threads.create({ title: 'redis-m', primaryAgentId: 'claude' });
+    const thread = await threads.create({
+      title: `redis-m-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
     const m = await messages.append({
       threadId: thread.id, role: 'assistant', content: 'x', status: 'streaming',
     });
     const patched = await messages.patch(thread.id, m.id, { content: 'y', status: 'completed' });
     expect(patched.content).toBe('y');
     expect((await messages.list(thread.id)).length).toBe(1);
+    await messages.deleteAll(thread.id);
+    await threads.delete(thread.id);
+    expect(await messages.list(thread.id)).toEqual([]);
   });
 });
 

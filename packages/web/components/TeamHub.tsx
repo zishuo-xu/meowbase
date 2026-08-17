@@ -40,7 +40,7 @@ export interface VerifyModelResult {
 
 function splitList(raw: string): string[] {
   return raw
-    .split(/[,，]/)
+    .split(/[,，、]+/)
     .map((s) => s.replace(/^@/, '').trim())
     .filter(Boolean);
 }

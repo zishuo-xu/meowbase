@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AGENT_ORDER, getPersona } from '@/lib/persona';
 import { getMentionQuery } from '@/lib/mention';
 
@@ -19,10 +19,14 @@ export function ChatInput({
   onSend,
   sending = false,
   agents,
+  insert,
+  onInserted,
 }: {
   onSend: (content: string) => void;
   sending?: boolean;
   agents?: { id: string; name: string }[];
+  insert?: { id: number; text: string } | null;
+  onInserted?: () => void;
 }) {
   const [value, setValue] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -35,6 +39,15 @@ export function ChatInput({
   // 回车确认组合的那一刻 isComposing 已是 false,但事件序列保证
   // compositionend 晚于该次 keydown。
   const composingRef = useRef(false);
+
+  useEffect(() => {
+    if (!insert?.text) return;
+    setValue((prev) => {
+      const pad = prev && !/\s$/.test(prev) ? ' ' : '';
+      return `${prev}${pad}${insert.text} `;
+    });
+    onInserted?.();
+  }, [insert?.id, insert?.text, onInserted]);
 
   const updateMention = (val: string, pos: number) => {
     const q = getMentionQuery(val, pos);
@@ -161,7 +174,7 @@ export function ChatInput({
           }}
           rows={2}
           disabled={sending}
-          placeholder="@墨墨 干活吧…(行首 @名字 呼叫 / 猫回复行首 @团团 会自动交接)"
+          placeholder="@墨墨 干活吧…(不写 @ 会续上一只 / 行首 @名字 换猫)"
           className="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-white px-3.5 py-2.5 text-sm shadow-inner outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-60"
         />
         <button

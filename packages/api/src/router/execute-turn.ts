@@ -13,8 +13,8 @@ import {
   parseConfirmCommand,
   parseEvidenceRefs,
   parseLearnCommand,
-  parseMentionTargets,
   parseRejectCommand,
+  resolveTurnTargets,
   parseReviewVerdict,
   allowsAutoApprove,
   gateReviewVerdict,
@@ -228,7 +228,20 @@ export async function executeTurn(input: {
         ? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }))
         : [...DEFAULT_ROSTER];
   const maxDepth = context.a2aMaxDepth ?? MAX_A2A_DEPTH;
-  const targets = parseMentionTargets(content, thread.primaryAgentId, catalog);
+  const history = await context.stores.messages.list(threadId);
+  const priorUsers = history.filter((m) => m.role === 'user').slice(0, -1);
+  const lastSpeakerId = [...history]
+    .reverse()
+    .find((m) => m.role === 'assistant' && m.agentId)?.agentId;
+  const targets = resolveTurnTargets(content, {
+    primaryAgentId: thread.primaryAgentId,
+    recentUserMessages: priorUsers.map((m) => ({
+      content: m.content,
+      createdAt: m.createdAt,
+    })),
+    lastAssistantAgentId: lastSpeakerId,
+    catalog,
+  });
   turnLog('turn start', {
     thread: threadId,
     targets: targets.join(','),

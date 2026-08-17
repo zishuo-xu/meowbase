@@ -19,6 +19,7 @@ export interface ThreadStore {
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;
+  delete(id: string): Promise<boolean>;
 }
 
 export interface MessageStore {
@@ -34,6 +35,7 @@ export interface MessageStore {
   }): Promise<Message>;
   get(threadId: string, messageId: string): Promise<Message | null>;
   list(threadId: string): Promise<Message[]>;
+  deleteAll(threadId: string): Promise<void>;
   patch(
     threadId: string,
     messageId: string,

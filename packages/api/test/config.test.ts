@@ -81,6 +81,13 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(applyAgentPatch(patched, { model: '' }).model).toBeUndefined();
   });
 
+  it('顿号粘在一起的别名拆开,不存成一个 token', () => {
+    const patched = applyAgentPatch(DEFAULT_AGENTS[0]!, {
+      aliases: ['墨墨、claude', '@闪'],
+    });
+    expect(patched.aliases).toEqual(['墨墨', 'claude', '闪']);
+  });
+
   it('落盘后 loadConfig 能读回', () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-write-'));
     const path = join(dir, 'meowbase.config.json');

@@ -34,6 +34,33 @@ describe('api', () => {
     expect(result.id).toBe('m1');
   });
 
+  it('listEvidence / deleteThread 打对应接口', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ id: 'ev_1' }],
+      }),
+    );
+    await api.listEvidence('t1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/evidence?threadId=t1'),
+      undefined,
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true }),
+      }),
+    );
+    await api.deleteThread('t1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/threads/t1'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
   it('非 2xx 抛错', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     await expect(api.createThread('x', 'claude')).rejects.toThrow();

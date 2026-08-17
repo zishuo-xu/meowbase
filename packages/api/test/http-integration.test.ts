@@ -82,6 +82,21 @@ describe('HTTP 集成', () => {
     expect(messages.map((m) => m.role)).toEqual(['user', 'assistant']);
   });
 
+  it('DELETE /api/threads/:id 删线程', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '待删', primaryAgentId: 'claude' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+    const del = await fetch(`${baseUrl}/api/threads/${thread.id}`, { method: 'DELETE' });
+    expect(del.status).toBe(200);
+    const list = (await (await fetch(`${baseUrl}/api/threads`)).json()) as { id: string }[];
+    expect(list.some((t) => t.id === thread.id)).toBe(false);
+    const missing = await fetch(`${baseUrl}/api/threads/no-such-thread`, { method: 'DELETE' });
+    expect(missing.status).toBe(404);
+  });
+
   it('空 content 返回 400', async () => {
     const createRes = await fetch(`${baseUrl}/api/threads`, {
       method: 'POST',

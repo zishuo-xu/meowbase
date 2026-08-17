@@ -1,9 +1,27 @@
 import type { ReactNode } from 'react';
 import { parseMarkdown, type MdInline } from '@/lib/parse-markdown';
 
-function Inline({ nodes }: { nodes: MdInline[] }): ReactNode {
+function Inline({
+  nodes,
+  onEvidenceClick,
+}: {
+  nodes: MdInline[];
+  onEvidenceClick?: (id: string) => void;
+}): ReactNode {
   return nodes.map((node, i) => {
     if (node.type === 'text') return node.text;
+    if (node.type === 'evidence') {
+      return (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onEvidenceClick?.(node.id)}
+          className="mx-0.5 rounded-md bg-[var(--accent)]/10 px-1 py-0.5 font-mono text-[0.85em] font-bold text-[var(--accent-strong)] hover:bg-[var(--accent)]/20"
+        >
+          #{node.id}
+        </button>
+      );
+    }
     if (node.type === 'code') {
       return (
         <code key={i} className="rounded bg-black/[0.06] px-1 py-0.5 font-mono text-[0.85em]">
@@ -14,13 +32,13 @@ function Inline({ nodes }: { nodes: MdInline[] }): ReactNode {
     if (node.type === 'strong') {
       return (
         <strong key={i} className="font-bold">
-          <Inline nodes={node.children} />
+          <Inline nodes={node.children} onEvidenceClick={onEvidenceClick} />
         </strong>
       );
     }
     return (
       <em key={i}>
-        <Inline nodes={node.children} />
+        <Inline nodes={node.children} onEvidenceClick={onEvidenceClick} />
       </em>
     );
   });
@@ -35,9 +53,11 @@ const HEADING = {
 export function MarkdownBody({
   text,
   trailing,
+  onEvidenceClick,
 }: {
   text: string;
   trailing?: ReactNode;
+  onEvidenceClick?: (id: string) => void;
 }) {
   const blocks = parseMarkdown(text);
   if (blocks.length === 0) return trailing ? <>{trailing}</> : null;
@@ -50,7 +70,7 @@ export function MarkdownBody({
           const Tag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
           return (
             <Tag key={i} className={HEADING[block.level]}>
-              <Inline nodes={block.children} />
+              <Inline nodes={block.children} onEvidenceClick={onEvidenceClick} />
               {last ? trailing : null}
             </Tag>
           );
@@ -64,7 +84,7 @@ export function MarkdownBody({
             >
               {block.items.map((item, j) => (
                 <li key={j} className="my-0.5">
-                  <Inline nodes={item} />
+                  <Inline nodes={item} onEvidenceClick={onEvidenceClick} />
                   {last && j === block.items.length - 1 ? trailing : null}
                 </li>
               ))}
@@ -84,7 +104,7 @@ export function MarkdownBody({
         }
         return (
           <p key={i} className="whitespace-pre-wrap">
-            <Inline nodes={block.children} />
+            <Inline nodes={block.children} onEvidenceClick={onEvidenceClick} />
             {last ? trailing : null}
           </p>
         );

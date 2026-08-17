@@ -23,6 +23,25 @@ describe('MessageBubble', () => {
     expect(screen.getByText('墨墨')).toBeTruthy();
   });
 
+  it('气泡里的 #ev_ 可点引用', () => {
+    const onCite = vi.fn();
+    render(
+      <MessageBubble
+        onCiteEvidence={onCite}
+        message={{
+          id: 'm-ev',
+          threadId: 't',
+          role: 'user',
+          content: '对照 #ev_abcd1234',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '#ev_abcd1234' }));
+    expect(onCite).toHaveBeenCalledWith('ev_abcd1234');
+  });
+
   it('失败且无正文时显示错误', () => {
     render(
       <MessageBubble

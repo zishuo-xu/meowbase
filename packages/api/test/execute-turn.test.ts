@@ -53,6 +53,50 @@ describe('executeTurn', () => {
     expect(final.content).toBe('默认');
   });
 
+  it('没 @ 续最近用户点过的猫', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '墨墨'),
+      stubAgent('gemini', '闪闪接着干'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@闪闪 你来',
+      context: { stores, registry },
+    });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '继续',
+      context: { stores, registry },
+    });
+    expect(final.agentId).toBe('gemini');
+    expect(final.content).toBe('闪闪接着干');
+  });
+
+  it('用户也没 @ 时续最后开口的猫', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '主猫'),
+      stubAgent('opencode', '团团接着'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: 'opencode',
+      content: '上一棒是我',
+      status: 'completed',
+    });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '接着说',
+      context: { stores, registry },
+    });
+    expect(final.agentId).toBe('opencode');
+    expect(final.content).toBe('团团接着');
+  });
+
   it('流式增量累积并触发 onIncrement', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '一二三')]);

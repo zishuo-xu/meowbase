@@ -2,7 +2,8 @@ export type MdInline =
   | { type: 'text'; text: string }
   | { type: 'strong'; children: MdInline[] }
   | { type: 'em'; children: MdInline[] }
-  | { type: 'code'; text: string };
+  | { type: 'code'; text: string }
+  | { type: 'evidence'; id: string };
 
 export type MdBlock =
   | { type: 'heading'; level: 1 | 2 | 3; children: MdInline[] }
@@ -21,6 +22,12 @@ export function parseInline(text: string): MdInline[] {
   };
 
   while (i < text.length) {
+    const ev = text.slice(i).match(/^#ev_[a-f0-9]{8}\b/);
+    if (ev) {
+      out.push({ type: 'evidence', id: ev[0].slice(1) });
+      i += ev[0].length;
+      continue;
+    }
     if (text.startsWith('`', i)) {
       const end = text.indexOf('`', i + 1);
       if (end > i) {
