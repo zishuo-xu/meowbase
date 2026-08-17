@@ -8,25 +8,35 @@ import {
 } from '../src/mention-targets.js';
 
 describe('parseMentionTargets', () => {
-  it('多 @ 提取全部目标(保持顺序)', () => {
-    expect(parseMentionTargets('@claude @opencode 帮我看看', 'claude')).toEqual([
+  it('各占一行的行首 @ 才并行', () => {
+    expect(parseMentionTargets('@claude\n@opencode\n帮我看看', 'claude')).toEqual([
       'claude',
       'opencode',
     ]);
   });
 
-  it('中文名提取目标', () => {
-    expect(parseMentionTargets('@墨墨 @团团 帮我看看', 'gemini')).toEqual([
+  it('中文名各占一行', () => {
+    expect(parseMentionTargets('@墨墨\n@团团\n帮我看看', 'gemini')).toEqual([
       'claude',
       'opencode',
     ]);
   });
 
-  it('重复 @ 去重', () => {
-    expect(parseMentionTargets('@claude 写 @claude 再改', 'claude')).toEqual(['claude']);
+  it('同一行第二个 @ 不当目标', () => {
+    expect(parseMentionTargets('@claude @opencode 帮我看看', 'claude')).toEqual(['claude']);
+    expect(parseMentionTargets('@墨墨 @团团 帮我看看', 'gemini')).toEqual(['claude']);
   });
 
-  it('无 mention 用 fallback', () => {
+  it('句中不要 @ 某人不当目标', () => {
+    expect(parseMentionTargets('不要 @闪闪,只写 add.ts', 'claude')).toEqual(['claude']);
+    expect(extractMentionTargets('不要 @闪闪,只写 add.ts')).toEqual([]);
+  });
+
+  it('重复行首 @ 去重', () => {
+    expect(parseMentionTargets('@claude 写\n@claude 再改', 'gemini')).toEqual(['claude']);
+  });
+
+  it('无行首 mention 用 fallback', () => {
     expect(parseMentionTargets('普通消息', 'claude')).toEqual(['claude']);
   });
 });
@@ -37,9 +47,9 @@ describe('extractMentionTargets / lastMentionedAgent', () => {
     expect(lastMentionedAgent('普通消息')).toBeUndefined();
   });
 
-  it('多个 @ 取最后一个作为续棒对象', () => {
-    expect(lastMentionedAgent('@墨墨 @团团 一起看')).toBe('opencode');
-    expect(lastMentionedAgent('@团团 先做 @墨墨 再看')).toBe('claude');
+  it('续棒只看行首,取最后一行行首 @', () => {
+    expect(lastMentionedAgent('@墨墨\n@团团\n一起看')).toBe('opencode');
+    expect(lastMentionedAgent('@团团 先做 @墨墨 再看')).toBe('opencode');
   });
 });
 
@@ -101,16 +111,16 @@ describe('resolveTurnTargets', () => {
 });
 
 describe('stripMentions', () => {
-  it('移除 @mention 标记', () => {
-    expect(stripMentions('@claude 帮我写代码')).toBe(' 帮我写代码');
+  it('只剥行首 @,留给猫的是任务正文', () => {
+    expect(stripMentions('@claude 帮我写代码')).toBe('帮我写代码');
   });
 
-  it('移除多个标记', () => {
-    expect(stripMentions('@claude 写 @opencode 审')).toBe(' 写  审');
+  it('句中 @ 留给原文', () => {
+    expect(stripMentions('@claude 写 @opencode 审')).toBe('写 @opencode 审');
   });
 
-  it('移除中文名标记', () => {
-    expect(stripMentions('@墨墨 帮我写代码')).toBe(' 帮我写代码');
+  it('剥中文行首名', () => {
+    expect(stripMentions('@墨墨 帮我写代码')).toBe('帮我写代码');
   });
 
   it('无标记原样返回', () => {

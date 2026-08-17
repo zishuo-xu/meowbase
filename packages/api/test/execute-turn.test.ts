@@ -41,6 +41,34 @@ describe('executeTurn', () => {
     expect(final.status).toBe('completed');
   });
 
+  it('句中不要 @闪闪 不并行叫闪闪', async () => {
+    const stores = createMemoryStores();
+    const called: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          called.push('claude');
+          return { sessionId: 's1', content: '只写 add', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          called.push('gemini');
+          return { sessionId: 's2', content: '不该来', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '不要 @闪闪,只写 add.ts',
+      context: { stores, registry },
+    });
+    expect(called).toEqual(['claude']);
+  });
+
   it('首条用户消息把占位标题换成任务摘要', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '好')]);
@@ -1011,7 +1039,7 @@ describe('executeTurn 多角色协作', () => {
     const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
     const final = await executeTurn({
       threadId: thread.id,
-      content: '@claude 写个加法函数 @opencode 写个乘法函数',
+      content: '@claude\n@opencode\n写个加法函数 写个乘法函数',
       context: { stores, registry },
     });
     // 两个目标都收到清理后的同一消息(无 @ 标记)

@@ -234,7 +234,7 @@ export async function executeTurn(input: {
     }
   }
 
-  // 多 @ 同题并行(对齐 clowder):每个目标收到同一消息;A2A 接力各自串行;失败隔离
+  // 多 @ 同题并行:各占一行的行首 @ 才是目标;同一正文发给每个目标;A2A 接力各自串行;失败隔离
   const profiles = await context.stores.profiles.list();
   const members =
     context.agents?.map((a) => ({

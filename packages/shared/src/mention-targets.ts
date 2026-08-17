@@ -1,47 +1,48 @@
 import type { AgentId } from './types.js';
-import {
-  DEFAULT_CATALOG,
-  MENTION_TOKEN_RE,
-  type MentionCatalog,
-  resolveAlias,
-} from './catalog.js';
+import { DEFAULT_CATALOG, type MentionCatalog, resolveAlias } from './catalog.js';
 
 /** 没 @ 时回看最近几条用户消息;只扫人说的话,不扫猫。 */
 export const USER_MENTION_LOOKBACK = 5;
 export const USER_MENTION_MAX_AGE_MS = 60 * 60 * 1000;
 
-/** 提取消息里所有有效 @ 目标(不去 fallback;无 @ 返回空)。 */
+/** 行首 @名字,与猫的 A2A 同一条规则(对齐 clowder TIPS)。 */
+const LINE_START = /^\s*@([a-zA-Z][a-zA-Z0-9_-]*|[\u4e00-\u9fa5]+)/;
+
+function lineStartTarget(line: string, catalog: MentionCatalog): AgentId | undefined {
+  const match = line.match(LINE_START);
+  if (!match) return undefined;
+  return resolveAlias(match[1] ?? '', catalog);
+}
+
+/** 提取行首有效 @ 目标(不去 fallback;句中 @ 不算)。 */
 export function extractMentionTargets(
   content: string,
   catalog: MentionCatalog = DEFAULT_CATALOG,
 ): AgentId[] {
   const targets: AgentId[] = [];
-  const re = new RegExp(MENTION_TOKEN_RE.source, 'g');
-  for (const match of content.matchAll(re)) {
-    const id = resolveAlias(match[1] ?? '', catalog);
+  for (const line of content.split('\n')) {
+    const id = lineStartTarget(line, catalog);
     if (id && !targets.includes(id)) targets.push(id);
   }
   return targets;
 }
 
-/** 消息里最后一个有效 @;用于「没 @ 续上一只」。 */
+/** 最后一行行首 @;用于「没 @ 续上一只」。句中 @ 不续。 */
 export function lastMentionedAgent(
   content: string,
   catalog: MentionCatalog = DEFAULT_CATALOG,
 ): AgentId | undefined {
-  const re = new RegExp(MENTION_TOKEN_RE.source, 'g');
   let last: AgentId | undefined;
-  for (const match of content.matchAll(re)) {
-    const id = resolveAlias(match[1] ?? '', catalog);
+  for (const line of content.split('\n')) {
+    const id = lineStartTarget(line, catalog);
     if (id) last = id;
   }
   return last;
 }
 
 /**
- * 多 @ 同题并行(对齐 clowder):提取消息中所有 @mention 目标,
- * 同一消息原文发给每个目标;无 mention 时用 fallback。
- * 中文名与英文 id 等价(@墨墨 = @claude)。
+ * 多 @ 同题并行:各占一行的行首 @ 才是目标,同一正文发给每个目标。
+ * 无行首 mention 时用 fallback。中文名与英文 id 等价。
  */
 export function parseMentionTargets(
   content: string,
@@ -62,7 +63,7 @@ export interface TurnTargetInput {
 }
 
 /**
- * 本轮路由:本句有效 @ → 最近 1h 内用户消息的最后一只 @
+ * 本轮路由:本句行首 @ → 最近 1h 内用户消息的最后一行行首 @
  * → 最后开口的猫 → 线程主猫。不加 @all。
  */
 export function resolveTurnTargets(
@@ -92,13 +93,18 @@ export function resolveTurnTargets(
   return [input.primaryAgentId];
 }
 
-/** 移除消息中的 @mention 标记(发给 agent 前清理) */
+/** 只剥行首路由 @,句中 @ 留给原文。 */
 export function stripMentions(
   content: string,
   catalog: MentionCatalog = DEFAULT_CATALOG,
 ): string {
-  const re = new RegExp(MENTION_TOKEN_RE.source, 'g');
-  return content.replace(re, (full, token: string) =>
-    resolveAlias(token, catalog) ? '' : full,
-  );
+  return content
+    .split('\n')
+    .map((line) => {
+      const match = line.match(/^(\s*)@([a-zA-Z][a-zA-Z0-9_-]*|[\u4e00-\u9fa5]+)(\s*)(.*)$/);
+      if (!match) return line;
+      if (!resolveAlias(match[2] ?? '', catalog)) return line;
+      return `${match[1] ?? ''}${match[4] ?? ''}`;
+    })
+    .join('\n');
 }
