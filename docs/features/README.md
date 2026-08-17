@@ -2,8 +2,8 @@
 
 对照 clowder：他们也是一个 F 一篇。我们更短：**一次只写一篇，只做这一篇。**
 
-1. 对照他们公开 README / TIPS / `docs/features` / issue，只记语义。
-2. 复制 [_template.md](_template.md)，一篇一个可点可看的特性。
+1. 开篇先想：同一问题他们公开怎么设计，这一刀能靠多近。读 README / TIPS / `docs/features` / issue，只记语义。
+2. 复制 [_template.md](_template.md)，填「对照 / 靠拢」，一篇一个可点可看的特性。
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 

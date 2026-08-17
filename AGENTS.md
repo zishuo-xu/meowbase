@@ -71,7 +71,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 - TypeScript 严格模式,ESM,相对导入带 `.js` 后缀(NodeNext)
 - 业务逻辑只依赖 `stores/ports.ts` 接口,禁止直接 import ioredis
-- **计划先对照 clowder**:提出下一步前先看他们公开设计怎么做同一件事,只拿语义和踩坑,不抄源码,不搬邮箱/SOP/MCP
+- **计划先对照 clowder**:每次设计先想同一问题他们公开怎么做、这一刀能靠多近;只拿语义和踩坑,不抄源码。能靠就靠,本刀没更近要写清为什么。
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀

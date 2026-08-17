@@ -7,7 +7,7 @@ alwaysApply: true
 
 参考项目是 [clowder-ai](https://github.com/zts212653/clowder-ai)（MIT）。喵窝是参照重写，不是 fork。
 
-每次提出或修改计划（含「下一步做什么」）必须先查他们怎么处理同一问题：公开 README / TIPS / `docs/features` / issue，不读、不抄源码。
+每次提出或修改计划、写 `docs/features/` 新篇，必须先想同一问题他们公开怎么设计、这一刀能靠多近：公开 README / TIPS / `docs/features` / issue。能靠就靠。不读、不抄源码。模板里「对照 / 靠拢」两句空着就还没想完。
 
 对照之后仍走喵窝自己的门：
 
