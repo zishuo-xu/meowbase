@@ -91,4 +91,4 @@ docs/         设计文档(specs/)+ 实现计划(plans/)
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
-- **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api(claude/gemini 走本机 CLI;opencode 默认 relay:opencode.ai/zen/go,模型 deepseek-v4-flash);费用按 token 计(一次完整流程约 $0.2-0.4)
+- **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api;步骤和期望见 [docs/DEMO.md](docs/DEMO.md)。费用按 token 计(一次完整流程约 $0.2-0.4)。用户消息里不要写「不要 `@闪闪`」,句中 `@` 仍会并行叫它
