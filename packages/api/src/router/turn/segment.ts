@@ -266,8 +266,9 @@ export async function runSegment(
       break;
     }
     const relayFiles = await listHandoffFiles(thread.workdir);
+    const relayTarget: AgentId = handoff.target;
     const pendingHop: PendingHop = {
-      to: handoff.target,
+      to: relayTarget,
       from: currentAgent,
       task: handoff.task,
       goal: segment.text,
@@ -283,7 +284,7 @@ export async function runSegment(
         role: 'system',
         content: formatA2ARelayNote({
           fromName: displayName(currentAgent, catalog),
-          toName: displayName(handoff.target, catalog),
+          toName: displayName(relayTarget, catalog),
           goal: segment.text,
           files: relayFiles,
           task: handoff.task,
@@ -295,7 +296,7 @@ export async function runSegment(
     turnLog('a2a defer', {
       thread: thread.id,
       from: currentAgent,
-      to: handoff.target,
+      to: relayTarget,
       task: clip(handoff.task, 60),
     });
     break;

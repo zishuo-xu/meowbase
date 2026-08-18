@@ -46,38 +46,40 @@ export function parseUnifiedDiff(raw: string): DiffFile[] {
   let hunk: DiffHunk | null = null;
   let sawMarker = false;
 
-  const startFile = (path: string) => {
-    current = { path, hunks: [] };
-    files.push(current);
+  const startFile = (path: string): DiffFile => {
+    const file: DiffFile = { path, hunks: [] };
+    files.push(file);
+    current = file;
     hunk = null;
+    return file;
   };
 
   const ensureHunk = (header = '') => {
-    if (!current) startFile('改动');
+    if (!current) current = startFile('改动');
     if (!hunk) {
       hunk = { header, lines: [] };
-      current!.hunks.push(hunk);
+      current.hunks.push(hunk);
     }
   };
 
   for (const line of text.split('\n')) {
     if (line.startsWith('diff --git ')) {
       sawMarker = true;
-      startFile(filePathFromGitLine(line) ?? '改动');
+      current = startFile(filePathFromGitLine(line) ?? '改动');
       continue;
     }
     if (line.startsWith('--- ') || line.startsWith('+++ ')) {
       sawMarker = true;
       const path = filePathFromGitLine(line);
       if (path && current) current.path = path;
-      if (path && !current) startFile(path);
+      if (path && !current) current = startFile(path);
       continue;
     }
     if (line.startsWith('@@')) {
       sawMarker = true;
-      if (!current) startFile('改动');
+      if (!current) current = startFile('改动');
       hunk = { header: line, lines: [] };
-      current!.hunks.push(hunk);
+      current.hunks.push(hunk);
       continue;
     }
     if (/^(index |new file |deleted file |old mode |new mode |similarity |rename |copy )/.test(line)) {

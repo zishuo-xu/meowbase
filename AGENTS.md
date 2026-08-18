@@ -19,6 +19,8 @@ pnpm -r build     # 三包构建 + 类型检查
 pnpm smoke        # 真实冒烟(需要真实 claude/opencode 通道,花钱)
 ```
 
+CI 在 push/PR 上跑 `pnpm -r build` 与 `pnpm test`（`.github/workflows/ci.yml`）。
+
 浏览器打开 http://localhost:3300。API 只读接口可直接 curl localhost:3200。
 
 ## 仓库结构
