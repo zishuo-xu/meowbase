@@ -69,6 +69,23 @@ describe('TeamHub', () => {
     );
   });
 
+  it('能力页只读列出谁写谁审谁跑', () => {
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '能力' }));
+    expect(screen.getByText('谁写、谁审、谁跑。只读名册，不改路由。')).toBeTruthy();
+    expect(screen.getByText(/CLI claude/)).toBeTruthy();
+    expect(screen.getByText(/CLI gemini/)).toBeTruthy();
+    expect(screen.getByText(/CLI opencode/)).toBeTruthy();
+  });
+
   it('顿号拼接的别名保存成两个 token', () => {
     const onSaveAgent = vi.fn();
     render(

@@ -224,13 +224,24 @@ export function TeamHub({
           <button
             type="button"
             onClick={() => setPane('models')}
-            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+            className={`mb-1 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
               pane === 'models'
                 ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
                 : 'hover:bg-white/70'
             }`}
           >
             模型目录
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('capability')}
+            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+              pane === 'capability'
+                ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
+                : 'hover:bg-white/70'
+            }`}
+          >
+            能力
           </button>
           <div className="mb-2 px-1 text-[11px] font-bold tracking-wide text-[var(--ink-soft)] uppercase">
             成员
@@ -277,7 +288,41 @@ export function TeamHub({
             </button>
           </div>
 
-          {pane === 'models' ? (
+          {pane === 'capability' ? (
+            <section className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">能力</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  谁写、谁审、谁跑。只读名册，不改路由。
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {config.agents.map((agent) => (
+                  <li
+                    key={agent.id}
+                    className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CatAvatar agentId={agent.id} name={agent.name} size={28} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold">
+                          {agent.name}
+                          <span className="ml-2 text-xs font-medium text-[var(--ink-soft)]">
+                            {agent.role}
+                          </span>
+                        </div>
+                        <div className="truncate text-[11px] text-[var(--ink-soft)]">
+                          {(agent.expertise ?? []).join('、') || '擅长未填'}
+                          {` · CLI ${agent.bin}`}
+                          {agent.model ? ` / ${agent.model}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : pane === 'models' ? (
             <section className="space-y-3">
               <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
                 对齐 clowder:先选协议再勾 CLI。第三方模型填网关 URL 和 API Key；官方登录或 opencode zen 可留空。密钥只存在本机，不进 git。
