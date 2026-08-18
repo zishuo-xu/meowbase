@@ -12,6 +12,8 @@ export interface PendingHop {
   visited: AgentId[];
   firstAgent: AgentId;
   hop: number;
+  /** 行首「等跑」记下的沙箱命令;跑完再叫醒同一只 */
+  holdCommand?: string;
 }
 
 export interface Thread {

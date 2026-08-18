@@ -221,15 +221,78 @@ export function parseA2ARelayNote(text: string): { headline: string; details: st
 export type A2AStopKind = 'no-handoff' | 'reviewer-closeout' | 'blocked' | 'escalated' | 'held';
 
 const HOLD_LINE = /^\s*(?:HOLD|hold|等)[:：\s]+(\S.*)$/;
+const HOLD_COMMAND_LINE = /^\s*(?:HOLDCMD|holdcmd|等跑)[:：\s]+(\S.*)$/;
 
-/** 行首「等 / HOLD」+ 原因是持球出口,不是掉地上,也不是升级给人。 */
+/** 行首「等跑 / HOLDCMD」+ 命令:持球,并由平台在沙箱跑。 */
+export function parseHoldCommand(text: string): string | null {
+  const stripped = text.replace(/```[\s\S]*?```/g, '');
+  for (const line of stripped.split('\n')) {
+    const match = line.match(HOLD_COMMAND_LINE);
+    if (match?.[1]?.trim()) return match[1].trim();
+  }
+  return null;
+}
+
+/** 行首「等 / HOLD」+ 原因是持球出口,不是掉地上,也不是升级给人。「等跑」也算持球。 */
 export function parseHoldExit(text: string): string | null {
+  const command = parseHoldCommand(text);
+  if (command) return `跑 \`${clipBody(command, 60)}\``;
   const stripped = text.replace(/```[\s\S]*?```/g, '');
   for (const line of stripped.split('\n')) {
     const match = line.match(HOLD_LINE);
     if (match?.[1]?.trim()) return match[1].trim();
   }
   return null;
+}
+
+export function formatHoldCommandDoneNote(input: {
+  command: string;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+}): string {
+  const cmd = clipBody(input.command, 60);
+  const head = input.timedOut
+    ? `跑完: \`${cmd}\` 超时`
+    : `跑完: \`${cmd}\` 退出 ${input.exitCode ?? '?'}`;
+  return [head, tailBlock('stdout', input.stdout), tailBlock('stderr', input.stderr)]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function formatHoldCommandWakePrompt(input: {
+  command: string;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  previousOutput: string;
+}): string {
+  const status = input.timedOut ? '超时' : `退出 ${input.exitCode ?? '?'}`;
+  return [
+    '【命令跑完】平台已在沙箱跑完你写下的命令。根据结果继续。要交棒就行首 @。',
+    `命令: ${input.command}`,
+    `结果: ${status}`,
+    tailBlock('stdout', input.stdout),
+    tailBlock('stderr', input.stderr),
+    '上一棒原话:',
+    clipBody(input.previousOutput),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function tailBlock(label: string, text: string): string {
+  const tail = clipTail(text, 4000);
+  return tail ? `${label}:\n${tail}` : '';
+}
+
+function clipTail(text: string, max: number): string {
+  const trimmed = text.replace(/\s+$/u, '');
+  if (!trimmed) return '';
+  if (trimmed.length <= max) return trimmed;
+  return `…${trimmed.slice(-max)}`;
 }
 
 export function formatHoldBallNote(speakerName: string, reason?: string): string {
@@ -255,7 +318,7 @@ export interface DroppedBallInput {
 export function formatDroppedBallNote(input: DroppedBallInput): string | null {
   const reviewer = Boolean(input.role?.includes('审查'));
   if (reviewer && hasExplicitReviewVerdict(input.lastContent)) return null;
-  if (parseHoldExit(input.lastContent)) return null;
+  if (parseHoldExit(input.lastContent) || parseHoldCommand(input.lastContent)) return null;
   if (input.hadInlineHint) return null;
   if (input.stop === 'escalated' || input.stop === 'held') return null;
   if (input.stop === 'blocked') {
@@ -339,7 +402,7 @@ export function formatExitNudgePrompt(input: {
   const next = input.handoffName ? `@${input.handoffName}` : '@下一只';
   const closeout = input.isReviewer
     ? '审查官:写出「通过」或「需修改」即停,不要再 @。或行首 @人 升级。'
-    : `三选一:接(做完再行首 ${next} 跟任务)/退(另起一行 ${next} 跟任务)/升(行首 @人 写要拍板的事)/持(行首 等 原因)。不要问人要不要继续。`;
+      : `三选一:接(做完再行首 ${next} 跟任务)/退(另起一行 ${next} 跟任务)/升(行首 @人 写要拍板的事)/持(行首 等 原因,或 等跑 命令)。不要问人要不要继续。`;
   return [
     '【出口补问】上一棒没有行首交给下一只,也没有 @人。平台只再问一次,不替你选下一棒。',
     closeout,

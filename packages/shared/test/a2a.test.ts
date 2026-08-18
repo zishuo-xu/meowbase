@@ -11,6 +11,8 @@ import {
   formatFreezeBallNote,
   formatFailedBallNote,
   formatHoldBallNote,
+  formatHoldCommandDoneNote,
+  formatHoldCommandWakePrompt,
   formatPickupCommand,
   formatExitNudgeNote,
   formatExitNudgePrompt,
@@ -20,6 +22,7 @@ import {
   isFreezeBallNote,
   isHoldBallNote,
   parseA2ARelayNote,
+  parseHoldCommand,
   parseHoldExit,
   shouldNudgeExit,
   shouldResumePending,
@@ -275,6 +278,32 @@ describe('parseHoldExit', () => {
     expect(parseHoldExit('HOLD:等 CI 绿')).toBe('等 CI 绿');
     expect(parseHoldExit('先等等看再交')).toBeNull();
     expect(parseHoldExit('等等再说')).toBeNull();
+  });
+
+  it('行首等跑才是托管命令,等 原因不是命令', () => {
+    expect(parseHoldCommand('写到一半。\n等跑 npm test')).toBe('npm test');
+    expect(parseHoldCommand('HOLDCMD:node -e "console.log(1)"')).toBe('node -e "console.log(1)"');
+    expect(parseHoldCommand('等 测试跑完')).toBeNull();
+    expect(parseHoldCommand('先等跑 npm test 再看')).toBeNull();
+    expect(parseHoldCommand('等跑')).toBeNull();
+    expect(parseHoldExit('等跑 npm test')).toContain('npm test');
+    const done = formatHoldCommandDoneNote({
+      command: 'npm test',
+      exitCode: 1,
+      stdout: 'not ok',
+      stderr: '',
+      timedOut: false,
+    });
+    expect(done).toContain('跑完');
+    expect(done).toContain('退出 1');
+    expect(formatHoldCommandWakePrompt({
+      command: 'npm test',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+      timedOut: false,
+      previousOutput: '等跑 npm test',
+    })).toContain('命令跑完');
   });
 
   it('持球不是掉地上,也不补问', () => {

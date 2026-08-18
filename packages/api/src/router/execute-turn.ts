@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { killHoldCommand, runHoldCommand } from './hold-command.js';
 import {
   buildMentionCatalog,
   buildSystemPrompt,
@@ -16,6 +17,9 @@ import {
   formatFreezeBallNote,
   formatFailedBallNote,
   formatHoldBallNote,
+  formatHoldCommandDoneNote,
+  formatHoldCommandWakePrompt,
+  parseHoldCommand,
   parseHoldExit,
   isPlaceholderTitle,
   matchSkills,
@@ -206,6 +210,7 @@ export async function executeTurn(input: {
 
   if (parseFreezeCommand(content)) {
     turnLog('freeze', { thread: threadId });
+    killHoldCommand(threadId);
     await context.stores.threads.setPendingHop(threadId, null);
     return context.stores.messages.append({
       threadId,
@@ -296,11 +301,15 @@ export async function executeTurn(input: {
   const writeQueue = createWriteQueue();
   const pending = thread.pendingHop;
   if (pending) {
-    if (shouldResumePending(content, pending.to, catalog)) {
+    if (pending.holdCommand) {
+      killHoldCommand(threadId);
+      await context.stores.threads.setPendingHop(threadId, null);
+    } else if (shouldResumePending(content, pending.to, catalog)) {
       const followed = await resumePendingTurn({ threadId, context, learn, refs });
       if (followed) return followed;
+    } else {
+      await context.stores.threads.setPendingHop(threadId, null);
     }
-    await context.stores.threads.setPendingHop(threadId, null);
     if (userEscalates(content)) {
       return context.stores.messages.append({
         threadId,
@@ -383,7 +392,7 @@ export async function resumePendingTurn(input: {
 }): Promise<Message | null> {
   const { threadId, context } = input;
   const thread = await context.stores.threads.get(threadId);
-  if (!thread?.pendingHop) return null;
+  if (!thread?.pendingHop || thread.pendingHop.holdCommand) return null;
   thread.workdir = resolve(thread.workdir);
   const pending = thread.pendingHop;
   const roster = await loadRoster(context);
@@ -420,11 +429,83 @@ export async function followPendingChain(input: {
   context: TurnContext;
 }): Promise<void> {
   const max = input.context.a2aMaxDepth ?? MAX_A2A_DEPTH;
+  await finishHoldCommandThenWake(input);
   for (let i = 0; i < max; i++) {
     if (input.context.signal?.aborted) return;
     const ran = await resumePendingTurn(input);
     if (!ran) return;
   }
+}
+
+async function finishHoldCommandThenWake(input: {
+  threadId: string;
+  context: TurnContext;
+}): Promise<void> {
+  const { threadId, context } = input;
+  const thread = await context.stores.threads.get(threadId);
+  const pending = thread?.pendingHop;
+  if (!pending?.holdCommand || !thread) return;
+  const result = await runHoldCommand({
+    threadId,
+    command: pending.holdCommand,
+    cwd: resolve(thread.workdir),
+    signal: context.signal,
+  });
+  const still = (await context.stores.threads.get(threadId))?.pendingHop;
+  if (!still?.holdCommand || still.holdCommand !== pending.holdCommand) return;
+  await context.stores.messages.append({
+    threadId,
+    role: 'system',
+    content: formatHoldCommandDoneNote({
+      command: pending.holdCommand,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      timedOut: result.timedOut,
+    }),
+    status: 'completed',
+  });
+  await context.stores.threads.setPendingHop(threadId, {
+    ...pending,
+    from: pending.to,
+    task: formatHoldCommandWakePrompt({
+      command: pending.holdCommand,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      timedOut: result.timedOut,
+      previousOutput: pending.previousOutput,
+    }),
+    holdCommand: undefined,
+  });
+}
+
+async function rememberHoldCommand(input: {
+  thread: { id: string };
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  currentAgent: AgentId;
+  prevContent: string;
+  segmentText: string;
+  visited: Set<AgentId>;
+  firstAgent: AgentId;
+  hop: number;
+}): Promise<void> {
+  const command = parseHoldCommand(input.prevContent);
+  if (!command) return;
+  const pendingHop: PendingHop = {
+    to: input.currentAgent,
+    from: input.currentAgent,
+    task: command,
+    goal: input.segmentText,
+    previousOutput: input.prevContent,
+    visited: [...input.visited],
+    firstAgent: input.firstAgent,
+    hop: input.hop,
+    holdCommand: command,
+  };
+  await input.writeQueue(() => input.context.stores.threads.setPendingHop(input.thread.id, pendingHop));
+  turnLog('hold command', { thread: input.thread.id, from: input.currentAgent, command: clip(command, 60) });
 }
 
 async function loadRoster(context: TurnContext): Promise<{
@@ -542,7 +623,8 @@ async function runSegment(
   let currentAgent: AgentId = resume?.to ?? segment.agentId;
   let currentTask = resume?.task ?? segment.text;
   let prevContent = resume?.previousOutput ?? '';
-  let fromAgent: AgentId | undefined = resume?.from;
+  let fromAgent: AgentId | undefined =
+    resume && resume.from === resume.to ? undefined : resume?.from;
   let firstAgent: AgentId = resume?.firstAgent ?? segment.agentId;
   let stop: {
     kind: A2AStopKind;
@@ -609,6 +691,17 @@ async function runSegment(
       if (holdReason) {
         turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'held' });
         stop = { kind: 'held', holdReason };
+        await rememberHoldCommand({
+          thread,
+          context,
+          writeQueue,
+          currentAgent,
+          prevContent,
+          segmentText: segment.text,
+          visited,
+          firstAgent,
+          hop,
+        });
         break;
       }
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
@@ -675,6 +768,17 @@ async function runSegment(
       if (holdReason) {
         turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'held' });
         stop = { kind: 'held', holdReason };
+        await rememberHoldCommand({
+          thread,
+          context,
+          writeQueue,
+          currentAgent,
+          prevContent,
+          segmentText: segment.text,
+          visited,
+          firstAgent,
+          hop,
+        });
         break;
       }
       turnLog('a2a stop', { thread: thread.id, from: currentAgent });

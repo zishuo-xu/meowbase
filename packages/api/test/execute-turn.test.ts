@@ -1372,6 +1372,100 @@ describe('executeTurn 多角色协作', () => {
     expect(messages.some((m) => m.content.includes('审批卡片'))).toBe(false);
   });
 
+  it('行首等跑:平台跑完再叫醒同一只', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-holdcmd-'));
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.prompt);
+          return {
+            sessionId: 's1',
+            content: prompts.length === 1
+              ? '先自检。\n等跑 node -e "process.stdout.write(\'hold-ok\')"'
+              : '看到结果了。通过',
+            status: 'completed',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    writeFileSync(join(thread.workdir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    expect(prompts).toHaveLength(1);
+    const pending = (await stores.threads.get(thread.id))?.pendingHop;
+    expect(pending?.holdCommand).toContain('hold-ok');
+    expect(pending?.to).toBe('claude');
+    const before = await stores.messages.list(thread.id);
+    expect(before.some((m) => m.content.includes('球在等'))).toBe(true);
+    expect(before.some((m) => m.content.includes('球还在地上'))).toBe(false);
+    expect(before.some((m) => m.content.includes('出口未明'))).toBe(false);
+    expect(before.some((m) => m.content.includes('审批卡片'))).toBe(false);
+    await followPendingChain({ threadId: thread.id, context: ctx });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain('命令跑完');
+    expect(prompts[1]).toContain('hold-ok');
+    const after = await stores.messages.list(thread.id);
+    expect(after.some((m) => m.content.includes('跑完'))).toBe(true);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    rmSync(workdirBase, { recursive: true, force: true });
+  });
+
+  it('人开口取消等跑,不再叫醒', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-holdcmd-cancel-'));
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.prompt);
+          return {
+            sessionId: 's1',
+            content: prompts.length === 1 ? '等跑 node -e "process.stdout.write(1)"' : '听你的',
+            status: 'completed',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写一点',
+      context: ctx,
+    });
+    expect((await stores.threads.get(thread.id))?.pendingHop?.holdCommand).toBeTruthy();
+    await executeTurn({
+      threadId: thread.id,
+      content: '先停下',
+      context: ctx,
+    });
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    await followPendingChain({ threadId: thread.id, context: ctx });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toBe('先停下');
+    rmSync(workdirBase, { recursive: true, force: true });
+  });
+
   it('简单问答不提示球还在地上', async () => {
     const stores = createMemoryStores();
     let calls = 0;
