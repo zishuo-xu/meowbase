@@ -203,7 +203,12 @@ export default function Home() {
             <h1 className="text-sm font-bold tracking-wide">meowbase · 喵窝</h1>
             <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
               {activeId
-                ? describeBall(headerMessages, sending, (id) => agentName(id, agents)).text
+                ? describeBall(
+                    headerMessages,
+                    sending,
+                    (id) => agentName(id, agents),
+                    (id) => agents.find((a) => a.id === id)?.role,
+                  ).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
             {activeId ? (

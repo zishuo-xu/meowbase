@@ -3,8 +3,47 @@ import { describeBall, describeRelayTimeline, formatPickupCommand, isDroppedBall
 
 const nameOf = (id?: string) =>
   id === 'gemini' ? '闪闪' : id === 'opencode' ? '团团' : id === 'claude' ? '墨墨' : '猫';
+const roleOf = (id?: string) =>
+  id === 'gemini' ? '审查官' : id === 'claude' ? '主架构师' : '执行者';
 
 describe('describeBall', () => {
+  it('审查官写出结论、卡片还没到:球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了\n@闪闪 请审查', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          { role: 'assistant', agentId: 'gemini', content: '## 结论\n通过', status: 'completed' },
+        ],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('执行者口头通过不把球给人', () => {
+    expect(
+      describeBall(
+        [{ role: 'assistant', agentId: 'opencode', content: '做好了。通过', status: 'completed' }],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在团团手上', tone: 'cat', agentId: 'opencode' });
+  });
+
+  it('审查官还在流式:球仍在它手上', () => {
+    expect(
+      describeBall(
+        [{ role: 'assistant', agentId: 'gemini', content: '结论:通过', status: 'streaming' }],
+        true,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在闪闪手上', tone: 'busy', agentId: 'gemini' });
+  });
+
   it('发送中且有流式回复:球在那只猫手上', () => {
     expect(
       describeBall(

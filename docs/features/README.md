@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在没有设计中；上一刀 [exit-nudge.md](exit-nudge.md) 已落地。
+`设计中` 同时最多一篇。现在没有设计中；上一刀 [review-ball-to-human.md](review-ball-to-human.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -26,3 +26,4 @@
 | [defer-review-while-pending.md](defer-review-while-pending.md) | 已落地 | 有 pending 时本轮不审 |
 | [auto-follow-pending.md](auto-follow-pending.md) | 已落地 | 交棒后平台自己续跑 |
 | [exit-nudge.md](exit-nudge.md) | 已落地 | 无出口时再问同一只一次 |
+| [review-ball-to-human.md](review-ball-to-human.md) | 已落地 | 审查结论后顶栏球回人 |

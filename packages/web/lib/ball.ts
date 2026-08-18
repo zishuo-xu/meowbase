@@ -18,6 +18,7 @@ export function describeBall(
   messages: readonly BallMessage[],
   sending: boolean,
   nameOf: (agentId?: string) => string,
+  roleOf?: (agentId?: string) => string | undefined,
 ): BallView {
   if (sending) {
     const streaming = [...messages]
@@ -59,6 +60,13 @@ export function describeBall(
       return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
     }
     if (last.role === 'assistant' && last.agentId) {
+      if (
+        last.status !== 'streaming' &&
+        isReviewerRole(roleOf?.(last.agentId)) &&
+        hasReviewCloseout(last.content)
+      ) {
+        return { text: '球在人手里', tone: 'human' };
+      }
       return {
         text: `球在${nameOf(last.agentId)}手上`,
         tone: 'cat',
@@ -96,6 +104,20 @@ function isAppliedApprovalNote(text: string): boolean {
 /** 句中 @ 提示(对齐 clowder F064):给人看用法,不算球在谁手上。 */
 function isRoutingHint(text: string): boolean {
   return text.includes('写在句中不会交接');
+}
+
+function isReviewerRole(role?: string): boolean {
+  return Boolean(role?.includes('审查'));
+}
+
+/** 审查官写出通过/需修改即收棒;和 shared hasExplicitReviewVerdict 同关键词,避免 web 再依赖 shared。 */
+function hasReviewCloseout(text: string): boolean {
+  const heading = text.match(/(?:^|\n)#{1,3}\s*结论\s*[:：]?\s*\n?([\s\S]*)$/);
+  const inline = text.match(/结论\s*[:：]\s*([^\n]+)/);
+  const source = heading?.[1]?.trim() || inline?.[1]?.trim() || text;
+  return /需修改|不通过|未通过|请修复|CHANGES_REQUESTED|request changes|通过|LGTM|可以合入|APPROVED/i.test(
+    source,
+  );
 }
 
 export function formatPickupCommand(agentName: string): string {
