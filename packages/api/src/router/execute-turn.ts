@@ -15,6 +15,8 @@ import {
   formatExitNudgePrompt,
   formatFreezeBallNote,
   formatFailedBallNote,
+  formatHoldBallNote,
+  parseHoldExit,
   isPlaceholderTitle,
   matchSkills,
   parseA2AHandoff,
@@ -492,7 +494,8 @@ async function settleTurn(input: {
   }
 
   const waiting = (await context.stores.threads.get(threadId))?.pendingHop;
-  if (lastOutput.status === 'completed' && !waiting) {
+  const holding = Boolean(parseHoldExit(lastOutput.content ?? ''));
+  if (lastOutput.status === 'completed' && !waiting && !holding) {
     try {
       await gitAddAll(thread.workdir);
       const diff = await gitDiffHead(thread.workdir);
@@ -546,6 +549,7 @@ async function runSegment(
     blockedTarget?: AgentId;
     hadInlineHint?: boolean;
     escalateTask?: string;
+    holdReason?: string;
   } | undefined;
   if (resume) {
     for (const id of resume.visited) visited.add(id);
@@ -601,6 +605,12 @@ async function runSegment(
     if (context.signal?.aborted || lastOutput.status !== 'completed') break;
     let handoff = parseA2AHandoff(prevContent, currentAgent, catalog);
     if (!handoff) {
+      const holdReason = parseHoldExit(prevContent);
+      if (holdReason) {
+        turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'held' });
+        stop = { kind: 'held', holdReason };
+        break;
+      }
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
       const inlineHuman = findInlineEscalateTokens(prevContent);
       const labels = [
@@ -616,6 +626,7 @@ async function runSegment(
           isReviewer,
           hasExplicitVerdict: hasExplicitReviewVerdict(prevContent),
           hasDiff: (await listHandoffFiles(thread.workdir)).length > 0,
+          hasHold: Boolean(holdReason),
         })
       ) {
         const handoffName = member?.handoffTo
@@ -660,6 +671,12 @@ async function runSegment(
       break;
     }
     if (!handoff) {
+      const holdReason = parseHoldExit(prevContent);
+      if (holdReason) {
+        turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'held' });
+        stop = { kind: 'held', holdReason };
+        break;
+      }
       turnLog('a2a stop', { thread: thread.id, from: currentAgent });
       const inline = findInlineA2AMentions(prevContent, currentAgent, catalog);
       const inlineHuman = findInlineEscalateTokens(prevContent);
@@ -756,6 +773,8 @@ async function runSegment(
     const note =
       stop.kind === 'escalated'
         ? formatEscalatedBallNote(displayName(currentAgent, catalog), stop.escalateTask)
+        : stop.kind === 'held'
+          ? formatHoldBallNote(displayName(currentAgent, catalog), stop.holdReason)
         : formatDroppedBallNote({
             stop: stop.kind,
             lastContent: prevContent,
@@ -768,7 +787,7 @@ async function runSegment(
               : undefined,
           });
     if (note) {
-      if (stop.kind !== 'escalated') {
+      if (stop.kind !== 'escalated' && stop.kind !== 'held') {
         turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'dropped-ball' });
       }
       await writeQueue(() =>

@@ -1337,6 +1337,41 @@ describe('executeTurn 多角色协作', () => {
     expect(note?.content).toContain('闪闪');
   });
 
+  it('行首等持球:不补问、不掉地上', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-hold-'));
+    let calls = 0;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls += 1;
+          return { sessionId: 's1', content: '先停一下。\n等 测试跑完', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    writeFileSync(join(thread.workdir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    expect(calls).toBe(1);
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.content.includes('球在等'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('测试跑完'))).toBe(true);
+    expect(messages.some((m) => m.content.includes('球还在地上'))).toBe(false);
+    expect(messages.some((m) => m.content.includes('出口未明'))).toBe(false);
+    expect(messages.some((m) => m.content.includes('审批卡片'))).toBe(false);
+  });
+
   it('简单问答不提示球还在地上', async () => {
     const stores = createMemoryStores();
     let calls = 0;

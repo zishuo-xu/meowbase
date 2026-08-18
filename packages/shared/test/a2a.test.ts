@@ -10,6 +10,7 @@ import {
   formatEscalatedBallNote,
   formatFreezeBallNote,
   formatFailedBallNote,
+  formatHoldBallNote,
   formatPickupCommand,
   formatExitNudgeNote,
   formatExitNudgePrompt,
@@ -17,7 +18,9 @@ import {
   isEscalatedBallNote,
   isExitNudgeNote,
   isFreezeBallNote,
+  isHoldBallNote,
   parseA2ARelayNote,
+  parseHoldExit,
   shouldNudgeExit,
   shouldResumePending,
 } from '../src/a2a.js';
@@ -263,6 +266,42 @@ describe('formatEscalatedBallNote', () => {
         wasRelay: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe('parseHoldExit', () => {
+  it('行首等/HOLD 才是持球,句中等等不算', () => {
+    expect(parseHoldExit('写到一半。\n等 测试跑完')).toBe('测试跑完');
+    expect(parseHoldExit('HOLD:等 CI 绿')).toBe('等 CI 绿');
+    expect(parseHoldExit('先等等看再交')).toBeNull();
+    expect(parseHoldExit('等等再说')).toBeNull();
+  });
+
+  it('持球不是掉地上,也不补问', () => {
+    const note = formatHoldBallNote('墨墨', '测试跑完');
+    expect(isHoldBallNote(note)).toBe(true);
+    expect(note).toContain('球在等:墨墨');
+    expect(note).toContain('测试跑完');
+    expect(isDroppedBallNote(note)).toBe(false);
+    expect(
+      formatDroppedBallNote({
+        stop: 'held',
+        lastContent: '等 测试跑完',
+        speakerName: '墨墨',
+        role: '主架构师',
+        wasRelay: false,
+      }),
+    ).toBeNull();
+    expect(
+      shouldNudgeExit({
+        wasRelay: false,
+        hadInlineHint: false,
+        isReviewer: false,
+        hasExplicitVerdict: false,
+        hasDiff: true,
+        hasHold: true,
+      }),
+    ).toBe(false);
   });
 });
 

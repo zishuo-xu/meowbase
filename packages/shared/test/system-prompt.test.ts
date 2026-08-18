@@ -62,6 +62,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('接(能干就干)');
     expect(prompt).toContain('退');
     expect(prompt).toContain('升');
+    expect(prompt).toContain('持');
     expect(prompt).toContain('@人');
     expect(prompt).toContain('@owner');
     expect(prompt).toContain('出口检查');

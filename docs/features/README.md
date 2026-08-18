@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在没有设计中；上一刀 [revise-ball-to-writer.md](revise-ball-to-writer.md) 已落地。
+`设计中` 同时最多一篇。现在没有设计中；上一刀 [hold-wait.md](hold-wait.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -28,3 +28,4 @@
 | [exit-nudge.md](exit-nudge.md) | 已落地 | 无出口时再问同一只一次 |
 | [review-ball-to-human.md](review-ball-to-human.md) | 已落地 | 审查通过后顶栏球回人 |
 | [revise-ball-to-writer.md](revise-ball-to-writer.md) | 已落地 | 需修改后顶栏球在写手 |
+| [hold-wait.md](hold-wait.md) | 已落地 | 行首「等」持球 |

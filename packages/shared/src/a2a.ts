@@ -145,7 +145,7 @@ export function formatA2AHandoffPrompt(
   const closeout =
     extras.closeout === 'reviewer'
       ? '结论必须单独写明「通过」或「需修改」。没看到或没亲手跑出命令+结果,不能写通过。跑不了就写「跑不了:原因」并写需修改。写完结论即停:不要问人要不要继续,不要再 @ 任何人。需修改由平台打回写手。'
-      : '做完按交接条目交下一棒。交棒前尽量附上本轮命令和结果;没有证据也可以交,但下一棒不能当通过。接(能干就干)/退(行首 @ 对的那只)/升(行首 @人 或 @owner)。不要问人要不要继续。';
+      : '做完按交接条目交下一棒。交棒前尽量附上本轮命令和结果;没有证据也可以交,但下一棒不能当通过。接(能干就干)/退(行首 @ 对的那只)/升(行首 @人 或 @owner)/持(行首 等 原因)。不要问人要不要继续。';
   const verified = hasVerificationEvidence(previousOutput);
   return [
     `【A2A 交接包】`,
@@ -218,7 +218,28 @@ export function parseA2ARelayNote(text: string): { headline: string; details: st
   return { headline, details: lines.slice(1) };
 }
 
-export type A2AStopKind = 'no-handoff' | 'reviewer-closeout' | 'blocked' | 'escalated';
+export type A2AStopKind = 'no-handoff' | 'reviewer-closeout' | 'blocked' | 'escalated' | 'held';
+
+const HOLD_LINE = /^\s*(?:HOLD|hold|等)[:：\s]+(\S.*)$/;
+
+/** 行首「等 / HOLD」+ 原因是持球出口,不是掉地上,也不是升级给人。 */
+export function parseHoldExit(text: string): string | null {
+  const stripped = text.replace(/```[\s\S]*?```/g, '');
+  for (const line of stripped.split('\n')) {
+    const match = line.match(HOLD_LINE);
+    if (match?.[1]?.trim()) return match[1].trim();
+  }
+  return null;
+}
+
+export function formatHoldBallNote(speakerName: string, reason?: string): string {
+  const detail = reason?.trim() ? ` — ${clipBody(reason.trim(), 60)}` : '';
+  return `⏳ 球在等:${speakerName}${detail}。人开口即取消。`;
+}
+
+export function isHoldBallNote(text: string): boolean {
+  return text.includes('球在等') && text.includes('人开口即取消');
+}
 
 export interface DroppedBallInput {
   stop: A2AStopKind;
@@ -234,8 +255,9 @@ export interface DroppedBallInput {
 export function formatDroppedBallNote(input: DroppedBallInput): string | null {
   const reviewer = Boolean(input.role?.includes('审查'));
   if (reviewer && hasExplicitReviewVerdict(input.lastContent)) return null;
+  if (parseHoldExit(input.lastContent)) return null;
   if (input.hadInlineHint) return null;
-  if (input.stop === 'escalated') return null;
+  if (input.stop === 'escalated' || input.stop === 'held') return null;
   if (input.stop === 'blocked') {
     const to = input.blockedTargetName ?? '下一棒';
     return `⚠️ 球还在地上:${input.speakerName}想交给${to},但这只猫本轮已经出场或不可用,接力已停。`;
@@ -287,10 +309,12 @@ export interface ExitNudgeInput {
   isReviewer: boolean;
   hasExplicitVerdict: boolean;
   hasDiff: boolean;
+  hasHold?: boolean;
 }
 
-/** 该交棒却没出口时,再问同一只;问答收尾和已写结论不问。 */
+/** 该交棒却没出口时,再问同一只;问答收尾、已写结论、持球不问。 */
 export function shouldNudgeExit(input: ExitNudgeInput): boolean {
+  if (input.hasHold) return false;
   if (input.hasExplicitVerdict) return false;
   if (input.wasRelay) return true;
   if (input.hadInlineHint) return true;
@@ -315,7 +339,7 @@ export function formatExitNudgePrompt(input: {
   const next = input.handoffName ? `@${input.handoffName}` : '@下一只';
   const closeout = input.isReviewer
     ? '审查官:写出「通过」或「需修改」即停,不要再 @。或行首 @人 升级。'
-    : `三选一:接(做完再行首 ${next} 跟任务)/退(另起一行 ${next} 跟任务)/升(行首 @人 写要拍板的事)。不要问人要不要继续。`;
+    : `三选一:接(做完再行首 ${next} 跟任务)/退(另起一行 ${next} 跟任务)/升(行首 @人 写要拍板的事)/持(行首 等 原因)。不要问人要不要继续。`;
   return [
     '【出口补问】上一棒没有行首交给下一只,也没有 @人。平台只再问一次,不替你选下一棒。',
     closeout,

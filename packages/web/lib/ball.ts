@@ -59,6 +59,9 @@ export function describeBall(
     if (last.role === 'system' && isEscalatedBallNote(last.content)) {
       return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
     }
+    if (last.role === 'system' && isHoldBallNote(last.content)) {
+      return { text: last.content.replace(/^⏳\s*/, '').replace(/。人开口即取消。$/, ''), tone: 'cat' };
+    }
     if (last.role === 'assistant' && last.agentId) {
       if (last.status !== 'streaming' && isReviewerRole(roleOf?.(last.agentId))) {
         const verdict = parseReviewCloseout(last.content);
@@ -95,6 +98,10 @@ export function isEscalatedBallNote(text: string): boolean {
 
 export function isFreezeBallNote(text: string): boolean {
   return text.includes('已拉闸') && text.includes('星星罐子');
+}
+
+export function isHoldBallNote(text: string): boolean {
+  return text.includes('球在等') && text.includes('人开口即取消');
 }
 
 /** 审批卡等人点批准/打回,还没自动落地。 */

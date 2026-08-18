@@ -176,6 +176,19 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在人手里:墨墨请求拍板 — 选A还是选B', tone: 'human' });
   });
 
+  it('持球系统句:顶栏球在等', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '等 测试跑完', status: 'completed' },
+          { role: 'system', content: '⏳ 球在等:墨墨 — 测试跑完。人开口即取消。' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在等:墨墨 — 测试跑完', tone: 'cat' });
+  });
+
   it('星星罐子拉闸后等人开口', () => {
     expect(
       describeBall(
