@@ -56,6 +56,15 @@
 
 ## 代码入口
 
-- 管线：`packages/api/src/router/execute-turn.ts`
+- 管线：`packages/api/src/router/execute-turn.ts`（入口；阶段在 `router/turn/`）
+- 类型：`packages/api/src/router/turn/types.ts`
+- 写队列：`packages/api/src/router/turn/write-queue.ts`
+- 名册：`packages/api/src/router/turn/context.ts`
+- 系统命令：`packages/api/src/router/turn/system-commands.ts`
+- 一跳：`packages/api/src/router/turn/agent-hop.ts`
+- 段：`packages/api/src/router/turn/segment.ts`
+- 审查：`packages/api/src/router/turn/review.ts`
+- 持球：`packages/api/src/router/turn/hold.ts`
+- 收尾：`packages/api/src/router/turn/settle.ts`
 - 端口：`packages/api/src/stores/ports.ts`
 - 单测：`packages/api/src/router/execute-turn.test.ts`
