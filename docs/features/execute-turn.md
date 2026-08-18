@@ -67,4 +67,4 @@
 - 持球：`packages/api/src/router/turn/hold.ts`
 - 收尾：`packages/api/src/router/turn/settle.ts`
 - 端口：`packages/api/src/stores/ports.ts`
-- 单测：`packages/api/src/router/execute-turn.test.ts`
+- 单测：`packages/api/test/execute-turn.test.ts`

@@ -44,6 +44,7 @@
 ## 入口
 
 - `parseHoldCommand` / `formatHoldCommandWakePrompt`：`packages/shared/src/a2a.ts`
-- 记下命令、跑完再叫醒：`packages/api/src/router/execute-turn.ts` `rememberHoldCommand` / `followPendingChain`
-- 沙箱执行：`packages/api/src/router/hold-command.ts`
+- 记下命令：`packages/api/src/router/turn/segment.ts` `rememberHoldCommand`
+- 跑完再叫醒：`packages/api/src/router/execute-turn.ts` `followPendingChain` → `packages/api/src/router/turn/hold.ts`
+- 沙箱执行：`packages/api/src/services/hold-command.ts`
 - 顶栏仍认「球在等」：`packages/web/lib/ball.ts`
