@@ -43,8 +43,8 @@ export function describeBall(
     if (last.role === 'system' && last.content.includes('球还在地上')) {
       return { text: last.content.replace(/^⚠️\s*/, ''), tone: 'ground' };
     }
-    if (last.role === 'system' && last.content.includes('接力:')) {
-      const to = relayTargetName(last.content);
+    if (last.role === 'system' && (last.content.includes('接力:') || last.content.includes('打回:'))) {
+      const to = hopTargetName(last.content);
       return { text: to ? `球在${to}手上` : '接力中', tone: 'cat' };
     }
     if (last.role === 'system' && isAppliedApprovalNote(last.content)) {
@@ -60,12 +60,17 @@ export function describeBall(
       return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
     }
     if (last.role === 'assistant' && last.agentId) {
-      if (
-        last.status !== 'streaming' &&
-        isReviewerRole(roleOf?.(last.agentId)) &&
-        hasReviewCloseout(last.content)
-      ) {
-        return { text: '球在人手里', tone: 'human' };
+      if (last.status !== 'streaming' && isReviewerRole(roleOf?.(last.agentId))) {
+        const verdict = parseReviewCloseout(last.content);
+        if (verdict === 'pass') {
+          return { text: '球在人手里', tone: 'human' };
+        }
+        if (verdict === 'revise') {
+          const writerId = findWriterId(messages, last.agentId, roleOf);
+          if (writerId) {
+            return { text: `球在${nameOf(writerId)}手上`, tone: 'cat', agentId: writerId };
+          }
+        }
       }
       return {
         text: `球在${nameOf(last.agentId)}手上`,
@@ -110,21 +115,46 @@ function isReviewerRole(role?: string): boolean {
   return Boolean(role?.includes('审查'));
 }
 
-/** 审查官写出通过/需修改即收棒;和 shared hasExplicitReviewVerdict 同关键词,避免 web 再依赖 shared。 */
-function hasReviewCloseout(text: string): boolean {
+const REVIEW_REVISE_RE = /需修改|不通过|未通过|请修复|CHANGES_REQUESTED|request changes/i;
+const REVIEW_PASS_RE = /通过|LGTM|可以合入|APPROVED/i;
+
+/** 和 shared parseReviewVerdict 同关键词,避免 web 再依赖 shared。没写出结论则 null。 */
+function parseReviewCloseout(text: string): 'pass' | 'revise' | null {
   const heading = text.match(/(?:^|\n)#{1,3}\s*结论\s*[:：]?\s*\n?([\s\S]*)$/);
   const inline = text.match(/结论\s*[:：]\s*([^\n]+)/);
   const source = heading?.[1]?.trim() || inline?.[1]?.trim() || text;
-  return /需修改|不通过|未通过|请修复|CHANGES_REQUESTED|request changes|通过|LGTM|可以合入|APPROVED/i.test(
-    source,
-  );
+  const reviseIdx = source.search(REVIEW_REVISE_RE);
+  const passIdx = source.search(REVIEW_PASS_RE);
+  if (reviseIdx < 0 && passIdx < 0) return null;
+  if (reviseIdx >= 0 && (passIdx < 0 || reviseIdx <= passIdx)) return 'revise';
+  return 'pass';
+}
+
+function findWriterId(
+  messages: readonly BallMessage[],
+  reviewerId: string,
+  roleOf?: (agentId?: string) => string | undefined,
+): string | undefined {
+  for (const message of [...messages].reverse()) {
+    if (message.role !== 'assistant' || !message.agentId) continue;
+    if (message.agentId === reviewerId) continue;
+    if (isReviewerRole(roleOf?.(message.agentId))) continue;
+    return message.agentId;
+  }
+  return undefined;
 }
 
 export function formatPickupCommand(agentName: string): string {
   return `@${agentName.replace(/^@/, '').trim()} 接着做`;
 }
 
-/** 只读接力条第一行的「→ 下一棒」,避免交接包正文糊进时间线。 */
+/** 只读接力/打回条第一行的「→ 下一棒」,避免交接包正文糊进时间线。 */
+function hopTargetName(content: string): string | undefined {
+  const headline = content.split('\n')[0] ?? '';
+  if (!headline.includes('接力:') && !headline.includes('打回:')) return undefined;
+  return headline.split('→').pop()?.trim() || undefined;
+}
+
 function relayTargetName(content: string): string | undefined {
   const headline = content.split('\n')[0] ?? '';
   if (!headline.includes('接力:')) return undefined;

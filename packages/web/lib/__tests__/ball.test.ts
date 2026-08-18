@@ -33,6 +33,55 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在团团手上', tone: 'cat', agentId: 'opencode' });
   });
 
+  it('审查官写出需修改、还没打回:球在写手手上', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了\n@闪闪 请审查', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          { role: 'assistant', agentId: 'gemini', content: '## 结论\n需修改', status: 'completed' },
+        ],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在墨墨手上', tone: 'cat', agentId: 'claude' });
+  });
+
+  it('打回条指向写手', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          { role: 'assistant', agentId: 'gemini', content: '## 结论\n需修改', status: 'completed' },
+          { role: 'system', content: '🤝 打回:闪闪 → 墨墨' },
+        ],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在墨墨手上', tone: 'cat' });
+  });
+
+  it('互审仍需修改、卡片已出:球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'gemini', content: '## 结论\n需修改', status: 'completed' },
+          {
+            role: 'system',
+            content:
+              '📋 审批卡片 ap_a1b2c3d4(写:claude → 审:gemini)\n改动:add.ts | 9 +\n审查意见:需修改\n互审后仍需修改，请你决定是否落地。\n回复 #approve ap_a1b2c3d4 批准',
+          },
+        ],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
   it('审查官还在流式:球仍在它手上', () => {
     expect(
       describeBall(
