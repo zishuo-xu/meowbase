@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { AgentConfigDto, ThreadDto } from '@/lib/api';
 import { AGENT_ORDER, agentName, getPersona } from '@/lib/persona';
-import { defaultSessionTitle, isNoiseThreadTitle, sortThreadsByCreated } from '@/lib/threads';
+import { defaultSessionTitle, isNoiseThreadTitle, sortThreadsByCreated, threadRepoHint } from '@/lib/threads';
 import { CatAvatar } from './CatAvatar';
 
 function ThreadRow({
@@ -41,6 +41,11 @@ function ThreadRow({
             </span>
           ) : null}
         </div>
+        {thread.repo ? (
+          <div className="mt-0.5 truncate text-[10px] text-[var(--ink-soft)]">
+            {threadRepoHint(thread.repo)}
+          </div>
+        ) : null}
         <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
           <CatAvatar
             agentId={thread.primaryAgentId}
@@ -89,7 +94,11 @@ export function ThreadSidebar({
   agents?: AgentConfigDto[];
   defaultAgentId?: string;
   onSelect: (id: string) => void;
-  onCreate: (title: string, primaryAgentId: string) => void;
+  onCreate: (
+    title: string,
+    primaryAgentId: string,
+    opts?: { repoPath?: string; baseBranch?: string },
+  ) => void;
   onDelete?: (id: string) => void;
   onOpenTeam?: (agentId?: string) => void;
   pendingIds?: readonly string[];
@@ -106,6 +115,8 @@ export function ThreadSidebar({
         }));
   const primary = defaultAgentId ?? roster[0]?.id ?? 'claude';
   const [showNoise, setShowNoise] = useState(false);
+  const [repoPath, setRepoPath] = useState('');
+  const [baseBranch, setBaseBranch] = useState('');
   const ordered = sortThreadsByCreated(threads);
   const visible = ordered.filter((t) => !isNoiseThreadTitle(t.title));
   const noise = ordered.filter((t) => isNoiseThreadTitle(t.title));
@@ -123,8 +134,28 @@ export function ThreadSidebar({
             <div className="mt-1 text-[11px] text-[var(--ink-soft)]">多猫协作</div>
           </div>
         </div>
+        <input
+          value={repoPath}
+          onChange={(e) => setRepoPath(e.target.value)}
+          placeholder="仓库路径（可选）"
+          className="mb-1.5 w-full rounded-xl border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)]"
+        />
+        <input
+          value={baseBranch}
+          onChange={(e) => setBaseBranch(e.target.value)}
+          placeholder="基准分支（可选）"
+          className="mb-2 w-full rounded-xl border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)]"
+        />
         <button
-          onClick={() => onCreate(defaultSessionTitle(), primary)}
+          onClick={() => {
+            const path = repoPath.trim();
+            const branch = baseBranch.trim();
+            const opts =
+              path || branch
+                ? { ...(path ? { repoPath: path } : {}), ...(branch ? { baseBranch: branch } : {}) }
+                : undefined;
+            onCreate(defaultSessionTitle(), primary, opts);
+          }}
           className="w-full rounded-2xl bg-[var(--accent)] px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)]"
         >
           + 新会话

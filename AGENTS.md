@@ -32,7 +32,7 @@ packages/
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
 scripts/      smoke.ts(真实冒烟)、fixtures/(fake CLI,测试/演示用)
-work/         线程沙箱目录(git 仓库,gitignore 忽略)
+work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
 
@@ -93,10 +93,10 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
 4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。
 5. **gemini 适配器**:`stream-json` 事件是 `init`/`message`/`result`(不是 claude 的 assistant/result);无系统提示词参数,身份前置拼进 prompt;headless 写文件必须 `--approval-mode yolo`,否则会卡在审批。`--resume`/`-r` 接受 session UUID(init 事件的 `session_id`)。
-6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:适配器传 `--dir` 绝对沙箱路径 + 线程工作目录有 package.json + 系统提示写明沙箱绝对路径 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。审批/交接 diff 忽略 `node_modules`。
+6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:适配器传 `--dir` 绝对沙箱路径 + 线程工作目录有 package.json + 系统提示写明沙箱绝对路径 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。审批/交接 diff 忽略 `node_modules`。绑仓线程跳过清扫,以免把真仓库根文件搬进 worktree。
 7. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
 8. **审批状态机**:`markApplied` 只接受 `approved` 状态,自动批准路径必须先 `approve()`。
-9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。
+9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。绑仓线程不调 gitInit(会覆盖目标仓的 `.gitignore`)。
 10. **IME 输入法**:前端回车处理必须检查组合状态(composingRef + isComposing + keyCode 229),否则中文选词回车会误发送。
 11. **Redis 测试数据污染**:测试线程/证据会留在 Redis,断言前用唯一 id(如 `t-${Date.now()}`)。
 12. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——改 shared 后需重启 api 或手动 `pnpm --filter @meowbase/shared build`。
@@ -104,6 +104,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 ## 常见操作
 
+- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore

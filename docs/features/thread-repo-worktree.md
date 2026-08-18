@@ -4,7 +4,7 @@
 
 开篇先想：同一问题他们公开怎么设计，这一刀能靠多近。能靠就靠；本刀没更近，写清差在哪、为什么先薄。不读、不抄源码。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:公开 `pnpm start` 写明「auto-creates runtime worktree」,Mission Hub 跨项目跟 feature,GitHub PR 评审能回流到线程 —— 猫干的是真仓库的活,不是空目录里的玩具。
 - 靠拢:worktree 这条直接靠,粒度做到**一线程一 worktree 一分支**。差在:不合主干、不开 PR、不跨项目看板,那些以后另开篇。
 
@@ -46,4 +46,9 @@
 
 ## 入口
 
-落地后填路径。
+- 类型:`packages/shared/src/types.ts` `Thread.repo` / `ThreadRepo`
+- worktree 帮手:`packages/api/src/services/git.ts` `gitIsRepo` / `gitCurrentBranch` / `gitBranchExists` / `gitWorktreeAdd` / `gitWorktreeRemove` / `gitWorktreeList` / `gitWorktreePrune`
+- 建/删:`packages/api/src/http/server.ts` `POST /api/threads`、`DELETE /api/threads/:threadId`
+- 绑仓跳过清扫:`packages/api/src/router/turn/agent-hop.ts` `sweepStrayFiles`
+- 系统提示边界:`packages/shared/src/system-prompt.ts` `buildSystemPrompt`
+- 侧栏建会话输入:`packages/web/components/ThreadSidebar.tsx`

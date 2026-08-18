@@ -73,9 +73,67 @@ describe('api', () => {
     );
   });
 
+  it('createThread 带仓库路径时写入 body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 't2' }),
+      }),
+    );
+    await api.createThread('绑仓', 'claude', {
+      repoPath: '/tmp/myapp',
+      baseBranch: 'main',
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/threads'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          title: '绑仓',
+          primaryAgentId: 'claude',
+          repoPath: '/tmp/myapp',
+          baseBranch: 'main',
+        }),
+      }),
+    );
+  });
+
+  it('createThread 不传仓库时 body 与现在一致', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 't3' }),
+      }),
+    );
+    await api.createThread('hello', 'claude');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/threads'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ title: 'hello', primaryAgentId: 'claude' }),
+      }),
+    );
+  });
+
   it('非 2xx 抛错', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     await expect(api.createThread('x', 'claude')).rejects.toThrow();
+  });
+
+  it('400 时抛出服务端 error 文案', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: '仓库路径不存在' }),
+      }),
+    );
+    await expect(api.createThread('x', 'claude', { repoPath: '/no/such' })).rejects.toThrow(
+      '仓库路径不存在',
+    );
   });
 
   it('网络失败抛出可读错误', async () => {

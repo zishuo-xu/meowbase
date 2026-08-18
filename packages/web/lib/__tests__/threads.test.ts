@@ -4,6 +4,7 @@ import {
   isNoiseThreadTitle,
   isPlaceholderTitle,
   sortThreadsByCreated,
+  threadRepoHint,
   titleFromUserMessage,
 } from '../threads';
 
@@ -35,6 +36,14 @@ describe('titleFromUserMessage', () => {
   it('去掉 @ 后截一段', () => {
     expect(titleFromUserMessage('@墨墨 在沙箱写 add.ts')).toBe('在沙箱写 add.ts');
     expect(titleFromUserMessage('@闪闪')).toBeNull();
+  });
+});
+
+describe('threadRepoHint', () => {
+  it('只展示仓库目录名和分支', () => {
+    expect(threadRepoHint({ path: '/tmp/throwaway-app', branch: 'meow/t1' })).toBe(
+      'throwaway-app · meow/t1',
+    );
   });
 });
 

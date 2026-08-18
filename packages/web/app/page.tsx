@@ -9,7 +9,7 @@ import { TeamHub } from '@/components/TeamHub';
 import { EvidenceRail } from '@/components/EvidenceRail';
 import { CatAvatar } from '@/components/CatAvatar';
 import { describeBall, describeRelayTimeline, formatPickupCommand } from '@/lib/ball';
-import { defaultSessionTitle, isPlaceholderTitle, titleFromUserMessage } from '@/lib/threads';
+import { defaultSessionTitle, isPlaceholderTitle, threadRepoHint, titleFromUserMessage } from '@/lib/threads';
 import { pendingThreadIds } from '@/lib/approvals';
 import { RelayTimeline } from '@/components/RelayTimeline';
 
@@ -77,9 +77,13 @@ export default function Home() {
   }, []);
 
   const createThread = useCallback(
-    async (title: string, primaryAgentId: string) => {
+    async (
+      title: string,
+      primaryAgentId: string,
+      opts?: { repoPath?: string; baseBranch?: string },
+    ) => {
       try {
-        const thread = await api.createThread(title, primaryAgentId);
+        const thread = await api.createThread(title, primaryAgentId, opts);
         await refreshThreads();
         await openThread(thread.id);
       } catch (err) {
@@ -183,6 +187,7 @@ export default function Home() {
   };
 
   const headerMessages = liveMessages.length > 0 ? liveMessages : messages;
+  const activeThread = threads.find((t) => t.id === activeId);
 
   return (
     <main className="flex h-full">
@@ -192,7 +197,7 @@ export default function Home() {
         agents={agents}
         defaultAgentId={config?.defaultAgentId}
         onSelect={(id) => void openThread(id)}
-        onCreate={(title, agent) => void createThread(title, agent)}
+        onCreate={(title, agent, opts) => void createThread(title, agent, opts)}
         onDelete={(id) => void deleteThread(id)}
         onOpenTeam={openHub}
         pendingIds={pendingIds}
@@ -201,6 +206,11 @@ export default function Home() {
         <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)]/75 px-5 py-3 backdrop-blur-sm">
           <div>
             <h1 className="text-sm font-bold tracking-wide">meowbase · 喵窝</h1>
+            {activeThread?.repo ? (
+              <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
+                {threadRepoHint(activeThread.repo)}
+              </p>
+            ) : null}
             <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
               {activeId
                 ? describeBall(

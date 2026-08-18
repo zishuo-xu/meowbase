@@ -8,8 +8,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new Error(`无法连接 API ${baseUrl}${path}(请确认后端已启动)`);
   }
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  if (!res.ok) {
+    let message = `API ${res.status}: ${path}`;
+    try {
+      if (typeof res.json === 'function') {
+        const body = (await res.json()) as { error?: string };
+        if (typeof body?.error === 'string' && body.error.trim()) message = body.error;
+      }
+    } catch {
+      // 没有 JSON 体时沿用状态码文案
+    }
+    throw new Error(message);
+  }
   return res.json() as Promise<T>;
+}
+
+export interface ThreadRepoDto {
+  path: string;
+  baseBranch: string;
+  branch: string;
 }
 
 export interface ThreadDto {
@@ -18,6 +35,7 @@ export interface ThreadDto {
   primaryAgentId: string;
   workdir: string;
   sessions: Record<string, string>;
+  repo?: ThreadRepoDto;
   createdAt: string;
 }
 
@@ -146,12 +164,24 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
-  createThread: (title: string, primaryAgentId: string) =>
-    request<ThreadDto>('/api/threads', {
+  createThread: (
+    title: string,
+    primaryAgentId: string,
+    opts?: { repoPath?: string; baseBranch?: string },
+  ) => {
+    const repoPath = opts?.repoPath?.trim();
+    const baseBranch = opts?.baseBranch?.trim();
+    return request<ThreadDto>('/api/threads', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title, primaryAgentId }),
-    }),
+      body: JSON.stringify({
+        title,
+        primaryAgentId,
+        ...(repoPath ? { repoPath } : {}),
+        ...(baseBranch ? { baseBranch } : {}),
+      }),
+    });
+  },
   listMessages: (threadId: string) =>
     request<MessageDto[]>(`/api/threads/${threadId}/messages`),
   listApprovals: (threadId?: string) =>

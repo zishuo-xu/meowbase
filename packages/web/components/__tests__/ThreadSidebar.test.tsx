@@ -50,6 +50,62 @@ describe('ThreadSidebar', () => {
     expect(onDelete).toHaveBeenCalledWith('b');
   });
 
+  it('填了仓库路径后新建会带上绑仓参数', () => {
+    const onCreate = vi.fn();
+    render(
+      <ThreadSidebar
+        threads={[]}
+        activeId={null}
+        onSelect={vi.fn()}
+        onCreate={onCreate}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('仓库路径（可选）'), {
+      target: { value: '/tmp/myapp' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('基准分支（可选）'), {
+      target: { value: 'main' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.any(String), 'claude', {
+      repoPath: '/tmp/myapp',
+      baseBranch: 'main',
+    });
+  });
+
+  it('仓库路径留空时新建不带绑仓参数', () => {
+    const onCreate = vi.fn();
+    render(
+      <ThreadSidebar
+        threads={[]}
+        activeId={null}
+        onSelect={vi.fn()}
+        onCreate={onCreate}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.any(String), 'claude', undefined);
+  });
+
+  it('绑仓线程显示仓库名和分支,未绑的不显示', () => {
+    render(
+      <ThreadSidebar
+        threads={[
+          thread('a', '空沙箱'),
+          {
+            ...thread('b', '绑仓任务'),
+            repo: { path: '/tmp/throwaway-app', baseBranch: 'main', branch: 'meow/b' },
+          },
+        ]}
+        activeId="b"
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('throwaway-app · meow/b')).toBeTruthy();
+    expect(screen.getByText('空沙箱').closest('button')?.textContent).not.toMatch(/meow\//);
+  });
+
   it('有待批准卡片的会话标待确认', () => {
     render(
       <ThreadSidebar

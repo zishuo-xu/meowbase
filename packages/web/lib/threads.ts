@@ -30,3 +30,10 @@ export function titleFromUserMessage(content: string, max = 24): string | null {
 export function sortThreadsByCreated<T extends { createdAt: string }>(threads: T[]): T[] {
   return [...threads].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
+
+/** 侧栏/顶栏用:仓库目录名 · 线程分支 */
+export function threadRepoHint(repo: { path: string; branch: string }): string {
+  const parts = repo.path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean);
+  const base = parts[parts.length - 1] ?? repo.path;
+  return `${base} · ${repo.branch}`;
+}
