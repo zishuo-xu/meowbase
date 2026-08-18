@@ -17,7 +17,7 @@
 |---|---|---|
 | [execute-turn.md](execute-turn.md) | 已落地 | 一条消息一个心脏 |
 | [mention-routing.md](mention-routing.md) | 已落地 | 只认行首 `@` |
-| [a2a.md](a2a.md) | 已落地 | 同步接力 + 交接包 |
+| [a2a.md](a2a.md) | 已落地 | 交接包 + 独立会话 |
 | [memory-evidence.md](memory-evidence.md) | 已落地 | 人确认才进公共记忆 |
 | [approval.md](approval.md) | 已落地 | diff 建卡，人批落地 |
 | [providers.md](providers.md) | 已落地 | 三家 CLI 一个 `runTurn` |

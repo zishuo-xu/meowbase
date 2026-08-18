@@ -80,7 +80,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
-- 测试:`pnpm test`(shared 48 + api 70 + web 24 ≈ 142);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
+- 测试:`pnpm test`(shared 124 + api 179 + web 120 ≈ 423);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
