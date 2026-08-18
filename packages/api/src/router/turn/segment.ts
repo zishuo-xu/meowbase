@@ -32,7 +32,7 @@ import type { AgentTurnOutput } from '../../providers/types.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runAgentTurn } from './agent-hop.js';
 import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
-import type { SegmentRunResult, TurnContext, WriteQueue } from './types.js';
+import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
 
 async function rememberHoldCommand(input: {
   thread: { id: string };
@@ -65,7 +65,7 @@ async function rememberHoldCommand(input: {
 /** 执行一个 @mention 段:单轮 + A2A 接力链 */
 export async function runSegment(
   context: TurnContext,
-  thread: { id: string; workdir: string; sessions: Partial<Record<AgentId, string>>; primaryAgentId: AgentId },
+  thread: ThreadRuntime,
   segment: { agentId: AgentId; text: string },
   refs: EvidenceEntry[],
   visited: Set<AgentId>,
@@ -110,6 +110,7 @@ export async function runSegment(
       skills: matchedSkills,
       evidenceRefs: refs,
       workdir: thread.workdir,
+      repo: thread.repo,
     });
     const prompt = fromAgent
       ? formatA2AHandoffPrompt(

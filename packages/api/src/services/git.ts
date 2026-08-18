@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync, renameSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
@@ -34,6 +34,53 @@ export function isApprovalNoisePath(path: string): boolean {
 async function run(dir: string, args: string[]): Promise<string> {
   const { stdout } = await exec('git', args, { cwd: dir });
   return stdout;
+}
+
+export async function gitIsRepo(dir: string): Promise<boolean> {
+  if (!existsSync(join(dir, '.git'))) return false;
+  try {
+    return (await run(dir, ['rev-parse', '--is-inside-work-tree'])).trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function gitCurrentBranch(dir: string): Promise<string> {
+  return (await run(dir, ['branch', '--show-current'])).trim();
+}
+
+export async function gitBranchExists(dir: string, branch: string): Promise<boolean> {
+  try {
+    await run(dir, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function gitWorktreeAdd(
+  repoPath: string,
+  workdir: string,
+  branch: string,
+  baseBranch: string,
+): Promise<void> {
+  await run(repoPath, ['worktree', 'add', workdir, '-b', branch, baseBranch]);
+}
+
+export async function gitWorktreeRemove(repoPath: string, workdir: string): Promise<void> {
+  await run(repoPath, ['worktree', 'remove', '--force', workdir]);
+}
+
+export async function gitWorktreePrune(repoPath: string): Promise<void> {
+  await run(repoPath, ['worktree', 'prune']);
+}
+
+export async function gitWorktreeList(repoPath: string): Promise<string[]> {
+  const out = await run(repoPath, ['worktree', 'list', '--porcelain']);
+  return out
+    .split('\n')
+    .filter((line) => line.startsWith('worktree '))
+    .map((line) => resolve(line.slice('worktree '.length).trim()));
 }
 
 export async function gitInit(dir: string): Promise<void> {

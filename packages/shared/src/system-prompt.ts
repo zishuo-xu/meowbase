@@ -1,4 +1,4 @@
-import type { AgentId, AgentProfile, EvidenceEntry, Skill } from './types.js';
+import type { AgentId, AgentProfile, EvidenceEntry, Skill, ThreadRepo } from './types.js';
 import { DEFAULT_ROSTER, type TeamMember } from './catalog.js';
 
 export type { TeamMember };
@@ -68,14 +68,18 @@ export function buildSystemPrompt(input: {
   skills?: Skill[];
   evidenceRefs: EvidenceEntry[];
   workdir?: string;
+  repo?: ThreadRepo;
 }): string | undefined {
   const parts: string[] = [];
   if (input.profile) {
     const p = input.profile;
     const pin = input.workdir ? `当前工作目录是 ${input.workdir}。` : '';
+    const workdirRule = input.repo
+      ? `这是真实仓库 ${input.repo.path} 的 worktree,绝对路径 ${input.workdir ?? ''}。当前分支 ${input.repo.branch}。不许 push、不许切分支、不许动 .git、不许碰 ${input.repo.baseBranch}。所有文件创建/修改都发生在当前工作目录内,只使用相对路径,禁止读写工作目录以外的路径。`
+      : `${pin}所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。不要上溯到平台仓库的 packages/。`;
     parts.push(
       `你是 ${p.name},${p.role}。性格:${p.personality}。擅长:${p.expertise.join('、')}。` +
-        `\n工作区规则:${pin}所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。不要上溯到平台仓库的 packages/。`,
+        `\n工作区规则:${workdirRule}`,
     );
   }
   const team = input.team ?? (input.profile ? DEFAULT_ROSTER : undefined);

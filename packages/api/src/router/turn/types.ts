@@ -1,6 +1,7 @@
 import type {
   AgentId,
   Message,
+  ThreadRepo,
   ToolActivity,
 } from '@meowbase/shared';
 import type { AgentRegistry, AgentTurnOutput } from '../../providers/types.js';
@@ -24,6 +25,7 @@ export type ThreadRuntime = {
   workdir: string;
   sessions: Partial<Record<AgentId, string>>;
   primaryAgentId: AgentId;
+  repo?: ThreadRepo;
 };
 
 export interface TurnContext {

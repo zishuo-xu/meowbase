@@ -12,6 +12,7 @@ export type {
   Skill,
   PendingHop,
   Thread,
+  ThreadRepo,
   TokenUsage,
   ToolActivity,
   ToolActivityStatus,

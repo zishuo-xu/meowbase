@@ -50,6 +50,24 @@ describe('Redis 存储', () => {
     expect(await threads.get(thread.id)).toBeNull();
   });
 
+  it('线程 repo 绑定写入并回读', async () => {
+    if (!redis) return;
+    const threads = createThreadStore(redis);
+    const title = `redis-repo-${Date.now()}`;
+    const thread = await threads.create({
+      title,
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'develop' },
+    });
+    const loaded = await threads.get(thread.id);
+    expect(loaded?.repo).toEqual({
+      path: '/src/myapp',
+      baseBranch: 'develop',
+      branch: `meow/${thread.id}`,
+    });
+    await threads.delete(thread.id);
+  });
+
   it('消息追加与 patch', async () => {
     if (!redis) return;
     const threads = createThreadStore(redis);

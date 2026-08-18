@@ -26,7 +26,16 @@ export interface Thread {
   sessions: Partial<Record<AgentId, string>>;
   /** 交棒后本轮先结束时记下的下一跳 */
   pendingHop?: PendingHop;
+  /** 绑了真实仓库时:父仓路径、基准分支、本线程分支 */
+  repo?: ThreadRepo;
   createdAt: string;
+}
+
+/** 线程绑真实仓库时的 worktree 地址 */
+export interface ThreadRepo {
+  path: string;
+  baseBranch: string;
+  branch: string;
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';

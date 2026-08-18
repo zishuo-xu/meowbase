@@ -12,6 +12,21 @@ describe('内存存储', () => {
     expect(await threads.get('不存在')).toBeNull();
   });
 
+  it('create 可带 repo 绑定并补全 meow/<id> 分支', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({
+      title: '绑仓',
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'main' },
+    });
+    expect(thread.repo).toEqual({
+      path: '/src/myapp',
+      baseBranch: 'main',
+      branch: `meow/${thread.id}`,
+    });
+    expect((await threads.get(thread.id))?.repo).toEqual(thread.repo);
+  });
+
   it('rename 改标题', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: '8/17 19:28', primaryAgentId: 'claude' });

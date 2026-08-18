@@ -162,6 +162,34 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('/tmp/meowbase-work/t1');
     expect(prompt).toContain('不要上溯');
     expect(prompt).toContain('packages/');
+    expect(prompt).toContain(
+      '当前工作目录是 /tmp/meowbase-work/t1。所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。不要上溯到平台仓库的 packages/。',
+    );
+  });
+
+  it('绑了仓库时写明 worktree、分支和禁令;未绑时措辞不变', () => {
+    const unbound = buildSystemPrompt({
+      profile,
+      evidenceRefs: [],
+      workdir: '/tmp/meowbase-work/t1',
+    });
+    const bound = buildSystemPrompt({
+      profile,
+      evidenceRefs: [],
+      workdir: '/tmp/meowbase-work/t1',
+      repo: { path: '/src/myapp', baseBranch: 'main', branch: 'meow/t1' },
+    });
+    expect(unbound).toContain(
+      '当前工作目录是 /tmp/meowbase-work/t1。所有文件创建/修改都发生在当前工作目录(线程沙箱)内,只使用相对路径,禁止读写工作目录以外的路径。不要上溯到平台仓库的 packages/。',
+    );
+    expect(bound).toContain('/src/myapp');
+    expect(bound).toContain('/tmp/meowbase-work/t1');
+    expect(bound).toContain('meow/t1');
+    expect(bound).toContain('不许 push');
+    expect(bound).toContain('不许切分支');
+    expect(bound).toContain('不许动 .git');
+    expect(bound).toContain('不许碰 main');
+    expect(bound).toContain('worktree');
   });
 });
 

@@ -8,6 +8,7 @@ import type {
   PendingHop,
   Skill,
   Thread,
+  ThreadRepo,
 } from '@meowbase/shared';
 
 export interface ThreadStore {
@@ -16,6 +17,8 @@ export interface ThreadStore {
     primaryAgentId: AgentId;
     /** 线程工作目录的基准路径;不传时默认相对路径 'work'(与历史行为一致) */
     workdirBase?: string;
+    /** 绑真实仓库时只传 path + baseBranch;store 补全 branch 为 meow/<id> */
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
   }): Promise<Thread>;
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;

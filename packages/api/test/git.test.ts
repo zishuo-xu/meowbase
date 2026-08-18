@@ -1,17 +1,44 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
   gitAddAll,
+  gitBranchExists,
   gitChangedPaths,
   gitCommit,
+  gitCurrentBranch,
   gitDiffHead,
   gitInit,
+  gitIsRepo,
+  gitWorktreeAdd,
+  gitWorktreeList,
+  gitWorktreePrune,
+  gitWorktreeRemove,
   isApprovalNoisePath,
   parseStrayFiles,
   sweepStrayFiles,
 } from '../src/services/git.js';
+
+const exec = promisify(execFile);
+
+const USER_GITIGNORE = 'node_modules/\n*.env\n';
+
+async function initScratchRepo(dir: string): Promise<void> {
+  await exec('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+  await exec('git', ['config', 'user.name', 'tester'], { cwd: dir });
+  await exec('git', ['config', 'user.email', 't@t.local'], { cwd: dir });
+  writeFileSync(join(dir, '.gitignore'), USER_GITIGNORE);
+  writeFileSync(join(dir, 'README.md'), 'hello\n');
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({ name: 'scratch', private: true, type: 'module' }, null, 2),
+  );
+  await exec('git', ['add', '-A'], { cwd: dir });
+  await exec('git', ['commit', '-q', '-m', 'init'], { cwd: dir });
+}
 
 describe('git 辅助函数', () => {
   it('init 空基线;新增文件后 diff 非空;commit 后 diff 为空', async () => {
@@ -124,5 +151,38 @@ describe('git 辅助函数', () => {
     expect(existsSync(join(workdir, 'stray.js'))).toBe(true);
     expect(existsSync(join(root, 'packages', 'api', 'stray.js'))).toBe(false);
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('worktree add 在 meow/<id> 上建工作区;remove 清登记;不改父仓 .gitignore', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-wt-repo-'));
+    await initScratchRepo(repo);
+    const threadId = 'wt-test-id';
+    const workdir = join(mkdtempSync(join(tmpdir(), 'meowbase-wt-base-')), threadId);
+    const branch = `meow/${threadId}`;
+
+    expect(await gitIsRepo(repo)).toBe(true);
+    expect(await gitCurrentBranch(repo)).toBe('main');
+    expect(await gitBranchExists(repo, 'main')).toBe(true);
+    expect(await gitBranchExists(repo, branch)).toBe(false);
+
+    await gitWorktreeAdd(repo, workdir, branch, 'main');
+    expect(existsSync(workdir)).toBe(true);
+    expect(await gitCurrentBranch(workdir)).toBe(branch);
+    expect(await gitBranchExists(repo, branch)).toBe(true);
+    const listed = await gitWorktreeList(repo);
+    expect(listed.some((p) => p === workdir || p.endsWith(threadId))).toBe(true);
+    expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe(USER_GITIGNORE);
+    expect(readFileSync(join(workdir, '.gitignore'), 'utf8')).toBe(USER_GITIGNORE);
+    expect(readFileSync(join(workdir, '.gitignore'), 'utf8')).not.toContain('*.tsbuildinfo');
+
+    await gitWorktreeRemove(repo, workdir);
+    expect(existsSync(workdir)).toBe(false);
+    const after = await gitWorktreeList(repo);
+    expect(after.some((p) => p === workdir || p.endsWith(threadId))).toBe(false);
+    expect(await gitBranchExists(repo, branch)).toBe(true);
+    expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe(USER_GITIGNORE);
+
+    await gitWorktreePrune(repo);
+    rmSync(repo, { recursive: true, force: true });
   });
 });

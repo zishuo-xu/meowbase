@@ -82,11 +82,13 @@ export async function runAgentTurn(
     }),
   );
 
-  try {
-    const repoRoot = resolve(thread.workdir, '..', '..');
-    await sweepStrayFiles(repoRoot, thread.workdir);
-  } catch {
-    // 清扫失败不阻塞
+  if (!thread.repo) {
+    try {
+      const repoRoot = resolve(thread.workdir, '..', '..');
+      await sweepStrayFiles(repoRoot, thread.workdir);
+    } catch {
+      // 清扫失败不阻塞
+    }
   }
 
   return { assistant, output, content: output.content || accumulated };

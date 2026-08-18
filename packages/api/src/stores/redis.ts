@@ -10,6 +10,7 @@ import type {
   Message,
   PendingHop,
   Thread,
+  ThreadRepo,
 } from '@meowbase/shared';
 import type {
   ApprovalStore,
@@ -34,6 +35,7 @@ export class RedisThreadStore implements ThreadStore {
     title: string;
     primaryAgentId: AgentId;
     workdirBase?: string;
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
   }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
@@ -43,6 +45,15 @@ export class RedisThreadStore implements ThreadStore {
       workdir: join(input.workdirBase ?? 'work', id),
       sessions: {},
       createdAt: new Date().toISOString(),
+      ...(input.repo
+        ? {
+            repo: {
+              path: input.repo.path,
+              baseBranch: input.repo.baseBranch,
+              branch: input.repo.branch ?? `meow/${id}`,
+            },
+          }
+        : {}),
     };
     await this.redis
       .multi()
@@ -53,6 +64,7 @@ export class RedisThreadStore implements ThreadStore {
         workdir: thread.workdir,
         sessions: JSON.stringify(thread.sessions),
         createdAt: thread.createdAt,
+        ...(thread.repo ? { repo: JSON.stringify(thread.repo) } : {}),
       })
       .sadd('thread:index', id)
       .exec();
@@ -71,6 +83,7 @@ export class RedisThreadStore implements ThreadStore {
       ...(raw.pendingHop
         ? { pendingHop: JSON.parse(raw.pendingHop) as PendingHop }
         : {}),
+      ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
     };
   }

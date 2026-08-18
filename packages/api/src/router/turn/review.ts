@@ -73,6 +73,7 @@ export async function runReviewFixThenCard(input: {
       skills: reviewSkill ? [reviewSkill] : [],
       evidenceRefs: [],
       workdir: thread.workdir,
+      repo: thread.repo,
     });
 
     const runReview = async (): Promise<string> => {
@@ -135,6 +136,7 @@ export async function runReviewFixThenCard(input: {
           skills: fixSkills,
           evidenceRefs: refs,
           workdir: thread.workdir,
+          repo: thread.repo,
         }),
         writeQueue,
       );

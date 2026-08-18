@@ -10,6 +10,7 @@ import type {
   PendingHop,
   Skill,
   Thread,
+  ThreadRepo,
 } from '@meowbase/shared';
 import type {
   ApprovalStore,
@@ -27,6 +28,7 @@ export class InMemoryThreadStore implements ThreadStore {
     title: string;
     primaryAgentId: AgentId;
     workdirBase?: string;
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
   }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
@@ -36,6 +38,15 @@ export class InMemoryThreadStore implements ThreadStore {
       workdir: join(input.workdirBase ?? 'work', id),
       sessions: {},
       createdAt: new Date().toISOString(),
+      ...(input.repo
+        ? {
+            repo: {
+              path: input.repo.path,
+              baseBranch: input.repo.baseBranch,
+              branch: input.repo.branch ?? `meow/${id}`,
+            },
+          }
+        : {}),
     };
     this.threads.set(id, thread);
     return thread;

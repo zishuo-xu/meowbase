@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
@@ -34,7 +34,16 @@ import {
   syncAgentsWithCatalog,
 } from '../config.js';
 import { executeTurn, followPendingChain, type TurnContext } from '../router/execute-turn.js';
-import { gitInit } from '../services/git.js';
+import {
+  gitBranchExists,
+  gitCurrentBranch,
+  gitInit,
+  gitIsRepo,
+  gitWorktreeAdd,
+  gitWorktreeList,
+  gitWorktreePrune,
+  gitWorktreeRemove,
+} from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
 
 export interface ApiDeps {
@@ -133,7 +142,60 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   await app.register(websocket);
 
   app.post('/api/threads', async (request, reply) => {
-    const body = request.body as { title?: string; primaryAgentId?: AgentId } | null;
+    const body = request.body as {
+      title?: string;
+      primaryAgentId?: AgentId;
+      repoPath?: string;
+      baseBranch?: string;
+    } | null;
+    const repoPathRaw = body?.repoPath?.trim();
+    if (repoPathRaw) {
+      const repoPath = resolve(repoPathRaw);
+      if (!existsSync(repoPath)) {
+        return reply.code(400).send({ error: '仓库路径不存在' });
+      }
+      if (!(await gitIsRepo(repoPath))) {
+        return reply.code(400).send({ error: '路径不是 git 仓库' });
+      }
+      const baseBranch = body?.baseBranch?.trim() || (await gitCurrentBranch(repoPath));
+      if (!baseBranch || !(await gitBranchExists(repoPath, baseBranch))) {
+        return reply.code(400).send({ error: `分支不存在: ${baseBranch || '(空)'}` });
+      }
+      const thread = await deps.stores.threads.create({
+        title: body?.title?.trim() || '新会话',
+        primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
+        workdirBase: deps.workdirBase,
+        repo: { path: repoPath, baseBranch },
+      });
+      const workdir = resolve(thread.workdir);
+      const listed = await gitWorktreeList(repoPath);
+      const occupied =
+        existsSync(workdir) ||
+        listed.some((p) => p === workdir || p.endsWith(thread.id));
+      if (occupied) {
+        await deps.stores.threads.delete(thread.id);
+        return reply.code(400).send({ error: 'worktree 路径已被占用' });
+      }
+      try {
+        // 绑仓:git 自己建目录。绝不能 mkdir / 写 package.json / gitInit
+        // gitInit 会覆盖工作区里的 .gitignore
+        await gitWorktreeAdd(repoPath, workdir, thread.repo!.branch, baseBranch);
+      } catch {
+        await deps.stores.threads.delete(thread.id);
+        try {
+          rmSync(workdir, { recursive: true, force: true });
+        } catch {
+          // 目录可能没建出来
+        }
+        try {
+          await gitWorktreePrune(repoPath);
+        } catch {
+          // 清理失败不掩盖创建失败
+        }
+        return reply.code(400).send({ error: '创建 worktree 失败' });
+      }
+      return reply.code(201).send(thread);
+    }
     const thread = await deps.stores.threads.create({
       title: body?.title?.trim() || '新会话',
       primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
@@ -158,10 +220,27 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (!thread) return reply.code(404).send({ error: `线程不存在: ${threadId}` });
     await deps.stores.messages.deleteAll(threadId);
     await deps.stores.threads.delete(threadId);
-    try {
-      rmSync(thread.workdir, { recursive: true, force: true });
-    } catch {
-      // 沙箱目录不在不影响删线程
+    if (thread.repo) {
+      try {
+        await gitWorktreeRemove(thread.repo.path, resolve(thread.workdir));
+      } catch {
+        try {
+          rmSync(thread.workdir, { recursive: true, force: true });
+        } catch {
+          // 目录已不在
+        }
+        try {
+          await gitWorktreePrune(thread.repo.path);
+        } catch {
+          // prune 失败不阻塞删线程
+        }
+      }
+    } else {
+      try {
+        rmSync(thread.workdir, { recursive: true, force: true });
+      } catch {
+        // 沙箱目录不在不影响删线程
+      }
     }
     return { ok: true };
   });

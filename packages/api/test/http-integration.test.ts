@@ -1,6 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMemoryStores } from '../src/stores/factories.js';
@@ -9,6 +11,18 @@ import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import { buildServer } from '../src/http/server.js';
 import { DEFAULT_AGENTS } from '../src/config.js';
+
+const exec = promisify(execFile);
+
+async function initScratchRepo(dir: string): Promise<void> {
+  await exec('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+  await exec('git', ['config', 'user.name', 'tester'], { cwd: dir });
+  await exec('git', ['config', 'user.email', 't@t.local'], { cwd: dir });
+  writeFileSync(join(dir, '.gitignore'), 'node_modules/\n');
+  writeFileSync(join(dir, 'README.md'), 'hello\n');
+  await exec('git', ['add', '-A'], { cwd: dir });
+  await exec('git', ['commit', '-q', '-m', 'init'], { cwd: dir });
+}
 
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-test-'));
 const FAKE_CLAUDE = join(import.meta.dirname, 'fixtures', 'fake-claude.mjs');
@@ -144,6 +158,96 @@ describe('HTTP 集成', () => {
     expect(list.some((t) => t.id === thread.id)).toBe(false);
     const missing = await fetch(`${baseUrl}/api/threads/no-such-thread`, { method: 'DELETE' });
     expect(missing.status).toBe(404);
+  });
+
+  it('POST /api/threads 带合法 repoPath 返回绑定;非法路径 400 且不建线程', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-http-repo-'));
+    await initScratchRepo(repo);
+
+    const ok = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '绑仓成功', primaryAgentId: 'claude', repoPath: repo }),
+    });
+    expect(ok.status).toBe(201);
+    const thread = (await ok.json()) as {
+      id: string;
+      workdir: string;
+      repo?: { path: string; baseBranch: string; branch: string };
+    };
+    expect(thread.repo?.path).toBe(repo);
+    expect(thread.repo?.baseBranch).toBe('main');
+    expect(thread.repo?.branch).toBe(`meow/${thread.id}`);
+    const listed = await exec('git', ['-C', repo, 'worktree', 'list', '--porcelain']);
+    expect(listed.stdout).toContain(thread.id);
+
+    const missingPathTitle = `坏路径-${Date.now()}`;
+    const missingPath = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: missingPathTitle, repoPath: join(repo, 'no-such-dir') }),
+    });
+    expect(missingPath.status).toBe(400);
+    expect(((await missingPath.json()) as { error: string }).error).toMatch(/不存在/);
+
+    const notRepo = mkdtempSync(join(tmpdir(), 'meowbase-http-norepo-'));
+    const notRepoTitle = `非仓库-${Date.now()}`;
+    const notGit = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: notRepoTitle, repoPath: notRepo }),
+    });
+    expect(notGit.status).toBe(400);
+    expect(((await notGit.json()) as { error: string }).error).toMatch(/不是 git 仓库/);
+
+    const missingBranchTitle = `缺分支-${Date.now()}`;
+    const missingBranch = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: missingBranchTitle,
+        repoPath: repo,
+        baseBranch: 'no-such-branch',
+      }),
+    });
+    expect(missingBranch.status).toBe(400);
+    expect(((await missingBranch.json()) as { error: string }).error).toMatch(/分支不存在/);
+
+    const list = (await (await fetch(`${baseUrl}/api/threads`)).json()) as { title: string }[];
+    expect(list.some((t) => t.title === missingPathTitle)).toBe(false);
+    expect(list.some((t) => t.title === notRepoTitle)).toBe(false);
+    expect(list.some((t) => t.title === missingBranchTitle)).toBe(false);
+
+    await fetch(`${baseUrl}/api/threads/${thread.id}`, { method: 'DELETE' });
+    rmSync(notRepo, { recursive: true, force: true });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('DELETE 绑仓线程时卸 worktree 并保留 meow/<id> 分支', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-http-del-'));
+    await initScratchRepo(repo);
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '待卸 worktree', repoPath: repo }),
+    });
+    const thread = (await createRes.json()) as {
+      id: string;
+      workdir: string;
+      repo?: { branch: string };
+    };
+    expect(createRes.status).toBe(201);
+    const before = await exec('git', ['-C', repo, 'worktree', 'list', '--porcelain']);
+    expect(before.stdout).toContain(thread.id);
+
+    const del = await fetch(`${baseUrl}/api/threads/${thread.id}`, { method: 'DELETE' });
+    expect(del.status).toBe(200);
+    const after = await exec('git', ['-C', repo, 'worktree', 'list', '--porcelain']);
+    expect(after.stdout).not.toContain(thread.id);
+    expect(existsSync(thread.workdir)).toBe(false);
+    const branches = await exec('git', ['-C', repo, 'branch', '--list', `meow/${thread.id}`]);
+    expect(branches.stdout).toContain(`meow/${thread.id}`);
+    rmSync(repo, { recursive: true, force: true });
   });
 
   it('空 content 返回 400', async () => {
