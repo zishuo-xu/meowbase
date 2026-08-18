@@ -106,6 +106,20 @@ describe('mergeCanonicalMessages', () => {
     expect(next[0]?.status).toBe('streaming');
   });
 
+  it('中途 refetch 空正文的 streaming 快照不盖掉已打出的字', () => {
+    const canonical = [
+      msg({ id: 'u1', role: 'user', content: '写 add.ts' }),
+      msg({ id: 'a1', role: 'assistant', agentId: 'claude', content: '', status: 'streaming' }),
+    ];
+    const streamed = [
+      msg({ id: 'u1', role: 'user', content: '写 add.ts' }),
+      msg({ id: 'a1', role: 'assistant', agentId: 'claude', content: '先写类型', status: 'streaming' }),
+    ];
+    const next = mergeCanonicalMessages(canonical, streamed, 't1');
+    expect(next[1]?.content).toBe('先写类型');
+    expect(next[1]?.status).toBe('streaming');
+  });
+
   it('服务端用户消息到位后丢掉 local- 乐观气泡', () => {
     const canonical = [msg({ id: 'u-real', role: 'user', content: '干活' })];
     const streamed = [msg({ id: 'local-1', role: 'user', content: '干活' })];

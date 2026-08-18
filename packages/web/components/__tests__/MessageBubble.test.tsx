@@ -252,6 +252,26 @@ describe('MessageBubble', () => {
     expect(screen.queryByText('## 结论')).toBeNull();
   });
 
+  it('user 气泡保留换行,行首 @ 看起来就是行首', () => {
+    const { container } = render(
+      <MessageBubble
+        message={{
+          id: 'm-nl',
+          threadId: 't',
+          role: 'user',
+          content: '在沙箱写 add.ts\n@墨墨',
+          status: 'completed',
+          createdAt: '',
+        }}
+      />,
+    );
+    const bubble = container.querySelector('.whitespace-pre-wrap');
+    expect(bubble).not.toBeNull();
+    expect(bubble?.textContent).toContain('在沙箱写 add.ts');
+    expect(bubble?.textContent).toContain('@墨墨');
+    expect(bubble?.textContent).toMatch(/在沙箱写 add.ts\s*\n\s*@墨墨/);
+  });
+
   it('user 气泡无猫耳', () => {
     const { container } = render(
       <MessageBubble

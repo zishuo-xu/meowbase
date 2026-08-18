@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type AgentConfigDto, type ApprovalDto, type MessageDto } from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
-import { useThreadStream } from '@/lib/use-thread-stream';
+import type { StreamEvent } from '@/lib/use-thread-stream';
 import { applyStreamActivity, applyStreamIncrement, applyStreamStart, applyStreamThinking, dropAbandonedStreamShells, mergeCanonicalMessages, pipelinePhase } from '@/lib/stream-messages';
 import { agentName } from '@/lib/persona';
 import { approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '@/lib/parse-message';
@@ -10,6 +10,7 @@ import { approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '@/lib/
 export function ChatArea({
   threadId,
   messages,
+  lastEvent,
   sending,
   agents,
   onApprove,
@@ -22,6 +23,7 @@ export function ChatArea({
 }: {
   threadId: string;
   messages: MessageDto[];
+  lastEvent?: StreamEvent | null;
   sending?: boolean;
   agents?: AgentConfigDto[];
   onApprove: (id: string) => void;
@@ -32,7 +34,6 @@ export function ChatArea({
   onSpeak?: () => void;
   onViewMessages?: (messages: MessageDto[]) => void;
 }) {
-  const { lastEvent } = useThreadStream(threadId);
   const [streamed, setStreamed] = useState<MessageDto[]>(messages);
   const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -41,7 +42,7 @@ export function ChatArea({
     setStreamed((prev) => mergeCanonicalMessages(messages, prev, threadId));
   }, [messages, threadId]);
   useEffect(() => {
-    if (!lastEvent) return;
+    if (!lastEvent || lastEvent.type === 'sync') return;
     if (lastEvent.type === 'activity') {
       setStreamed((prev) => applyStreamActivity(prev, lastEvent, threadId));
       return;

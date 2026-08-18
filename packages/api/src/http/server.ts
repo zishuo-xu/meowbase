@@ -33,6 +33,11 @@ import {
   resolvePresetBin,
   syncAgentsWithCatalog,
 } from '../config.js';
+import {
+  broadcastApprovalSync,
+  broadcastMessageSync,
+  broadcastThreadSync,
+} from './broadcast-sync.js';
 import { executeTurn, followPendingChain, type TurnContext } from '../router/execute-turn.js';
 import {
   gitBranchExists,
@@ -93,6 +98,17 @@ function adapterRuntimeChanged(prev: AgentSpec, next: AgentSpec): boolean {
 export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   const emitter = new EventEmitter();
+  const emitSync = (threadId: string) => {
+    emitter.emit(`sync:${threadId}`, { threadId });
+  };
+  const stores = {
+    threads: broadcastThreadSync(deps.stores.threads, emitSync),
+    messages: broadcastMessageSync(deps.stores.messages, emitSync),
+    profiles: deps.stores.profiles,
+    evidence: deps.stores.evidence,
+    skills: deps.stores.skills,
+    approvals: broadcastApprovalSync(deps.stores.approvals, emitSync),
+  };
   const live: LiveConfig = {
     a2aMaxDepth: deps.a2aMaxDepth ?? 3,
     defaultAgentId: deps.defaultAgentId ?? 'claude',
@@ -115,7 +131,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   }
 
   async function publicConfig() {
-    const profiles = await deps.stores.profiles.list();
+    const profiles = await stores.profiles.list();
     const autoById = new Map(profiles.map((p) => [p.agentId, p.autoApprove]));
     const agents =
       live.agents.length > 0
@@ -161,7 +177,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       if (!baseBranch || !(await gitBranchExists(repoPath, baseBranch))) {
         return reply.code(400).send({ error: `分支不存在: ${baseBranch || '(空)'}` });
       }
-      const thread = await deps.stores.threads.create({
+      const thread = await stores.threads.create({
         title: body?.title?.trim() || '新会话',
         primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
         workdirBase: deps.workdirBase,
@@ -173,7 +189,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         existsSync(workdir) ||
         listed.some((p) => p === workdir || p.endsWith(thread.id));
       if (occupied) {
-        await deps.stores.threads.delete(thread.id);
+        await stores.threads.delete(thread.id);
         return reply.code(400).send({ error: 'worktree 路径已被占用' });
       }
       try {
@@ -181,7 +197,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         // gitInit 会覆盖工作区里的 .gitignore
         await gitWorktreeAdd(repoPath, workdir, thread.repo!.branch, baseBranch);
       } catch {
-        await deps.stores.threads.delete(thread.id);
+        await stores.threads.delete(thread.id);
         try {
           rmSync(workdir, { recursive: true, force: true });
         } catch {
@@ -196,7 +212,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       }
       return reply.code(201).send(thread);
     }
-    const thread = await deps.stores.threads.create({
+    const thread = await stores.threads.create({
       title: body?.title?.trim() || '新会话',
       primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
       workdirBase: deps.workdirBase,
@@ -212,14 +228,14 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return reply.code(201).send(thread);
   });
 
-  app.get('/api/threads', async () => deps.stores.threads.list());
+  app.get('/api/threads', async () => stores.threads.list());
 
   app.delete('/api/threads/:threadId', async (request, reply) => {
     const { threadId } = request.params as { threadId: string };
-    const thread = await deps.stores.threads.get(threadId);
+    const thread = await stores.threads.get(threadId);
     if (!thread) return reply.code(404).send({ error: `线程不存在: ${threadId}` });
-    await deps.stores.messages.deleteAll(threadId);
-    await deps.stores.threads.delete(threadId);
+    await stores.messages.deleteAll(threadId);
+    await stores.threads.delete(threadId);
     if (thread.repo) {
       try {
         await gitWorktreeRemove(thread.repo.path, resolve(thread.workdir));
@@ -245,7 +261,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return { ok: true };
   });
 
-  app.get('/api/profiles', async () => deps.stores.profiles.list());
+  app.get('/api/profiles', async () => stores.profiles.list());
 
   app.get('/api/config', async () => publicConfig());
 
@@ -363,13 +379,13 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const next = applyAgentPatch(prev, body);
     live.agents[index] = next;
     if (typeof body.autoApprove === 'boolean') {
-      await deps.stores.profiles.updateAutoApprove(agentId, body.autoApprove);
+      await stores.profiles.updateAutoApprove(agentId, body.autoApprove);
     }
     if (adapterRuntimeChanged(prev, next)) {
       deps.rebuildAdapter?.(next);
     }
     persist();
-    const profile = await deps.stores.profiles.get(agentId);
+    const profile = await stores.profiles.get(agentId);
     return publicAgentConfig(next, { autoApprove: profile?.autoApprove });
   });
 
@@ -379,7 +395,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (typeof body?.autoApprove !== 'boolean') {
       return reply.code(400).send({ error: 'autoApprove 必须是布尔值' });
     }
-    const updated = await deps.stores.profiles.updateAutoApprove(
+    const updated = await stores.profiles.updateAutoApprove(
       agentId as AgentId,
       body.autoApprove,
     );
@@ -389,19 +405,19 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
 
   app.get('/api/evidence', async (request) => {
     const { threadId } = request.query as { threadId?: string };
-    return deps.stores.evidence.list(threadId);
+    return stores.evidence.list(threadId);
   });
 
-  app.get('/api/skills', async () => deps.stores.skills.list());
+  app.get('/api/skills', async () => stores.skills.list());
 
   app.get('/api/approvals', async (request) => {
     const { threadId } = request.query as { threadId?: string };
-    return deps.stores.approvals.list(threadId);
+    return stores.approvals.list(threadId);
   });
 
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };
-    return deps.stores.messages.list(threadId);
+    return stores.messages.list(threadId);
   });
 
   const runningTurns = new Map<string, AbortController>();
@@ -424,7 +440,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const ac = new AbortController();
     runningTurns.set(threadId, ac);
     const context: TurnContext = {
-      stores: deps.stores,
+      stores,
       registry: deps.registry,
       a2aMaxDepth: live.a2aMaxDepth,
       agents: live.agents.length > 0 ? live.agents : deps.agents,
@@ -476,15 +492,20 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     const onThinking = (payload: unknown) => {
       socket.send(JSON.stringify({ type: 'thinking', ...(payload as object) }));
     };
+    const onSync = (payload: unknown) => {
+      socket.send(JSON.stringify({ type: 'sync', ...(payload as object) }));
+    };
     emitter.on(`increment:${threadId}`, onIncrement);
     emitter.on(`activity:${threadId}`, onActivity);
     emitter.on(`start:${threadId}`, onStart);
     emitter.on(`thinking:${threadId}`, onThinking);
+    emitter.on(`sync:${threadId}`, onSync);
     socket.on('close', () => {
       emitter.off(`increment:${threadId}`, onIncrement);
       emitter.off(`activity:${threadId}`, onActivity);
       emitter.off(`start:${threadId}`, onStart);
       emitter.off(`thinking:${threadId}`, onThinking);
+      emitter.off(`sync:${threadId}`, onSync);
     });
   });
 

@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在是 [live-sync.md](live-sync.md)；上一刀 [thread-repo-worktree.md](thread-repo-worktree.md) 已落地。
+`设计中` 同时最多一篇。现在没有设计中。上一刀 [live-sync.md](live-sync.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -33,4 +33,4 @@
 | [hub-capability.md](hub-capability.md) | 已落地 | Hub 能力表 |
 | [hold-command-wake.md](hold-command-wake.md) | 已落地 | 行首「等跑」平台托管命令再叫醒 |
 | [thread-repo-worktree.md](thread-repo-worktree.md) | 已落地 | 线程绑真实仓库,worktree 隔离 |
-| [live-sync.md](live-sync.md) | 设计中 | 续跑产出即时推到前端 |
+| [live-sync.md](live-sync.md) | 已落地 | 续跑产出即时推到前端 |

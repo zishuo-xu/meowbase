@@ -4,7 +4,7 @@
 
 开篇先想：同一问题他们公开怎么设计，这一刀能靠多近。能靠就靠；本刀没更近，写清差在哪、为什么先薄。不读、不抄源码。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:公开是异步 A2A + 富消息卡片 + 飞书投递 —— 服务端产出主动送到人眼前,人不用回去刷新问一遍。
 - 靠拢:靠「服务端产出主动送达」这条。差在:不开推送通道、不做富消息协议,只在现有 WebSocket 上加一个最薄的 `sync` 事件。
 
@@ -48,4 +48,7 @@ WS 现在只推 `increment` / `activity` / `start` / `thinking`（`packages/api/
 
 ## 入口
 
-落地后填路径。
+- 广播装饰器:`packages/api/src/http/broadcast-sync.ts`（`broadcastMessageSync` / `broadcastApprovalSync` / `broadcastThreadSync`）,`buildServer` 里包一层注入的 store
+- WS 事件:`packages/api/src/http/server.ts` 的 `emitSync` + `/api/ws` 转发 `{ type: 'sync', threadId }`
+- web 处理:`packages/web/lib/use-thread-stream.ts` 认 `sync`;`packages/web/app/page.tsx` 去抖约 150ms 后重拉 messages / evidence / threads / approvals。`ChatArea` 用 `mergeCanonicalMessages` 保住流式正文
+- 搭车:用户气泡 `whitespace-pre-wrap`（`MessageBubble`）;关 socket 前看 `readyState`（`closeThreadSocket`）

@@ -111,7 +111,7 @@ export function MessageBubble({
         data-cat-ear={isUser ? undefined : 'true'}
         className={`relative max-w-[75%] rounded-2xl border px-4 py-2.5 text-sm leading-relaxed ${
           isUser
-            ? 'rounded-br-md border-[var(--border)] bg-white shadow-sm'
+            ? 'whitespace-pre-wrap rounded-br-md border-[var(--border)] bg-white shadow-sm'
             : 'rounded-tl-none border-transparent shadow-sm'
         }`}
         style={isUser ? undefined : { background: persona.surface }}

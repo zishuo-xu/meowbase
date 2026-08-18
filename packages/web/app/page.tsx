@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type AgentConfigDto, type AppConfigDto, type EvidenceDto, type MessageDto, type ThreadDto } from '@/lib/api';
 import { AGENT_ORDER, agentName, getPersona } from '@/lib/persona';
 import { ThreadSidebar } from '@/components/ThreadSidebar';
@@ -12,6 +12,7 @@ import { describeBall, describeRelayTimeline, formatPickupCommand } from '@/lib/
 import { defaultSessionTitle, isPlaceholderTitle, threadRepoHint, titleFromUserMessage } from '@/lib/threads';
 import { pendingThreadIds } from '@/lib/approvals';
 import { RelayTimeline } from '@/components/RelayTimeline';
+import { SYNC_REFRESH_DEBOUNCE_MS, useThreadStream } from '@/lib/use-thread-stream';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
   id,
@@ -38,6 +39,7 @@ export default function Home() {
   const [pendingIds, setPendingIds] = useState<string[]>([]);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
+  const { lastEvent } = useThreadStream(activeId);
 
   const refreshThreads = useCallback(async () => {
     try {
@@ -62,6 +64,41 @@ export default function Home() {
     void refreshThreads();
     void refreshConfig();
   }, [refreshThreads, refreshConfig]);
+
+  // 只响应 sync 事件本身去拉,不把 messages 放进依赖,避免 refetch → setState → 再拉。
+  // 定时器放 ref:lastEvent 变成 increment 时不能清掉待发的 sync 去抖。
+  const syncRefreshSeq = useRef(0);
+  const syncTimer = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+      syncRefreshSeq.current += 1;
+    };
+  }, [activeId]);
+  useEffect(() => {
+    if (!activeId || lastEvent?.type !== 'sync') return;
+    if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
+    const seq = ++syncRefreshSeq.current;
+    const tid = activeId;
+    syncTimer.current = window.setTimeout(() => {
+      syncTimer.current = null;
+      void (async () => {
+        try {
+          const [msgs, ev] = await Promise.all([
+            api.listMessages(tid),
+            api.listEvidence(tid),
+          ]);
+          if (seq !== syncRefreshSeq.current) return;
+          setMessages(msgs);
+          setEvidence(ev);
+          await refreshThreads();
+        } catch {
+          /* 同步失败不打断当前气泡 */
+        }
+      })();
+    }, SYNC_REFRESH_DEBOUNCE_MS);
+  }, [lastEvent, activeId, refreshThreads]);
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
@@ -259,6 +296,7 @@ export default function Home() {
             <ChatArea
               threadId={activeId}
               messages={messages}
+              lastEvent={lastEvent}
               sending={sending}
               agents={agents}
               onApprove={(id) => sendCommand(`#approve ${id}`)}

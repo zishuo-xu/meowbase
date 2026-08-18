@@ -1,0 +1,80 @@
+import type { ApprovalStore, MessageStore, ThreadStore } from '../stores/ports.js';
+
+export type SyncEmit = (threadId: string) => void;
+
+function emitIfThread(emit: SyncEmit, threadId: string | undefined | null): void {
+  if (!threadId) return;
+  emit(threadId);
+}
+
+/** 消息写入成功后发 sync。读路径原样转发。 */
+export function broadcastMessageSync(store: MessageStore, emit: SyncEmit): MessageStore {
+  return {
+    append: async (input) => {
+      const result = await store.append(input);
+      emit(input.threadId);
+      return result;
+    },
+    get: (threadId, messageId) => store.get(threadId, messageId),
+    list: (threadId) => store.list(threadId),
+    deleteAll: (threadId) => store.deleteAll(threadId),
+    patch: async (threadId, messageId, patch) => {
+      const result = await store.patch(threadId, messageId, patch);
+      emit(threadId);
+      return result;
+    },
+  };
+}
+
+/** 审批卡成功变更后发 sync。threadId 从卡片或 create 入参取。 */
+export function broadcastApprovalSync(store: ApprovalStore, emit: SyncEmit): ApprovalStore {
+  return {
+    create: async (input) => {
+      const card = await store.create(input);
+      emitIfThread(emit, card.threadId ?? input.threadId);
+      return card;
+    },
+    get: (id) => store.get(id),
+    list: (threadId) => store.list(threadId),
+    setReviewComment: async (id, comment) => {
+      const card = await store.setReviewComment(id, comment);
+      emitIfThread(emit, card?.threadId);
+      return card;
+    },
+    approve: async (id) => {
+      const card = await store.approve(id);
+      emitIfThread(emit, card?.threadId);
+      return card;
+    },
+    reject: async (id, reason) => {
+      const card = await store.reject(id, reason);
+      emitIfThread(emit, card?.threadId);
+      return card;
+    },
+    markApplied: async (id) => {
+      const card = await store.markApplied(id);
+      emitIfThread(emit, card?.threadId);
+      return card;
+    },
+  };
+}
+
+/** 球权与标题变更成功后发 sync。 */
+export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadStore {
+  return {
+    create: (input) => store.create(input),
+    get: (id) => store.get(id),
+    list: () => store.list(),
+    setSession: (threadId, agentId, sessionId) => store.setSession(threadId, agentId, sessionId),
+    setPendingHop: async (threadId, hop) => {
+      await store.setPendingHop(threadId, hop);
+      emit(threadId);
+    },
+    rename: async (id, title) => {
+      const result = await store.rename(id, title);
+      if (result) emit(id);
+      return result;
+    },
+    delete: (id) => store.delete(id),
+  };
+}
