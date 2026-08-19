@@ -12,6 +12,8 @@ import {
   formatFailedBallNote,
   formatHoldBallNote,
   formatHoldCommandDoneNote,
+  formatHoldCommandRestartNote,
+  formatHoldCommandRestartWakePrompt,
   formatHoldCommandWakePrompt,
   formatPickupCommand,
   formatExitNudgeNote,
@@ -304,6 +306,21 @@ describe('parseHoldExit', () => {
       timedOut: false,
       previousOutput: '等跑 npm test',
     })).toContain('命令跑完');
+  });
+
+  it('重启捡到等跑:说没跑完,不说跑完了', () => {
+    const restart = formatHoldCommandRestartNote('npm test');
+    expect(restart).toContain('平台重启');
+    expect(restart).toContain('没跑完');
+    expect(restart).toContain('npm test');
+    const wake = formatHoldCommandRestartWakePrompt({
+      command: 'npm test',
+      previousOutput: '等跑 npm test',
+    });
+    expect(wake).toContain('平台重启');
+    expect(wake).toContain('npm test');
+    expect(wake).toContain('等跑 npm test');
+    expect(wake).not.toContain('命令跑完');
   });
 
   it('持球不是掉地上,也不补问', () => {

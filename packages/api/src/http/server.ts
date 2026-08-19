@@ -38,7 +38,13 @@ import {
   broadcastMessageSync,
   broadcastThreadSync,
 } from './broadcast-sync.js';
-import { executeTurn, followPendingChain, type TurnContext } from '../router/execute-turn.js';
+import { executeTurn, type TurnContext } from '../router/execute-turn.js';
+import {
+  createPendingRunner,
+  HOP_LEASE_RENEW_MS,
+  HOP_LEASE_TTL_MS,
+  HOP_SWEEP_INTERVAL_MS,
+} from '../router/pending-runner.js';
 import {
   gitBranchExists,
   gitCurrentBranch,
@@ -70,6 +76,10 @@ export interface ApiDeps {
   configPath?: string;
   persistConfig?: () => void;
   rebuildAdapter?: (spec: AgentSpec) => void;
+  /** 开机扫一遍还带着 pendingHop 的线程;测试默认关 */
+  resumePendingOnBoot?: boolean;
+  /** 收尸 interval;0 或不传且未开机扫则不挂定时器 */
+  hopSweepIntervalMs?: number;
 }
 
 interface LiveConfig {
@@ -422,21 +432,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
 
   const runningTurns = new Map<string, AbortController>();
 
-  app.post('/api/threads/:threadId/cancel', async (request, reply) => {
-    const { threadId } = request.params as { threadId: string };
-    const running = runningTurns.get(threadId);
-    if (!running) return reply.code(409).send({ error: '当前没有进行中的一轮' });
-    running.abort();
-    return { ok: true };
-  });
-
-  app.post('/api/threads/:threadId/messages', async (request, reply) => {
-    const { threadId } = request.params as { threadId: string };
-    const body = request.body as { content?: string } | null;
-    const content = body?.content?.trim();
-    if (!content) {
-      return reply.code(400).send({ error: 'content 不能为空' });
-    }
+  function createTurnContext(threadId: string): { context: TurnContext; release: () => void } {
     const ac = new AbortController();
     runningTurns.set(threadId, ac);
     const context: TurnContext = {
@@ -458,18 +454,57 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
       },
     };
+    return {
+      context,
+      release: () => {
+        if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
+      },
+    };
+  }
+
+  const resumeOnBoot = deps.resumePendingOnBoot ?? false;
+  const sweepIntervalMs = deps.hopSweepIntervalMs ?? (resumeOnBoot ? HOP_SWEEP_INTERVAL_MS : 0);
+  const runner = createPendingRunner({
+    threads: stores.threads,
+    messages: stores.messages,
+    createContext: createTurnContext,
+    leaseTtlMs: HOP_LEASE_TTL_MS,
+    leaseRenewMs: HOP_LEASE_RENEW_MS,
+    sweepIntervalMs,
+  });
+  app.addHook('onReady', async () => {
+    if (resumeOnBoot || sweepIntervalMs > 0) runner.start();
+  });
+  app.addHook('onClose', async () => {
+    runner.stop();
+  });
+
+  app.post('/api/threads/:threadId/cancel', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const running = runningTurns.get(threadId);
+    if (!running) return reply.code(409).send({ error: '当前没有进行中的一轮' });
+    running.abort();
+    return { ok: true };
+  });
+
+  app.post('/api/threads/:threadId/messages', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const body = request.body as { content?: string } | null;
+    const content = body?.content?.trim();
+    if (!content) {
+      return reply.code(400).send({ error: 'content 不能为空' });
+    }
+    const prepared = createTurnContext(threadId);
     try {
       const message = await executeTurn({
         threadId,
         content,
-        context,
+        context: prepared.context,
       });
-      void followPendingChain({ threadId, context }).finally(() => {
-        if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
-      });
+      void runner.run(threadId, prepared);
       return reply.code(200).send(message);
     } catch (err) {
-      if (runningTurns.get(threadId) === ac) runningTurns.delete(threadId);
+      prepared.release();
       throw err;
     }
   });

@@ -28,6 +28,24 @@ function messageKey(threadId: string): string {
   return `thread:${threadId}:messages`;
 }
 
+function hopLeaseKey(threadId: string): string {
+  return `hoplease:${threadId}`;
+}
+
+const RENEW_HOP_LEASE = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('pexpire', KEYS[1], ARGV[2])
+end
+return 0
+`;
+
+const RELEASE_HOP_LEASE = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0
+`;
+
 export class RedisThreadStore implements ThreadStore {
   constructor(private readonly redis: Redis) {}
 
@@ -117,6 +135,20 @@ export class RedisThreadStore implements ThreadStore {
     } else {
       await this.redis.hdel(threadKey(threadId), 'pendingHop');
     }
+  }
+
+  async claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
+    const reply = await this.redis.set(hopLeaseKey(threadId), runnerId, 'PX', ttlMs, 'NX');
+    return reply === 'OK';
+  }
+
+  async renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
+    const n = await this.redis.eval(RENEW_HOP_LEASE, 1, hopLeaseKey(threadId), runnerId, String(ttlMs));
+    return n === 1;
+  }
+
+  async releasePendingHopLease(threadId: string, runnerId: string): Promise<void> {
+    await this.redis.eval(RELEASE_HOP_LEASE, 1, hopLeaseKey(threadId), runnerId);
   }
 
   async rename(id: string, title: string): Promise<Thread | null> {

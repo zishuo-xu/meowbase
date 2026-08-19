@@ -42,10 +42,11 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 关键文件(按阅读顺序):
 1. `packages/api/src/router/execute-turn.ts` —— **心脏**（阶段在 `router/turn/`）。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 多 @ 同题并行 → 每目标跑 A2A 接力链(该交棒没出口则再问同一只一次) → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
-2. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
-3. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
-4. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
-5. `packages/web/components/` —— UI 组件
+2. `packages/api/src/router/pending-runner.ts` —— 交棒后那一棒谁接着跑:抢租约才跑、跑时续期、开机扫一遍、30 秒收尸。API 重启也不丢球
+3. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
+4. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
+5. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
+6. `packages/web/components/` —— UI 组件
 
 猫怎么交棒、交接包带什么、每只猫自己的 CLI 会话、线程沙箱和证据怎么共享，见 [docs/A2A.md](docs/A2A.md)。
 
@@ -82,13 +83,13 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
-- 测试:`pnpm test`(shared 132 + api 189 + web 137 ≈ 458);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
+- 测试:`pnpm test`(shared 133 + api 201 + web 137 ≈ 471);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
 ## 踩坑记录(血泪清单,改代码前先看)
 
-1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。
+1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。**重启后平台会自己把还搁着的那一棒捡起来接着跑**(日志 `[meow] resume sweep`),30 分钟内的才捡、一次只捡一棒;不想让它跑就先清掉那条线程的 `pendingHop`。注意**猫正在想的时候杀进程那一棒接不住**(hop 在跑之前就被清了),见 [durable-relay.md](docs/features/durable-relay.md)。
 2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
 4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。

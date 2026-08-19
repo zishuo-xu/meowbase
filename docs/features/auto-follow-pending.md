@@ -32,3 +32,4 @@
 
 - `resumePendingTurn` / `followPendingChain`：`packages/api/src/router/execute-turn.ts`
 - HTTP 首轮返回后跟跑：`packages/api/src/http/server.ts`
+- 进程死了那一棒谁捡（租约 + 开机扫 + 收尸）：[durable-relay.md](durable-relay.md)

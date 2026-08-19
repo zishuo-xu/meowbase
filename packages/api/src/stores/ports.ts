@@ -24,6 +24,12 @@ export interface ThreadStore {
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;
   setPendingHop(threadId: string, hop: PendingHop | null): Promise<void>;
+  /** 抢下这一棒的主人:抢到才跑,防止两个跑者跑同一 hop。 */
+  claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean>;
+  /** 跑的时候续期;不是主人则 false。 */
+  renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean>;
+  /** 跑完释放;不是主人则不动。 */
+  releasePendingHopLease(threadId: string, runnerId: string): Promise<void>;
   rename(id: string, title: string): Promise<Thread | null>;
   delete(id: string): Promise<boolean>;
 }

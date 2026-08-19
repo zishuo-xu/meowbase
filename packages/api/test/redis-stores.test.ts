@@ -50,6 +50,36 @@ describe('Redis 存储', () => {
     expect(await threads.get(thread.id)).toBeNull();
   });
 
+  it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
+    if (!redis) return;
+    const threads = createThreadStore(redis);
+    const thread = await threads.create({
+      title: `redis-lease-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    expect(await threads.claimPendingHop(thread.id, 'runner-a', 60_000)).toBe(true);
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'runner-b', 60_000)).toBe(false);
+    await threads.releasePendingHopLease(thread.id, 'runner-b');
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'runner-a', 60_000)).toBe(true);
+    await threads.releasePendingHopLease(thread.id, 'runner-a');
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(true);
+    await threads.releasePendingHopLease(thread.id, 'runner-b');
+
+    const other = await threads.create({
+      title: `redis-lease-exp-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    expect(await threads.claimPendingHop(other.id, 'dead', 20)).toBe(true);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(await threads.renewPendingHopLease(other.id, 'dead', 60_000)).toBe(false);
+    expect(await threads.claimPendingHop(other.id, 'alive', 60_000)).toBe(true);
+    await threads.releasePendingHopLease(other.id, 'alive');
+    await threads.delete(thread.id);
+    await threads.delete(other.id);
+  });
+
   it('线程 repo 绑定写入并回读', async () => {
     if (!redis) return;
     const threads = createThreadStore(redis);

@@ -261,6 +261,27 @@ export function formatHoldCommandDoneNote(input: {
     .join('\n');
 }
 
+/** 开机/收尸捡到等跑 hop:命令不重跑,只告诉人/猫平台重启了。 */
+export function formatHoldCommandRestartNote(command: string): string {
+  const cmd = clipBody(command, 60);
+  return `平台重启,等跑 \`${cmd}\` 没跑完。同一只猫被叫醒后自己决定要不要再跑。`;
+}
+
+/** 叫醒同一只:命令没跑完,由它决定要不要再开。 */
+export function formatHoldCommandRestartWakePrompt(input: {
+  command: string;
+  previousOutput: string;
+}): string {
+  return [
+    '【命令中断】平台重启,你写下的等跑命令没有跑完。自己决定要不要再跑。要交棒就行首 @。',
+    `命令: ${input.command}`,
+    '上一棒原话:',
+    clipBody(input.previousOutput),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function formatHoldCommandWakePrompt(input: {
   command: string;
   exitCode: number | null;

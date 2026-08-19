@@ -170,3 +170,24 @@ describe('HTTP live-sync', () => {
     expect(syncs.length).toBeLessThan(increments.length);
   });
 });
+
+describe('HTTP pending-runner 生命周期', () => {
+  it('app.close 在开机扫和收尸 interval 下也能马上返回', async () => {
+    const stores = createMemoryStores();
+    await ensureSeededProfiles(stores.profiles);
+    const app = await buildServer({
+      stores,
+      registry: createAgentRegistry([writer, reviewer]),
+      workdirBase,
+      agents: DEFAULT_AGENTS,
+      defaultAgentId: 'claude',
+      a2aMaxDepth: 3,
+      resumePendingOnBoot: true,
+      hopSweepIntervalMs: 40,
+    });
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const started = Date.now();
+    await app.close();
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});

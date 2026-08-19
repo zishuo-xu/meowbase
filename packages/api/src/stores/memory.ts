@@ -23,6 +23,17 @@ import type {
 
 export class InMemoryThreadStore implements ThreadStore {
   private readonly threads = new Map<string, Thread>();
+  private readonly leases = new Map<string, { owner: string; expiresAt: number }>();
+
+  private liveLease(threadId: string): { owner: string; expiresAt: number } | null {
+    const cur = this.leases.get(threadId);
+    if (!cur) return null;
+    if (cur.expiresAt <= Date.now()) {
+      this.leases.delete(threadId);
+      return null;
+    }
+    return cur;
+  }
 
   async create(input: {
     title: string;
@@ -71,6 +82,25 @@ export class InMemoryThreadStore implements ThreadStore {
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     if (hop) thread.pendingHop = hop;
     else delete thread.pendingHop;
+  }
+
+  async claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
+    if (this.liveLease(threadId)) return false;
+    this.leases.set(threadId, { owner: runnerId, expiresAt: Date.now() + ttlMs });
+    return true;
+  }
+
+  async renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
+    const cur = this.liveLease(threadId);
+    if (!cur || cur.owner !== runnerId) return false;
+    cur.expiresAt = Date.now() + ttlMs;
+    return true;
+  }
+
+  async releasePendingHopLease(threadId: string, runnerId: string): Promise<void> {
+    const cur = this.liveLease(threadId);
+    if (!cur || cur.owner !== runnerId) return;
+    this.leases.delete(threadId);
   }
 
   async rename(id: string, title: string): Promise<Thread | null> {

@@ -51,6 +51,7 @@ const app = await buildServer({
   models: config.models,
   configPath,
   rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)),
+  resumePendingOnBoot: true,
 });
 
 await app.listen({ port: config.port, host: '0.0.0.0' });

@@ -57,6 +57,25 @@ describe('内存存储', () => {
     expect(await threads.delete('不存在')).toBe(false);
   });
 
+  it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'lease', primaryAgentId: 'claude' });
+    expect(await threads.claimPendingHop(thread.id, 'runner-a', 60_000)).toBe(true);
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'runner-b', 60_000)).toBe(false);
+    await threads.releasePendingHopLease(thread.id, 'runner-b');
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'runner-a', 60_000)).toBe(true);
+    await threads.releasePendingHopLease(thread.id, 'runner-a');
+    expect(await threads.claimPendingHop(thread.id, 'runner-b', 60_000)).toBe(true);
+
+    const other = await threads.create({ title: 'lease-exp', primaryAgentId: 'claude' });
+    expect(await threads.claimPendingHop(other.id, 'dead', 15)).toBe(true);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(await threads.renewPendingHopLease(other.id, 'dead', 60_000)).toBe(false);
+    expect(await threads.claimPendingHop(other.id, 'alive', 60_000)).toBe(true);
+  });
+
   it('追加/读取/列表消息', async () => {
     const { threads, messages } = createMemoryStores();
     const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });
