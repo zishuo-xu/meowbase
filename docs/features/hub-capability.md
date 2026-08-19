@@ -27,7 +27,7 @@
 
 ## 不做（本篇）
 
-- Quota Board / token 预算
+- Quota Board / token 预算（已花多少后来由 [quota-board.md](quota-board.md) 做了；预算和准入仍没做）
 - 按能力自动改路由
 - 暴露 `handoffTo` 编辑
 

@@ -22,8 +22,8 @@
 ## 怎么做
 
 1. **`AuditStore` 端口 + 行结构**：`{ id, ts, threadId, actor, action, subject?, meta? }`。`actor` 是 agentId 或 `human` 或 `platform`；`action` 用枚举，系统消息那部分直接复用 `SystemKind`。追加式，只写不改，memory + redis 两套实现。
-2. **在 store 边界派生，不在三十个调用点手写**。仿 `packages/api/src/http/broadcast-sync.ts` 那个装饰器：包一层 `MessageStore` / `ApprovalStore`，系统消息带 kind 落一行，助手消息 patch 成 `completed` 落一行（带 `usage`），人发言落一行，审批 create／approve／reject／applied 各落一行。**业务代码一行不改，也不存在「新写入点忘了记」这回事**——和这一批前面几刀同一个原则：能让边界管的事，不要靠人记得。
-3. **不经过 store 的那几件事显式补**。租约生命周期在 `router/pending-runner.ts`，那里本来就有 `write(formatTurnLog('resume claim', …))` 这样的日志点，在旁边补审计行：claim / steal / skip-stale / 重跑 / 释放。就这几处，够了。
+2. **在 store 边界派生，不在三十个调用点手写**。仿 `packages/api/src/http/broadcast-sync.ts` 那个装饰器：包一层 `MessageStore` / `ApprovalStore`，系统消息带 kind 落一行，助手消息 patch 成 `completed` 落 `hop-done`（带 `usage`），`failed` / `terminated` 落 `hop-failed`，人发言落一行，审批 create／approve／reject／applied 各落一行。**业务代码不写 `audit.append`，也不存在「新写入点忘了记」这回事**——和这一批前面几刀同一个原则：能让边界管的事，不要靠人记得。
+3. **不经过 store 的那几件事显式补**。租约生命周期在 `router/pending-runner.ts`，那里本来就有 `write(formatTurnLog('resume claim', …))` 这样的日志点，在旁边补审计行：claim / steal / skip-stale / 释放。半截消息标失败后重跑（`hop-rerun`）在 `resumePendingTurn`。就这几处，够了。
 4. **只存指针，不存正文**。行里放 `messageId` / `approvalId` + kind + 一句短 subject，**不复制消息全文**——否则审计既膨胀又变成第二份真相。另外审计写失败**不能把这一轮弄挂**：`try/catch` 记日志就走，收发存根丢一张不该让邮件退回。
 5. **只读接口** `GET /api/audit?threadId=&actor=&action=&since=&limit=`，默认按时间倒序。Redis 侧全局列表用 `LTRIM` 封顶，避免无限长。
 
@@ -31,7 +31,7 @@
 
 ## 不做（本篇）
 
-- **Quota Board / 按猫成本聚合**：数据已经在 `Message.usage` 里，缺的是读侧聚合 + 看板 UI（`shared` 里那个一直闲置的 `mergeTokenUsage` 就是给它准备的）。是很自然的下一篇，但和本篇搅在一起就成了两刀。
+- **Quota Board / 按猫成本聚合**：数据已经在 `Message.usage` 里，缺的是读侧聚合 + 看板 UI（`shared` 里那个一直闲置的 `mergeTokenUsage` 就是给它准备的）。是很自然的下一篇，但和本篇搅在一起就成了两刀。（后来就是下一篇 [quota-board.md](quota-board.md)。）
 - **保留策略、归档、导出**：先封顶不删，够用；真要长期留再另开。
 - **审计行进 UI 时间线**：本篇只出接口，前端怎么展示另说。顶栏和接力时间线已经有自己的数据源。
 - **把 console 日志全量搬进审计**：只记「平台做了什么决定」，不记调试用的过程日志。

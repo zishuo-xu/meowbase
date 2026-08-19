@@ -34,10 +34,11 @@
 ## 怎么做
 
 1. 解析本条是不是系统命令；是则改存储、回系统句，返回。
-2. `extractMentionTargets` 得到行首目标；无则续最近行首点过的猫 / 最后开口 / 主猫。
-3. 每个目标 `runSegment`：调适配器 → 看回复里有没有行首 `@` → 有则拼交接包跑下一跳，直到深度/防环/审查收棒/`@人`。
-4. 若带 `#learn`，本轮回复落成证据 draft。
-5. `git diff HEAD` 有改动则建审批卡并拉审查；`autoApprove` 则先 `approve()` 再 `markApplied`。
+2. 线程上有搁着的棒：人开口可能续跑、取消「等跑」、或清掉；`@人` 则升级收回。
+3. `extractMentionTargets` 得到行首目标；无则续最近行首点过的猫 / 最后开口 / 主猫。
+4. 每个目标 `runSegment`：调适配器 → 看回复里有没有行首 `@` → 有则记下 `pendingHop`、本轮先结束。下一跳由 `followPendingChain` / `resumePendingTurn` 接着跑，直到没 pending、升级、或链深用尽。
+5. 若带 `#learn`，本轮回复落成证据 draft。
+6. `git diff HEAD` 有改动则建审批卡并拉审查；槽里已是下一棒则本轮不审；`autoApprove` 则先 `approve()` 再 `markApplied`。
 
 验收：发「写 add.ts，写完自检。\n@墨墨」能看到接力条、审批卡；发 `星星罐子` 不调猫。
 
@@ -52,7 +53,7 @@
 - **30 秒**：平台不推理。人发一条进 `executeTurn`，命令、点名、交棒、记忆、审批都在这一管线。模型在 CLI 里想，我们当邮差。
 - **追问「为什么不拆微服务」**：简历项目要能画一条线。拆开就要第二路由器，球权会丢。
 - **踩坑**：并行写 Redis 必须排队；`markApplied` 只接受 `approved`，自动批准要先 `approve()`。
-- **若继续往 clowder 靠**：异步交棒应挂在本函数**之后**的待跑队列，不要另起心脏。
+- **异步交棒**：下一跳挂在本函数之后的 `pendingHop` + `followPendingChain`，不另起心脏。见 [async-a2a.md](async-a2a.md)、[auto-follow-pending.md](auto-follow-pending.md)。
 
 ## 代码入口
 

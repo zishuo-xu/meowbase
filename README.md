@@ -40,11 +40,12 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 | 落点 | 职责 |
 |---|---|
-| `executeTurn` | 一条消息的心脏:命令 → 多 @ 并行 → A2A 链 → 记忆 → diff 审批。协作细节见 [docs/A2A.md](docs/A2A.md) |
+| `executeTurn` | 一条消息的心脏:命令 → 若有搁着的棒先续跑 → 多 @ 并行 → A2A 链 → 记忆 → diff 审批。协作细节见 [docs/A2A.md](docs/A2A.md) |
 | `stores/ports.ts` | 业务只依赖接口,Redis 可换 |
 | 名册 `handoffTo` / `handoff` | 交给谁、何时交,写在配置里,不写 `if (墨墨)` |
 | Provider 适配器 | claude / gemini / opencode,统一 `runTurn` |
 | 审计流水 | 平台的决定在 store 边界自动落存根,`GET /api/audit?threadId=` 可查:谁交给谁、哪张卡被批过、重启后哪一棒被重跑 |
+| 账本 | `GET /api/usage?threadId=` 按猫聚合已跑完的 token 和花费;Hub 侧栏「账本」展示。gemini 不报成本则写「无成本数据」 |
 
 定位:墨墨主架构师、闪闪审查官、团团执行者。写完默认交闪闪审。演示步骤见 [docs/DEMO.md](docs/DEMO.md)。A2A 怎么传信息、怎么隔离上下文，见 [docs/A2A.md](docs/A2A.md)。设计理由与面试提纲见 [docs/features/](docs/features/)。
 
@@ -61,6 +62,8 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 - `tdd` / `测试驱动` → 测试驱动开发
 - `review` / `审查` / `代码评审` → 代码审查
 - `debug` / `调试` / `bug` → 系统化调试
+- `脚手架` / `绕路了` / `喵约` → 当轮注入对照技能(人喊才出现)
+- 自检门无触发词、每轮都注入
 
 ## 配置
 
@@ -130,7 +133,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 ## 测试
 
 ```bash
-pnpm test              # 单测(内存存储,不依赖 Redis/CLI)
+pnpm test              # 全部单测(shared/api/web);api 的 Redis 测试需本机 Redis,连不上则该条直接 return
 pnpm smoke             # 真实冒烟(需要 Redis + claude CLI)
 ```
 

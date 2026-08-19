@@ -34,7 +34,7 @@
 ## 怎么做
 
 1. 线程创建时 `git init` + 基线（含 package.json）。
-2. 一轮（含 A2A）结束后 diff；有改动则建卡，选 ≠ 写手的审查官跑 review prompt。
+2. 一轮结束后 diff；有改动则建卡，选 ≠ 写手的审查官跑 review prompt。刚交棒、槽里已是下一棒时本轮不建卡，等续跑结束再审。
 3. UI 卡片或 `#approve` / `#reject`。批准后 commit，状态 applied；顶栏「已落地，等人开口」。
 
 验收：沙箱写出 `add.ts`，卡上无 `node_modules`；批准后顶栏已落地。
@@ -56,5 +56,5 @@
 
 - 状态机：`ApprovalStore`（`packages/api/src/stores/`）
 - git：`packages/api/src/services/git.ts`
-- 管线：`executeTurn` 审批块
+- 管线：`packages/api/src/router/turn/settle.ts` 收尾 diff；`review.ts` 建卡并拉审查
 - UI：web 审批卡片

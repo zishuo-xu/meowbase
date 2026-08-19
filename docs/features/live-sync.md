@@ -34,7 +34,7 @@ WS 现在只推 `increment` / `activity` / `start` / `thinking`（`packages/api/
 
 ## 不做（本篇）
 
-- 不做结构化系统消息（`systemKind`）和球权状态字段
+- 不做结构化系统消息（`systemKind`）和球权状态字段（`systemKind` 后来由 [system-message-kind.md](system-message-kind.md) 做了；球权状态字段仍不物化）
 - 不推消息体增量,`sync` 只说「变了」,前端自己拉
 - 不做浏览器通知 / 飞书 / 邮箱投递
 - 不改 A2A、审查、审批、持球任何语义

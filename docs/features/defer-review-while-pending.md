@@ -30,4 +30,4 @@
 
 ## 入口
 
-- `packages/api/src/router/execute-turn.ts` `settleTurn`
+- `packages/api/src/router/turn/settle.ts` `settleTurn`

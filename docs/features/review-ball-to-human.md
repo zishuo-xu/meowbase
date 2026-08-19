@@ -21,7 +21,7 @@
 
 ## 怎么做
 
-1. 审查官（角色含「审查」）已写「通过」，且本轮不再流式 → 顶栏「球在人手里」。需修改见 [revise-ball-to-writer.md](revise-ball-to-writer.md)。
+1. 审查官（角色含「审查」）已写「通过」，且本轮不再流式 → 顶栏「球在人手里」。需修改见 [revise-ball-to-writer.md](revise-ball-to-writer.md)。系统消息后来改成先读 `systemKind`（见 [system-message-kind.md](system-message-kind.md)），但审查结论仍从猫的正文里抽——那是猫写的话，不是平台的事件。
 2. 已有待批卡片、已落地、升级、拉闸：行为不变。
 3. 写手 / 执行者口头「通过」不改球权。
 4. 验收：接力后闪闪「结论:通过」、还没有审批系统句 → 顶栏不是「球在闪闪手上」。

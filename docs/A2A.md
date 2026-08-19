@@ -104,6 +104,7 @@
 
 - 人怎么点名：`packages/shared/src/mention-targets.ts`
 - 猫怎么交棒 / 交接包：`packages/shared/src/a2a.ts`
-- 一轮怎么跑完：`packages/api/src/router/execute-turn.ts`
+- 一轮怎么跑完：`packages/api/src/router/execute-turn.ts`（`followPendingChain` / `resumePendingTurn`）
+- 重启后谁捡棒：`packages/api/src/router/pending-runner.ts`
 - 身份 + 证据怎么进提示：`packages/shared/src/system-prompt.ts`
 - 点哪里能看见：`docs/DEMO.md`

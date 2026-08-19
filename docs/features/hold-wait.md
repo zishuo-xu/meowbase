@@ -41,5 +41,5 @@
 ## 入口
 
 - `parseHoldExit` / `formatHoldBallNote`：`packages/shared/src/a2a.ts`
-- 停链：`packages/api/src/router/execute-turn.ts` `runSegment` / `settleTurn`
+- 停链：`packages/api/src/router/turn/segment.ts` `runSegment`；收尾不建卡：`packages/api/src/router/turn/settle.ts` `settleTurn`
 - 顶栏：`packages/web/lib/ball.ts` `describeBall`

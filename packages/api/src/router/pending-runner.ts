@@ -138,7 +138,7 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
     return Date.now() - new Date(at).getTime();
   }
 
-  /** 一次只捡一棒:开机时几条线程都搁着棒,不要同时叫醒好几只猫。 */
+  /** 搁着棒的线程都捡,但串行:同时只叫醒一只猫。 */
   async function sweep(opts?: { steal?: boolean }): Promise<void> {
     if (sweeping) return;
     sweeping = true;
