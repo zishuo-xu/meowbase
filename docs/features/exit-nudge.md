@@ -35,4 +35,5 @@
 ## 入口
 
 - `shouldNudgeExit` / `formatExitNudgePrompt`：`packages/shared/src/a2a.ts`
-- 补问同一只：`packages/api/src/router/execute-turn.ts` `runSegment`
+- 补问同一只：`packages/api/src/router/turn/segment.ts` `runSegment`
+- 审查结论怎么读（读错会白补问一次）：[review-conclusion.md](review-conclusion.md)

@@ -7,6 +7,37 @@ const roleOf = (id?: string) =>
   id === 'gemini' ? '审查官' : id === 'claude' ? '主架构师' : '执行者';
 
 describe('describeBall', () => {
+  it('审查官审查结论标题+文末结论通过:球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了\n@闪闪 请审查', status: 'completed' },
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪' },
+          {
+            role: 'assistant',
+            agentId: 'gemini',
+            content: `审查结论:
+
+**问题列表**
+- 无阻塞问题。
+
+**建议**
+- 可选:...
+
+**验证**
+- 亲手运行 \`npm test\` → tests 4 / pass 4 / fail 0
+
+**结论:通过**。改动与任务一致,无需修改。`,
+            status: 'completed',
+          },
+        ],
+        false,
+        nameOf,
+        roleOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
   it('审查官写出结论、卡片还没到:球在人手里', () => {
     expect(
       describeBall(

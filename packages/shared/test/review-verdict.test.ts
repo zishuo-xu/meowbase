@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { allowsAutoApprove, hasExplicitReviewVerdict, parseReviewVerdict } from '../src/review-verdict.js';
+import {
+  allowsAutoApprove,
+  gateReviewVerdict,
+  hasExplicitReviewVerdict,
+  parseReviewVerdict,
+} from '../src/review-verdict.js';
+
+/** 真实审查官回复:文首「审查结论:」标题 + 文末「结论:通过」。 */
+const LEAD_IN_PASS = `审查结论:
+
+**问题列表**
+- 无阻塞问题。
+
+**建议**
+- 可选:...
+
+**验证**
+- 亲手运行 \`npm test\` → tests 4 / pass 4 / fail 0
+
+**结论:通过**。改动与任务一致,无需修改。`;
+
+/** 同形但文末是需修改;文首标题若抢走匹配,就会一个关键词都不匹配而默认 pass。 */
+const LEAD_IN_REVISE = `审查结论:
+
+**问题列表**
+- 核心路径漏了空输入。
+
+**建议**
+- 可选:...
+
+**验证**
+- 亲手运行 \`npm test\` → tests 4 / pass 4 / fail 0
+
+**结论:需修改**。`;
 
 describe('parseReviewVerdict', () => {
   it('结论需修改 → revise', () => {
@@ -22,6 +55,18 @@ describe('parseReviewVerdict', () => {
   it('正文里的「如需修改」不盖过结论通过', () => {
     expect(parseReviewVerdict('如需修改命名可另开。\n结论:通过')).toBe('pass');
   });
+
+  it('审查结论标题+文末结论通过 → pass', () => {
+    expect(parseReviewVerdict(LEAD_IN_PASS)).toBe('pass');
+  });
+
+  it('安全:审查结论标题抢走匹配时文末需修改不得默认为 pass', () => {
+    expect(parseReviewVerdict(LEAD_IN_REVISE)).toBe('revise');
+  });
+
+  it('无需修改不当成需修改', () => {
+    expect(parseReviewVerdict('结论:改动无需修改,通过')).toBe('pass');
+  });
 });
 
 describe('hasExplicitReviewVerdict', () => {
@@ -31,6 +76,24 @@ describe('hasExplicitReviewVerdict', () => {
     expect(hasExplicitReviewVerdict('## 结论\n需修改\n- 补测试')).toBe(true);
     expect(hasExplicitReviewVerdict('看了一下还行')).toBe(false);
     expect(hasExplicitReviewVerdict('(审查无输出)')).toBe(false);
+  });
+
+  it('审查结论标题+文末结论通过算明确结论', () => {
+    expect(hasExplicitReviewVerdict(LEAD_IN_PASS)).toBe(true);
+  });
+
+  it('如需修改单独出现不算明确结论', () => {
+    expect(hasExplicitReviewVerdict('如需修改命名可另开。')).toBe(false);
+  });
+
+  it('加粗结论标题换行后的通过算明确结论', () => {
+    expect(hasExplicitReviewVerdict('**结论**\n通过')).toBe(true);
+  });
+});
+
+describe('gateReviewVerdict', () => {
+  it('审查结论标题+文末通过且有验证证据 → pass', () => {
+    expect(gateReviewVerdict(LEAD_IN_PASS)).toBe('pass');
   });
 });
 

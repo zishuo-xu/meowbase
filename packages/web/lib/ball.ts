@@ -1,3 +1,5 @@
+import { extractConclusion, PASS_RE, REVISE_RE } from './review-conclusion';
+
 export type BallTone = 'cat' | 'human' | 'ground' | 'busy';
 
 export interface BallView {
@@ -122,16 +124,11 @@ function isReviewerRole(role?: string): boolean {
   return Boolean(role?.includes('审查'));
 }
 
-const REVIEW_REVISE_RE = /需修改|不通过|未通过|请修复|CHANGES_REQUESTED|request changes/i;
-const REVIEW_PASS_RE = /通过|LGTM|可以合入|APPROVED/i;
-
 /** 和 shared parseReviewVerdict 同关键词,避免 web 再依赖 shared。没写出结论则 null。 */
 function parseReviewCloseout(text: string): 'pass' | 'revise' | null {
-  const heading = text.match(/(?:^|\n)#{1,3}\s*结论\s*[:：]?\s*\n?([\s\S]*)$/);
-  const inline = text.match(/结论\s*[:：]\s*([^\n]+)/);
-  const source = heading?.[1]?.trim() || inline?.[1]?.trim() || text;
-  const reviseIdx = source.search(REVIEW_REVISE_RE);
-  const passIdx = source.search(REVIEW_PASS_RE);
+  const source = extractConclusion(text) ?? text;
+  const reviseIdx = source.search(REVISE_RE);
+  const passIdx = source.search(PASS_RE);
   if (reviseIdx < 0 && passIdx < 0) return null;
   if (reviseIdx >= 0 && (passIdx < 0 || reviseIdx <= passIdx)) return 'revise';
   return 'pass';

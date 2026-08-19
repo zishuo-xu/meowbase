@@ -1,3 +1,5 @@
+import { extractConclusion, PASS_RE, REVISE_RE } from './review-conclusion';
+
 export type MessageBlockKind = 'text' | 'approval' | 'evidence' | 'receipt';
 export type ApprovalUiStatus = 'pending' | 'applied' | 'rejected';
 
@@ -68,9 +70,9 @@ export function approvalStatusFromDto(status: string | undefined): ApprovalUiSta
 }
 
 function reviewLooksRevise(comment: string): boolean {
-  const conclusion = comment.match(/(?:^|\n)#*\s*结论\s*[:：]?\s*\n?([\s\S]*)$/)?.[1] ?? comment;
-  const reviseIdx = conclusion.search(/需修改|不通过|未通过|请修复/);
-  const passIdx = conclusion.search(/通过|LGTM|可以合入/);
+  const source = extractConclusion(comment) ?? comment;
+  const reviseIdx = source.search(REVISE_RE);
+  const passIdx = source.search(PASS_RE);
   return reviseIdx >= 0 && (passIdx < 0 || reviseIdx <= passIdx);
 }
 

@@ -77,4 +77,44 @@ describe('approvalCardTitle', () => {
     expect(approvalCardTitle('applied', '通过')).toBe('改动已确认');
     expect(approvalCardTitle('rejected', '需修改')).toBe('已打回');
   });
+
+  it('审查结论标题+文末结论通过 → 审查通过标题', () => {
+    expect(
+      approvalCardTitle(
+        'pending',
+        `审查结论:
+
+**问题列表**
+- 无阻塞问题。
+
+**建议**
+- 可选:...
+
+**验证**
+- 亲手运行 \`npm test\` → tests 4 / pass 4 / fail 0
+
+**结论:通过**。改动与任务一致,无需修改。`,
+      ),
+    ).toBe('审查通过，待你确认');
+  });
+
+  it('审查结论标题+文末需修改 → 互审未通过标题', () => {
+    expect(
+      approvalCardTitle(
+        'pending',
+        `审查结论:
+
+**问题列表**
+- 核心路径漏了空输入。
+
+**建议**
+- 可选:...
+
+**验证**
+- 亲手运行 \`npm test\` → tests 4 / pass 4 / fail 0
+
+**结论:需修改**。`,
+      ),
+    ).toBe('互审未通过，待你决定');
+  });
 });
