@@ -30,10 +30,10 @@ CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`�
 ```
 packages/
 ├── shared/   跨包纯逻辑:类型、@mention 解析、A2A 交接、token 归一化、systemPrompt 拼装
-├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流
+├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流;启动接线在 `src/app.ts`
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
-scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI)、smoke.ts(真实冒烟)、fixtures/(fake CLI)
+scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI;子进程调 `startApp`)、smoke.ts(真实冒烟)、fixtures/(fake CLI)
 work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
@@ -45,10 +45,11 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 关键文件(按阅读顺序):
 1. `packages/api/src/router/execute-turn.ts` —— **心脏**（阶段在 `router/turn/`）。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 若有搁着的棒先续跑或清掉 → 多 @ 同题并行 → 每目标跑 A2A 接力链(交棒后记下 pending,该交棒没出口则再问同一只一次) → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
 2. `packages/api/src/router/pending-runner.ts` —— 交棒后那一棒谁接着跑:抢租约才跑、跑时续期、开机扫一遍、30 秒收尸。API 重启也不丢球
-3. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
-4. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
-5. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
-6. `packages/web/components/` —— UI 组件
+3. `packages/api/src/app.ts` —— 生产和 e2e 共用启动接线(`startApp`):loadConfig → stores → registry → `listen` → **之后**才 `startPendingRunner()`。`index.ts` 与 `scripts/e2e-server.ts` 都调它,只用参数区分
+4. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
+5. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
+6. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
+7. `packages/web/components/` —— UI 组件
 
 猫怎么交棒、交接包带什么、每只猫自己的 CLI 会话、线程沙箱和证据怎么共享，见 [docs/A2A.md](docs/A2A.md)。
 
@@ -87,13 +88,13 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))
-- 测试:`pnpm test`(shared 140 + api 247 + web 159 ≈ 546);api 的 Redis 测试需要本地 Redis 在跑(连不上则该条直接 return,不算失败)
+- 测试:`pnpm test`(shared 140 + api 247 + web 159 ≈ 546);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
 ## 踩坑记录(血泪清单,改代码前先看)
 
-1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。**重启后平台会自己把还搁着的那一棒捡起来接着跑**(日志 `[meow] resume sweep`),30 分钟内的才捡、多条线程串行捡(同时只叫醒一只);不想让它跑就先清掉那条线程的 `pendingHop`。猫正在想的时候杀进程也接得住:那一棒跑完落库才清,半截的助手气泡会被标成 `failed`(「平台重启,这一跳没写完」)然后重跑。**没杀干净、新进程 EADDRINUSE 起不来时,那个进程不会碰球**——捡棒挂在 `listen` 成功之后(`app.startPendingRunner()`),不是 `onReady`(它在绑定失败后照样会跑完)。见 [durable-relay.md](docs/features/durable-relay.md) 和 [hop-commit-then-clear.md](docs/features/hop-commit-then-clear.md)。杀完须自己再起,见第 15 条。
+1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。**重启后平台会自己把还搁着的那一棒捡起来接着跑**(日志 `[meow] resume sweep`),30 分钟内的才捡、多条线程串行捡(同时只叫醒一只);不想让它跑就先清掉那条线程的 `pendingHop`。猫正在想的时候杀进程也接得住:那一棒跑完落库才清,半截的助手气泡会被标成 `failed`(「平台重启,这一跳没写完」)然后重跑。**没杀干净、新进程 EADDRINUSE 起不来时,那个进程不会碰球**——捡棒挂在 `listen` 成功之后(`startApp` 里才调 `app.startPendingRunner()`),不是 `onReady`(它在绑定失败后照样会跑完)。见 [durable-relay.md](docs/features/durable-relay.md) 和 [hop-commit-then-clear.md](docs/features/hop-commit-then-clear.md)。杀完须自己再起,见第 15 条。
 2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
 4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。
@@ -111,6 +112,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 16. **写 fake CLI 别忘了可执行位**:`scripts/fixtures/` 下新加的 fake 若是 `644`,适配器 `spawn` 直接 `EACCES`,链会在那一跳静默失败(日志只有「启动失败」)。新文件 `chmod +x` 并确认 git 记的是 `100755`。
 17. **`pnpm e2e` 用 Redis db 14,不要改成 db 0**:本机 3200 的 API 也在扫 pending,共用一个 db 时它可能把 e2e 的棒抢走、甚至打到真 CLI 上花钱。e2e 进出各 `FLUSHDB` 一次,所以别把真数据放 db 14。
 18. **fake 写手的正文必须落在 claude 的 `result` 事件里**:`StreamAccumulator` 收到 `result` 会用它整段覆盖 assistant 增量。行首 `@` 只写在 assistant 事件里会被覆盖掉,交棒不成立。
+19. **e2e 必须验发货的那份接线**:API 启动顺序只许写在 `startApp` 一处。`index.ts` 和 `e2e-server.ts` 都调它,只用参数区分(`configPath` / host / 端口 / `rebuildAdapter`)。以前两份副本时,改生产入口的开机扫,`pnpm e2e` 照样绿——它验的是自己那份。happy-path 不依赖开机扫棒(POST 里的 `void runner.run()` 会把当轮 pending 跟完),反向验必须看崩溃续跑那一段。把 `startPendingRunner()` **注掉**崩溃段才会红;挪到 `listen` 之前盖不到(e2e 用 `PORT=0`,总能绑上)。`listen` 成功之后才捡棒(EADDRINUSE 时不抢租约)要靠别的办法验。见 [e2e-harness.md](docs/features/e2e-harness.md)。
+20. **Redis 单测假绿**:`if (!redis) return` 会被 vitest 算 passed。没 Redis 时要用 `describe.skipIf` / `it.skipIf`(条件得在收集测试前就算好,所以先 `await ping` 再声明套件),输出必须是 skipped 不是 passed。
 
 ## 常见操作
 

@@ -11,7 +11,7 @@
 - **功能**:push 一次,CI 就把「写手改文件 → 行首交棒 → 审查官下结论 → 审批卡」跑完,并且杀一次进程验证那一棒被捡回来。
 - **价值**:人不用每次开浏览器手动验;断言从「我们那次验过」变成「每次 push 都验」。
 - **愿景**:仍是邮差。不改协议、不给猫加能力,只把平台自己的行为架到可复验的位置。
-- **落点**:`scripts/`(fake CLI + e2e 入口)、`.github/workflows/ci.yml`、新增 `tsconfig.scripts.json`。不进 `executeTurn`,不改 store 契约。
+- **落点**:`scripts/`(fake CLI + e2e 入口)、`packages/api/src/app.ts`(`startApp`,生产和 e2e 共用接线)、`.github/workflows/ci.yml`、`tsconfig.scripts.json`。不进 `executeTurn`,不改 store 契约。
 
 ## 为什么
 
@@ -32,7 +32,7 @@
 5. 崩溃一段:让 fake 审查官睡到一半时 `kill -9` 子进程,再起一个,断言那一棒被捡回来跑完、半截助手气泡标 `failed`、最终审批卡仍然只有一张(不重复建)。
 6. CI 加一步跑 `pnpm e2e`,用 fake bin,不花钱。
 
-验收:本地 `pnpm e2e` 全绿;CI 同样绿。反向验两条——把 `smoke.ts` 的 `audit` 去掉,第 2 步必须红;把 `startPendingRunner()` 注掉,第 5 步必须红。
+验收:本地 `pnpm e2e` 全绿;CI 同样绿。反向验——把 `startApp` 里的 `startPendingRunner()` **注掉**,崩溃续跑那一段必须红(happy-path 不依赖开机扫棒,只看它绿看不出问题)。把调用挪到 `listen` 之前**盖不到**:e2e 用 `PORT=0`,总能绑上,扫棒照样发生。生产入口和 e2e 子进程都调 `startApp`,所以注掉这一刀对两处同时生效。`listen` 之后才捡棒这条不变量(EADDRINUSE 时不抢租约)要靠别的办法验,现有崩溃段验的是「开机有没有扫」。
 
 ## 不做(本篇)
 
@@ -42,8 +42,9 @@
 
 ## 入口
 
+- `packages/api/src/app.ts` — `startApp`:生产和 e2e 共用启动接线;`listen` 成功之后才 `startPendingRunner()`
 - `scripts/e2e.ts` — CI 整机自检(fake CLI,不花钱):完整接力链 + 杀进程续跑
-- `scripts/e2e-server.ts` — e2e 拉起的 API 子进程(不读、不写 `meowbase.config.json`,用环境变量覆盖 bin/端口)
+- `scripts/e2e-server.ts` — e2e 拉起的 API 子进程(调 `startApp`,不传 `configPath`,不读、不写 `meowbase.config.json`;用环境变量覆盖 bin/端口)
 - `scripts/fixtures/fake-claude-writer.mjs` — 写手 fake(claude stream-json,行首 `@闪闪`)
 - `scripts/fixtures/fake-gemini-reviewer.mjs` — 审查官 fake(gemini stream-json,命令+结果 + 单独一行「通过」)
 - `tsconfig.scripts.json` + `pnpm typecheck:scripts` — 把 `scripts/` 纳入类型检查

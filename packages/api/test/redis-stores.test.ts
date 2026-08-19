@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { Redis } from 'ioredis';
 import { createRedisClient } from '../src/redis.js';
 import {
@@ -10,22 +10,26 @@ import {
 import { ensureSeededProfiles } from '../src/stores/seeds.js';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
-let redis: Redis | null = null;
 
-beforeAll(async () => {
+async function connectRedisOrNull(url: string): Promise<Redis | null> {
+  const client = createRedisClient(url);
+  const onError = () => {};
+  client.on('error', onError);
   try {
-    const client = createRedisClient(REDIS_URL);
     await client.ping();
-    redis = client;
+    client.off('error', onError);
+    return client;
   } catch {
-    redis = null;
+    client.disconnect();
+    return null;
   }
-});
+}
 
-describe('Redis 存储', () => {
+const redis = await connectRedisOrNull(REDIS_URL);
+
+describe.skipIf(!redis)('Redis 存储', () => {
   it('线程 CRUD 与会话映射', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
+    const threads = createThreadStore(redis!);
     const title = `redis-t-${Date.now()}`;
     const thread = await threads.create({ title, primaryAgentId: 'claude' });
     expect((await threads.get(thread.id))?.title).toBe(title);
@@ -52,8 +56,7 @@ describe('Redis 存储', () => {
   });
 
   it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
+    const threads = createThreadStore(redis!);
     const thread = await threads.create({
       title: `redis-lease-${Date.now()}`,
       primaryAgentId: 'claude',
@@ -82,8 +85,7 @@ describe('Redis 存储', () => {
   });
 
   it('forceClaimPendingHop 覆盖别人的租约,新主人能续旧主人不能', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
+    const threads = createThreadStore(redis!);
     const thread = await threads.create({
       title: `redis-force-lease-${Date.now()}`,
       primaryAgentId: 'claude',
@@ -98,8 +100,7 @@ describe('Redis 存储', () => {
   });
 
   it('clearPendingHopIfSame:同 id 才清;无 id 旧记录 hydrate 补上', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
+    const threads = createThreadStore(redis!);
     const thread = await threads.create({
       title: `redis-clear-${Date.now()}`,
       primaryAgentId: 'claude',
@@ -121,7 +122,7 @@ describe('Redis 存储', () => {
     expect(await threads.clearPendingHopIfSame(thread.id, hop.id)).toBe(true);
     expect((await threads.get(thread.id))?.pendingHop).toBeUndefined();
 
-    await redis.hset(`thread:${thread.id}`, 'pendingHop', JSON.stringify({
+    await redis!.hset(`thread:${thread.id}`, 'pendingHop', JSON.stringify({
       to: 'gemini',
       from: 'claude',
       task: '请审查',
@@ -138,8 +139,7 @@ describe('Redis 存储', () => {
   });
 
   it('线程 repo 绑定写入并回读', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
+    const threads = createThreadStore(redis!);
     const title = `redis-repo-${Date.now()}`;
     const thread = await threads.create({
       title,
@@ -156,9 +156,8 @@ describe('Redis 存储', () => {
   });
 
   it('消息追加与 patch', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
-    const messages = createMessageStore(redis);
+    const threads = createThreadStore(redis!);
+    const messages = createMessageStore(redis!);
     const thread = await threads.create({
       title: `redis-m-${Date.now()}`,
       primaryAgentId: 'claude',
@@ -175,9 +174,8 @@ describe('Redis 存储', () => {
   });
 
   it('系统消息 round-trip 保留 systemKind/systemMeta', async () => {
-    if (!redis) return;
-    const threads = createThreadStore(redis);
-    const messages = createMessageStore(redis);
+    const threads = createThreadStore(redis!);
+    const messages = createMessageStore(redis!);
     const thread = await threads.create({
       title: `redis-kind-${Date.now()}`,
       primaryAgentId: 'claude',
@@ -201,10 +199,9 @@ describe('Redis 存储', () => {
   });
 });
 
-describe('Redis Profile/Evidence 存储', () => {
+describe.skipIf(!redis)('Redis Profile/Evidence 存储', () => {
   it('profile 读写 + 种子幂等', async () => {
-    if (!redis) return;
-    const profiles = createProfileStore(redis);
+    const profiles = createProfileStore(redis!);
     await ensureSeededProfiles(profiles);
     await ensureSeededProfiles(profiles);
     expect((await profiles.list()).length).toBe(3);
@@ -212,10 +209,9 @@ describe('Redis Profile/Evidence 存储', () => {
   });
 
   it('evidence draft → confirm', async () => {
-    if (!redis) return;
     // 用唯一 threadId,避免历史测试数据污染断言
     const threadId = `t-${Date.now()}`;
-    const evidence = createEvidenceStore(redis);
+    const evidence = createEvidenceStore(redis!);
     const draft = await evidence.createDraft({ threadId, kind: 'fact', title: 'x', content: 'y' });
     const confirmed = await evidence.confirm(draft.id);
     expect(confirmed?.status).toBe('confirmed');

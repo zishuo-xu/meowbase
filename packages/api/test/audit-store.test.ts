@@ -1,21 +1,26 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Redis } from 'ioredis';
 import type { AuditStore } from '../src/stores/ports.js';
 import { createRedisClient } from '../src/redis.js';
 import { createAuditStore, createMemoryStores } from '../src/stores/factories.js';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
-let redis: Redis | null = null;
 
-beforeAll(async () => {
+async function connectRedisOrNull(url: string): Promise<Redis | null> {
+  const client = createRedisClient(url);
+  const onError = () => {};
+  client.on('error', onError);
   try {
-    const client = createRedisClient(REDIS_URL);
     await client.ping();
-    redis = client;
+    client.off('error', onError);
+    return client;
   } catch {
-    redis = null;
+    client.disconnect();
+    return null;
   }
-});
+}
+
+const redis = await connectRedisOrNull(REDIS_URL);
 
 function uniqueThread(): string {
   return `t-audit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -46,11 +51,10 @@ async function seedThree(store: AuditStore, threadId: string) {
   return { first, second, third };
 }
 
-function runSuite(label: string, create: () => Promise<AuditStore | null>): void {
-  describe(label, () => {
+function runSuite(label: string, create: () => Promise<AuditStore>, skip = false): void {
+  describe.skipIf(skip)(label, () => {
     it('round-trip 新的在前', async () => {
       const store = await create();
-      if (!store) return;
       const threadId = uniqueThread();
       const { first, second, third } = await seedThree(store, threadId);
       const listed = await store.list({ threadId });
@@ -61,7 +65,6 @@ function runSuite(label: string, create: () => Promise<AuditStore | null>): void
 
     it('按 threadId / actor / action / since 过滤', async () => {
       const store = await create();
-      if (!store) return;
       const threadId = uniqueThread();
       const other = uniqueThread();
       const { first, second, third } = await seedThree(store, threadId);
@@ -82,7 +85,6 @@ function runSuite(label: string, create: () => Promise<AuditStore | null>): void
 
     it('limit 默认 100、上限 500,倒序截断', async () => {
       const store = await create();
-      if (!store) return;
       const threadId = uniqueThread();
       const { first, second, third } = await seedThree(store, threadId);
       const limited = await store.list({ threadId, limit: 2 });
@@ -97,4 +99,4 @@ function runSuite(label: string, create: () => Promise<AuditStore | null>): void
 }
 
 runSuite('内存 AuditStore', async () => createMemoryStores().audit);
-runSuite('Redis AuditStore', async () => (redis ? createAuditStore(redis) : null));
+runSuite('Redis AuditStore', async () => createAuditStore(redis!), !redis);

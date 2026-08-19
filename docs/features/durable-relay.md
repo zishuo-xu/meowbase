@@ -33,10 +33,10 @@
 
 1. **一跳一个主人**。`ThreadStore` 加租约方法：`claimPendingHop(threadId, runnerId, ttlMs)`（Redis `SET NX PX` 到 `hoplease:<threadId>`，抢到才算主人）、`forceClaimPendingHop`（开机首扫强抢）、`renewPendingHopLease`、`releasePendingHopLease`。占用是原子的，顺手把上面那个双跑隐患一起堵掉。
 2. **跑之前先抢，跑完就放**。`buildServer` 里把每个 POST 现在拼 `TurnContext` 的那段抽成一个工厂，续跑统一走 `createPendingRunner` 的 `run`：抢租约 → 跑 `followPendingChain` → `finally` 释放。这次带 `.catch()`，异常写进日志而不是变成未捕获拒绝。租约在跑的时候按心跳续期，所以一跳跑多久都不会被人抢走；进程死了则最多一个 TTL 之后自动过期。
-3. **开机扫一遍**。`ThreadStore.list()` 过滤出还带 `pendingHop` 的线程（`thread:index` 已经够，不需要 SCAN），逐个捡。抢不到租约的就是别人在跑，跳过。两条自我约束：**一次只捡一棒**（串行，开机时几条线程都搁着棒不要同时叫醒好几只猫），**搁超过 30 分钟的不捡**（按线程最后一条消息算，只记一行 `resume skip`）——人早走了，不能背着人烧钱。
+3. **开机扫一遍**。`ThreadStore.list()` 过滤出还带 `pendingHop` 的线程（`thread:index` 已经够，不需要 SCAN），搁着棒的线程都捡,但串行。抢不到租约的就是别人在跑，跳过。两条自我约束：**同时只叫醒一只**（开机时几条线程都搁着棒不要并行叫醒好几只猫），**搁超过 30 分钟的不捡**（按线程最后一条消息算，只记一行 `resume skip`）——人早走了，不能背着人烧钱。
 4. **定时收尸**。一个 30 秒的 `setInterval`（`.unref()`）重跑同一个扫描：租约过期的孤棒会在这里被接管。这是仓库里第一个 interval，所以同一刀补上 Fastify `onClose` 清掉它，否则测试里 `app.close()` 会挂住。
 5. **开机那一次可以强抢租约，之后的收尸不行**。租约 60 秒，而你改代码重启只要十几秒——死者的租约还没过期，开机扫会看到棒却抢不到，最坏近 90 秒才动。单实例下刚启动的进程知道任何挂着的租约都没有活主人（唯一可能持有的那个刚死），所以首扫用强抢（日志 `resume steal`）。定时收尸必须继续尊重租约，因为活着的 POST 路径正握着自己那条链的。
-6. **强抢只能发生在绑上端口之后**。实测 Fastify 的 `onReady` 在 `listen` 撞 EADDRINUSE 之后**仍然会跑完**，所以开机扫不能挂 `onReady`：那会让一个起不来的新进程去强抢旧进程正在跑的那一跳，跑两遍、花两次钱。改成 `listen` 成功后由 `index.ts` 显式叫 `startPendingRunner()`——**绑上 3200 才是「我是唯一实例」的凭证**。
+6. **强抢只能发生在绑上端口之后**。实测 Fastify 的 `onReady` 在 `listen` 撞 EADDRINUSE 之后**仍然会跑完**，所以开机扫不能挂 `onReady`：那会让一个起不来的新进程去强抢旧进程正在跑的那一跳，跑两遍、花两次钱。改成 `listen` 成功后由 `startApp` 显式叫 `startPendingRunner()`——**绑上 3200 才是「我是唯一实例」的凭证**。这条不变量只写在 `startApp` 一处,生产和 e2e 入口都调它,免得 e2e 全绿却验不到发货那份接线。
 7. **重启后的「等跑」不偷跑命令**。带 `holdCommand` 的 hop 被**开机/收尸**捡到时不重新执行那条命令——重跑一条任意 shell 命令太危险。改成写一句系统话「平台重启，命令没跑完」并清掉 `holdCommand`，让同一只猫被叫醒后自己决定要不要再跑。人当场发的那句「等跑」不受影响，照旧由平台真跑。
 8. **验收**：直接往 store 里塞一个 `pendingHop` 再起 API（等于重启现场）→ 不用发任何消息，那一棒自己跑完、审批卡自己出来（`sync` 事件已经会把它推到前端）。并发跑两个 `run` → 只有一个真的调模型。绑不上端口的那个进程不碰球。
 
@@ -59,6 +59,6 @@
 
 - 抢租约、续期、收尸、开机扫：`packages/api/src/router/pending-runner.ts`
 - 租约三方法：`packages/api/src/stores/ports.ts`；Redis `hoplease:<threadId>`（`SET NX PX` + Lua 比较后 `pexpire` / `del`）在 `stores/redis.ts`
-- 接线（`createTurnContext`、`startPendingRunner`、`onClose` 停表）：`packages/api/src/http/server.ts`；`listen` 成功后才叫 `startPendingRunner()` 在 `packages/api/src/index.ts`
+- 接线（`createTurnContext`、`startPendingRunner`、`onClose` 停表）：`packages/api/src/http/server.ts`；`listen` 成功后才叫 `startPendingRunner()` 只在 `packages/api/src/app.ts` 的 `startApp`（`index.ts` 与 `scripts/e2e-server.ts` 都调它）
 - 重启后叫醒的话术：`formatHoldCommandRestartNote` / `formatHoldCommandRestartWakePrompt`（`packages/shared/src/a2a.ts`）
 - 单测：`packages/api/test/pending-runner.test.ts`

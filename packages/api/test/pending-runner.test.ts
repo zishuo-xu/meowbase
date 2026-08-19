@@ -220,7 +220,7 @@ describe('pending-runner', () => {
     expect(logs.some((line) => line.includes('resume skip'))).toBe(true);
   });
 
-  it('几条线程都搁着棒时一次只捡一棒', async () => {
+  it('几条线程都搁着棒时串行捡、同时只叫醒一只', async () => {
     const stores = createMemoryStores();
     let inFlight = 0;
     let maxInFlight = 0;
