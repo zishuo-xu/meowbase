@@ -1,7 +1,30 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { AgentConfigDto, AppConfigDto, ModelPresetDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type ModelPresetDto, type TokenUsageDto, type UsageDto } from '@/lib/api';
 import { CatAvatar } from './CatAvatar';
+
+function formatTokenCount(n: number | undefined): string {
+  if (n == null) return '—';
+  return n.toLocaleString('en-US');
+}
+
+function formatCostUsd(costUsd: number): string {
+  return `$${costUsd.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })}`;
+}
+
+function CostCell({ row }: { row: TokenUsageDto | undefined }) {
+  if (!row) return <span>—</span>;
+  if (row.costUsd == null) return <span>无成本数据</span>;
+  return (
+    <span>
+      {formatCostUsd(row.costUsd)}
+      {row.costEstimated ? <span className="ml-1 text-[var(--ink-soft)]">估算</span> : null}
+    </span>
+  );
+}
 
 export interface AgentSavePayload {
   name: string;
@@ -121,6 +144,8 @@ export function TeamHub({
   config,
   focusAgentId,
   saving,
+  activeThreadId,
+  usageRefreshKey,
   onClose,
   onSaveAgent,
   onSaveSettings,
@@ -131,6 +156,8 @@ export function TeamHub({
   config: AppConfigDto;
   focusAgentId?: string;
   saving?: boolean;
+  activeThreadId?: string | null;
+  usageRefreshKey?: number;
   onClose: () => void;
   onSaveAgent: (agentId: string, patch: AgentSavePayload) => void;
   onSaveSettings: (patch: SettingsSavePayload) => void;
@@ -156,6 +183,8 @@ export function TeamHub({
   const [editApiKey, setEditApiKey] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
+  const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
+  const [usage, setUsage] = useState<UsageDto | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -169,7 +198,29 @@ export function TeamHub({
     setVerifyNotes({});
     setEditingId(null);
     setEditApiKey('');
+    setUsageScope('thread');
   }, [open, focusAgentId, config]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (usageScope === 'thread' && !activeThreadId) {
+          if (!cancelled) setUsage({ byAgent: {}, total: {} });
+          return;
+        }
+        const next = await api.fetchUsage(usageScope === 'all' ? undefined : activeThreadId ?? undefined);
+        if (!cancelled) setUsage(next);
+      } catch {
+        if (!cancelled) setUsage({ byAgent: {}, total: {} });
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, usageScope, activeThreadId, usageRefreshKey]);
 
   if (!open) return null;
 
@@ -235,13 +286,24 @@ export function TeamHub({
           <button
             type="button"
             onClick={() => setPane('capability')}
-            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+            className={`mb-1 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
               pane === 'capability'
                 ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
                 : 'hover:bg-white/70'
             }`}
           >
             能力
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('ledger')}
+            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+              pane === 'ledger'
+                ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
+                : 'hover:bg-white/70'
+            }`}
+          >
+            账本
           </button>
           <div className="mb-2 px-1 text-[11px] font-bold tracking-wide text-[var(--ink-soft)] uppercase">
             成员
@@ -288,7 +350,74 @@ export function TeamHub({
             </button>
           </div>
 
-          {pane === 'capability' ? (
+          {pane === 'ledger' ? (
+            <section aria-label="账本" className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">账本</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  按猫看已经跑完的用量。没报成本的格子写「无成本数据」，不估。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'thread'}
+                  onClick={() => setUsageScope('thread')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'thread'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  当前线程
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'all'}
+                  onClick={() => setUsageScope('all')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'all'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  全部
+                </button>
+              </div>
+              {usage && Object.keys(usage.byAgent).length === 0 && (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  还没有用量记录。跑完的回合会按猫记在这里。
+                </p>
+              )}
+              <ul className="space-y-2">
+                {config.agents.map((agent) => {
+                  const row = usage?.byAgent[agent.id];
+                  return (
+                    <li
+                      key={agent.id}
+                      className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CatAvatar agentId={agent.id} name={agent.name} size={28} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold">{agent.name}</div>
+                          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-soft)] sm:grid-cols-4">
+                            <span>输入 {formatTokenCount(row?.inputTokens)}</span>
+                            <span>输出 {formatTokenCount(row?.outputTokens)}</span>
+                            <span>缓存读 {formatTokenCount(row?.cacheReadTokens)}</span>
+                            <span>总计 {formatTokenCount(row?.totalTokens)}</span>
+                          </div>
+                          <div className="mt-1 text-xs font-medium text-[var(--ink)]">
+                            <CostCell row={row} />
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : pane === 'capability' ? (
             <section className="space-y-3">
               <div>
                 <div className="text-xs font-bold text-[var(--ink-soft)]">能力</div>

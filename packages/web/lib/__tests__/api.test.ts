@@ -140,4 +140,31 @@ describe('api', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     await expect(api.listThreads()).rejects.toThrow(/无法连接 API/);
   });
+
+  it('fetchUsage 带 threadId 打 /api/usage', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ byAgent: {}, total: {} }),
+      }),
+    );
+    await api.fetchUsage('t1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/usage?threadId=t1'),
+      undefined,
+    );
+  });
+
+  it('fetchUsage 不带 threadId 打全部', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ byAgent: {}, total: {} }),
+      }),
+    );
+    await api.fetchUsage();
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/usage$/), undefined);
+  });
 });

@@ -14,7 +14,7 @@ pnpm install
 pnpm dev   # 起 Redis + API(3200)+ Web(3300)
 ```
 
-浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 看能力表并配模型和密钥。建会话时可填真实仓库路径,改动只落在线程分支 `meow/<id>`,不碰基准分支、不 push。
+浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 看能力表、配模型和密钥、侧栏「账本」按猫看 token 和花费。建会话时可填真实仓库路径,改动只落在线程分支 `meow/<id>`,不碰基准分支、不 push。
 (API 需要本机 Redis;冒烟/演示可设 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 指向 fake CLI)
 
 ```bash

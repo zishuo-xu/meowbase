@@ -115,6 +115,21 @@ export interface AppConfigDto {
   models?: ModelPresetDto[];
 }
 
+export interface TokenUsageDto {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  costUsd?: number;
+  costEstimated?: boolean;
+}
+
+export interface UsageDto {
+  byAgent: Record<string, TokenUsageDto>;
+  total: TokenUsageDto;
+}
+
 export interface AgentPatchDto {
   name?: string;
   aliases?: string[];
@@ -202,4 +217,6 @@ export const api = {
     }),
   cancelTurn: (threadId: string) =>
     request<{ ok: boolean }>(`/api/threads/${threadId}/cancel`, { method: 'POST' }),
+  fetchUsage: (threadId?: string) =>
+    request<UsageDto>(threadId ? `/api/usage?threadId=${threadId}` : '/api/usage'),
 };

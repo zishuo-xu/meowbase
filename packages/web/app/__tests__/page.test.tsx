@@ -36,6 +36,7 @@ vi.mock('@/lib/api', () => ({
     deleteThread: vi.fn(),
     sendMessage: vi.fn(),
     cancelTurn: vi.fn(),
+    fetchUsage: vi.fn(),
   },
 }));
 
@@ -99,6 +100,7 @@ describe('Home live-sync', () => {
     vi.mocked(api.listApprovals).mockResolvedValue([]);
     vi.mocked(api.listMessages).mockResolvedValue([]);
     vi.mocked(api.listEvidence).mockResolvedValue([]);
+    vi.mocked(api.fetchUsage).mockResolvedValue({ byAgent: {}, total: {} });
     vi.mocked(api.getConfig).mockResolvedValue({
       a2aMaxDepth: 3,
       defaultAgentId: 'claude',
@@ -158,5 +160,22 @@ describe('Home live-sync', () => {
     vi.useRealTimers();
     await waitFor(() => expect(api.listMessages).toHaveBeenCalledTimes(1));
     expect(api.listThreads).toHaveBeenCalledTimes(1);
+  });
+
+  it('Hub 打开时 sync 去抖后刷新用量', async () => {
+    await openThread();
+    fireEvent.click(screen.getByRole('button', { name: '团队' }));
+    await waitFor(() => expect(api.fetchUsage).toHaveBeenCalled());
+    vi.mocked(api.fetchUsage).mockClear();
+    vi.useFakeTimers();
+    act(() => {
+      streamCtl.emit({ type: 'sync', threadId: 't-sync' });
+    });
+    expect(api.fetchUsage).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(150);
+    });
+    vi.useRealTimers();
+    await waitFor(() => expect(api.fetchUsage).toHaveBeenCalled());
   });
 });

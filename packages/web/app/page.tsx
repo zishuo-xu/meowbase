@@ -37,6 +37,7 @@ export default function Home() {
   const [insert, setInsert] = useState<{ id: number; text: string } | null>(null);
   const [focusSeq, setFocusSeq] = useState(0);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
   const { lastEvent } = useThreadStream(activeId);
@@ -93,6 +94,7 @@ export default function Home() {
           setMessages(msgs);
           setEvidence(ev);
           await refreshThreads();
+          setUsageRefreshKey((n) => n + 1);
         } catch {
           /* 同步失败不打断当前气泡 */
         }
@@ -359,6 +361,8 @@ export default function Home() {
           config={config}
           focusAgentId={hubFocus}
           saving={savingHub}
+          activeThreadId={activeId}
+          usageRefreshKey={usageRefreshKey}
           onClose={() => setHubOpen(false)}
           onSaveAgent={(agentId, patch) => {
             setSavingHub(true);

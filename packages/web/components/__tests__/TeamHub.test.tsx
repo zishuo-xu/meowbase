@@ -1,7 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TeamHub } from '../TeamHub';
-import type { AppConfigDto } from '@/lib/api';
+import type { AppConfigDto, UsageDto } from '@/lib/api';
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    fetchUsage: vi.fn().mockResolvedValue({ byAgent: {}, total: {} }),
+  },
+}));
+
+import { api } from '@/lib/api';
 
 const config: AppConfigDto = {
   a2aMaxDepth: 3,
@@ -47,7 +55,44 @@ const config: AppConfigDto = {
   ],
 };
 
+const threadUsage: UsageDto = {
+  byAgent: {
+    claude: {
+      inputTokens: 1234,
+      outputTokens: 56,
+      cacheReadTokens: 10,
+      totalTokens: 1300,
+      costUsd: 0.0123,
+    },
+    gemini: {
+      inputTokens: 80,
+      outputTokens: 20,
+      totalTokens: 100,
+    },
+    opencode: {
+      inputTokens: 40,
+      outputTokens: 8,
+      totalTokens: 48,
+      costUsd: 0.02,
+      costEstimated: true,
+    },
+  },
+  total: {
+    inputTokens: 1354,
+    outputTokens: 84,
+    cacheReadTokens: 10,
+    totalTokens: 1448,
+    costUsd: 0.0323,
+    costEstimated: true,
+  },
+};
+
 describe('TeamHub', () => {
+  beforeEach(() => {
+    vi.mocked(api.fetchUsage).mockReset();
+    vi.mocked(api.fetchUsage).mockResolvedValue({ byAgent: {}, total: {} });
+  });
+
   it('列出三只猫并保存当前猫的改名', () => {
     const onSaveAgent = vi.fn();
     render(
@@ -410,5 +455,108 @@ describe('TeamHub', () => {
       />,
     );
     expect(container.querySelector('[data-team-hub]')).toBeNull();
+  });
+
+  it('账本按猫渲染行,数字千分位', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    expect(within(ledger).getByText(/1,234/)).toBeTruthy();
+    expect(within(ledger).getByText('墨墨')).toBeTruthy();
+    expect(within(ledger).getByText('闪闪')).toBeTruthy();
+    expect(within(ledger).getByText('团团')).toBeTruthy();
+  });
+
+  it('没有 costUsd 时显示无成本数据而不是 $0', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    const geminiRow = within(ledger).getByText('闪闪').closest('li');
+    expect(geminiRow?.textContent).toContain('无成本数据');
+    expect(geminiRow?.textContent).not.toMatch(/\$0/);
+    expect(within(ledger).getByText('估算')).toBeTruthy();
+  });
+
+  it('切换当前线程 / 全部会换数据源', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t-current"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    await waitFor(() => expect(api.fetchUsage).toHaveBeenCalledWith('t-current'));
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    await waitFor(() => expect(api.fetchUsage).toHaveBeenCalledWith(undefined));
+    fireEvent.click(screen.getByRole('button', { name: '当前线程' }));
+    await waitFor(() => {
+      expect(vi.mocked(api.fetchUsage).mock.calls.at(-1)?.[0]).toBe('t-current');
+    });
+  });
+
+  it('没出场的猫显示占位,完全没数据时给空态', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue({
+      byAgent: {
+        claude: { inputTokens: 3, outputTokens: 1, totalTokens: 4, costUsd: 0.01 },
+      },
+      total: { inputTokens: 3, outputTokens: 1, totalTokens: 4, costUsd: 0.01 },
+    });
+    const { rerender } = render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    expect(within(ledger).getByText(/输入 3/)).toBeTruthy();
+    const geminiRow = within(ledger).getByText('闪闪').closest('li');
+    expect(geminiRow?.textContent).toMatch(/—/);
+    expect(geminiRow?.textContent).not.toMatch(/\b0\b/);
+
+    vi.mocked(api.fetchUsage).mockResolvedValue({ byAgent: {}, total: {} });
+    rerender(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        usageRefreshKey={1}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText(/还没有用量记录/)).toBeTruthy();
+    expect(screen.queryByText('$0')).toBeNull();
+    expect(screen.queryByText('NaN')).toBeNull();
   });
 });
