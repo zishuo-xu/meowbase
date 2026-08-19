@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Message } from '@meowbase/shared';
+import { totalTokensOf } from '@meowbase/shared';
 import { createMemoryStores } from '../src/stores/factories.js';
 import { loadUsage, sumUsage } from '../src/services/usage.js';
 
@@ -194,6 +195,41 @@ describe('sumUsage', () => {
     expect(result.byAgent.opencode?.costEstimated).toBe(true);
     expect(result.total.costEstimated).toBe(true);
     expect(result.total.costUsd).toBeCloseTo(0.03);
+  });
+
+  it('真实交棒链: total.totalTokens 是每只猫派生后再相加,不小于 inputTokens', () => {
+    const claude = {
+      inputTokens: 21171,
+      outputTokens: 1936,
+      cacheReadTokens: 107008,
+      cacheCreationTokens: 0,
+      costUsd: 0.207759,
+    };
+    const gemini = {
+      inputTokens: 179,
+      outputTokens: 557,
+      totalTokens: 13465,
+      cacheReadTokens: 10880,
+      costEstimated: false,
+    };
+    const result = sumUsage([
+      msg({
+        role: 'assistant',
+        status: 'completed',
+        agentId: 'claude',
+        usage: claude,
+      }),
+      msg({
+        role: 'assistant',
+        status: 'completed',
+        agentId: 'gemini',
+        usage: gemini,
+      }),
+    ]);
+    expect(result.byAgent.claude).toEqual(claude);
+    expect(result.byAgent.gemini).toEqual(gemini);
+    expect(result.total.totalTokens).toBeGreaterThanOrEqual(result.total.inputTokens ?? 0);
+    expect(result.total.totalTokens).toBe(totalTokensOf(claude) + totalTokensOf(gemini));
   });
 });
 

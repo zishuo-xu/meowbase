@@ -1,5 +1,5 @@
 import type { AgentId, Message, TokenUsage } from '@meowbase/shared';
-import { mergeTokenUsage } from '@meowbase/shared';
+import { mergeTokenUsage, totalTokensOf } from '@meowbase/shared';
 import type { AppStores } from '../stores/ports.js';
 
 export interface UsageSummary {
@@ -31,7 +31,18 @@ export function sumUsage(messages: ReadonlyArray<UsageMessage>): UsageSummary {
     total = mergeTokenUsage(total, message.usage);
   }
 
-  return { byAgent, total: total ?? {} };
+  const merged = total ?? {};
+  const derivedTotalTokens = Object.values(byAgent).reduce(
+    (sum, usage) => sum + totalTokensOf(usage),
+    0,
+  );
+  return {
+    byAgent,
+    total:
+      Object.keys(byAgent).length === 0
+        ? merged
+        : { ...merged, totalTokens: derivedTotalTokens },
+  };
 }
 
 export async function loadUsage(

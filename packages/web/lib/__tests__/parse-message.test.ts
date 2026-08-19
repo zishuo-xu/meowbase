@@ -90,6 +90,25 @@ describe('approvalCardTitle', () => {
     expect(approvalCardTitle('rejected', '需修改')).toBe('已打回');
   });
 
+  it('verdict=pass → 审查通过，待你确认', () => {
+    expect(approvalCardTitle('pending', '结论:需修改', 'pass')).toBe('审查通过，待你确认');
+  });
+
+  it('verdict=revise → 互审未通过，待你决定', () => {
+    expect(approvalCardTitle('pending', '结论:通过', 'revise')).toBe('互审未通过，待你决定');
+  });
+
+  it('verdict=incomplete → 缺验证证据，标题不含通过', () => {
+    const title = approvalCardTitle('pending', '结论:通过', 'incomplete');
+    expect(title).toBe('缺验证证据，待你决定');
+    expect(title).not.toContain('通过');
+  });
+
+  it('verdict 缺失时仍按正文判断(老消息)', () => {
+    expect(approvalCardTitle('pending', '结论:通过')).toBe('审查通过，待你确认');
+    expect(approvalCardTitle('pending', '## 结论\n需修改')).toBe('互审未通过，待你决定');
+  });
+
   it('审查结论标题+文末结论通过 → 审查通过标题', () => {
     expect(
       approvalCardTitle(

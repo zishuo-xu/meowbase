@@ -26,3 +26,14 @@ export function mergeTokenUsage(
   }
   return result;
 }
+
+/** 上游报了 totalTokens 就用它；否则派生可见字段之和。 */
+export function totalTokensOf(usage: TokenUsage): number {
+  if (usage.totalTokens != null) return usage.totalTokens;
+  return (
+    (usage.inputTokens ?? 0) +
+    (usage.outputTokens ?? 0) +
+    (usage.cacheReadTokens ?? 0) +
+    (usage.cacheCreationTokens ?? 0)
+  );
+}

@@ -25,6 +25,9 @@
 2. `parseReviewVerdict` 为通过且没证据 → `incomplete`；autoApprove 不落地。
 3. 卡片带「结论不算通过:没有本轮验证证据」。
 4. 验收：结论写通过、正文没有命令+结果 → 不 `applied`。
+5. 建卡时把已经算好的门控结果写进 `systemMeta.verdict`（`pass` / `revise` / `incomplete`）。卡片标题优先读这个字段，不再从正文重推结论。`incomplete` 的标题是「缺验证证据，待你决定」，绝不能再写「审查通过」。老消息没有 verdict 时才退回正文判断。
+
+真实跑里审查官写了「结论:通过」但没给本轮验证证据，正文已经是「结论不算通过」，标题却仍写「审查通过，待你确认」——标题更显眼，口径相反。这和 [system-message-kind.md](system-message-kind.md) 是同一类病：平台知道答案，却让前端猜。
 
 ## 不做（本篇）
 
@@ -42,4 +45,5 @@
 
 - `hasVerificationEvidence`：`packages/shared/src/verification.ts`
 - `gateReviewVerdict` / `allowsAutoApprove`：`packages/shared/src/review-verdict.ts`
-- 建卡文案：`packages/api/src/router/execute-turn.ts`
+- 建卡文案 + `systemMeta.verdict`：`packages/api/src/router/turn/review.ts`
+- 卡片标题：`packages/web/lib/parse-message.ts` 的 `approvalCardTitle`

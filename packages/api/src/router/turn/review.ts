@@ -195,5 +195,6 @@ export async function runReviewFixThenCard(input: {
           : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
     status: 'completed',
     systemKind: autoApplied ? 'approval-applied' : 'approval-pending',
+    systemMeta: { verdict: gated },
   });
 }

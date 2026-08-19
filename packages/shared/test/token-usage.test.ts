@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeTokenUsage } from '../src/token-usage.js';
+import { mergeTokenUsage, totalTokensOf } from '../src/token-usage.js';
 
 describe('mergeTokenUsage', () => {
   it('空值时直接返回 incoming', () => {
@@ -30,5 +30,37 @@ describe('mergeTokenUsage', () => {
       { costUsd: 0.02, costEstimated: true },
     );
     expect(result.costEstimated).toBe(true);
+  });
+});
+
+describe('totalTokensOf', () => {
+  it('有 totalTokens 就用上游报的', () => {
+    expect(
+      totalTokensOf({
+        inputTokens: 179,
+        outputTokens: 557,
+        totalTokens: 13465,
+        cacheReadTokens: 10880,
+      }),
+    ).toBe(13465);
+  });
+
+  it('没有 totalTokens 就派生 input+output+缓存', () => {
+    expect(
+      totalTokensOf({
+        inputTokens: 21171,
+        outputTokens: 1936,
+        cacheReadTokens: 107008,
+        cacheCreationTokens: 0,
+      }),
+    ).toBe(21171 + 1936 + 107008 + 0);
+  });
+
+  it('全空返回 0', () => {
+    expect(totalTokensOf({})).toBe(0);
+  });
+
+  it('只有 input 时等于 input', () => {
+    expect(totalTokensOf({ inputTokens: 42 })).toBe(42);
   });
 });

@@ -645,6 +645,7 @@ describe('executeTurn 审批流', () => {
     const cardMsg = messages.find((m) => m.role === 'system' && m.content.includes('审批卡片'));
     expect(cardMsg?.content).toContain('#approve');
     expect(cardMsg?.content).toContain('结论不算通过');
+    expect(cardMsg?.systemMeta?.verdict).toBe('incomplete');
     expect(messages.some((m) => m.role === 'assistant' && m.agentId === 'opencode')).toBe(true);
     expect(messages.some((m) => m.role === 'system' && m.content.includes('🤝 审查:'))).toBe(true);
   });
@@ -870,6 +871,7 @@ describe('executeTurn 审批流', () => {
     const cardMsg = (await stores.messages.list(thread.id)).find((m) => m.content.includes('审批卡片'));
     expect(cardMsg?.content).toContain('结论不算通过');
     expect(cardMsg?.content).not.toContain('已自动批准');
+    expect(cardMsg?.systemMeta?.verdict).toBe('incomplete');
   });
 
   it('未开 autoApprove → 仍等待人工批准', async () => {

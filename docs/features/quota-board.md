@@ -43,9 +43,24 @@
 - **跨线程是两层循环**（`threads.list()` + 每条线程一次 `messages.list()`），有测试盯着「一次 `get` 都不许调」，防的是以后有人改成按消息逐条取。
 - 复核时我把 `sumUsage` 收了两处：`isBillable` 改成类型谓词（原先检查完还要在循环里重查一遍才能过窄化）、去掉多余的 `hasTotal` 开关（`mergeTokenUsage({}, x)` 和 `mergeTokenUsage(undefined, x)` 等价）。
 
+## 总计是派生的（真实数据暴露的口径）
+
+`totalTokens` 只有部分 CLI 会报。claude 那条经常不报，gemini / opencode 会报，而且上游的总数还可以含我们没逐项列出的部分。
+
+真实交棒链跑完后，墨墨（claude）是输入 21,171 + 输出 1,936 + 缓存读 107,008、没有 `totalTokens`，Hub「总计」却画成「—」；闪闪（gemini）报了 13,465。聚合层还把「只有部分猫才有的字段」盲加进 `total.totalTokens`，于是合计 13,465 **小于** 合计输入 21,350——同一张账自相矛盾。
+
+规则只有一条，`shared` 的 `totalTokensOf` 和 web `lib/token-usage.ts` 镜像同一份：
+
+- 这只猫报了 `totalTokens` → 用上游的（更权威，含没逐项列的部分）
+- 没报 → 派生 `input + output + cacheRead + cacheCreation`（缺的当 0）
+- 全空 → 0
+
+`byAgent` 保持各家原始字段，不回填派生值。`total.totalTokens` 是「每只猫先 `totalTokensOf` 再相加」，不是 `mergeTokenUsage` 盲加出来的那个。Hub「总计」格走同一条规则；没出场的猫仍是「—」，不写成 0。
+
 ## 入口
 
-- 聚合纯函数 `sumUsage` + 跨线程 `loadUsage`：`packages/api/src/services/usage.ts`（第一个用上 `shared` 里 `mergeTokenUsage` 的地方）
+- 派生总计 `totalTokensOf`：`packages/shared/src/token-usage.ts`；web 镜像 `packages/web/lib/token-usage.ts`（不依赖 `@meowbase/shared`）
+- 聚合纯函数 `sumUsage` + 跨线程 `loadUsage`：`packages/api/src/services/usage.ts`（`total.totalTokens` 是每只猫 `totalTokensOf` 后再加，不沿用 `mergeTokenUsage` 盲加）
 - 只读接口 `GET /api/usage?threadId=`：`packages/api/src/http/server.ts`
 - 前端取数：`packages/web/lib/api.ts` 的 `fetchUsage`；`sync` 去抖后递增 `usageRefreshKey` 在 `packages/web/app/page.tsx`
 - 看板：`packages/web/components/TeamHub.tsx`（`CostCell` 管三种展示）

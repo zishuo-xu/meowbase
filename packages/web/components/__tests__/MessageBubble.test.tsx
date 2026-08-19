@@ -391,4 +391,25 @@ describe('ApprovalCardBlock', () => {
     expect(screen.getByText('互审未通过，待你决定')).toBeTruthy();
     expect(screen.getByRole('button', { name: '批准落地' })).toBeTruthy();
   });
+
+  it('incomplete 卡片标题是缺验证证据,不出现审查通过', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-card',
+          threadId: 't',
+          role: 'system',
+          content:
+            '📋 审批卡片 ap_a1b2c3d4(写:claude → 审:gemini)\n改动:x.txt | 1 +\n审查意见:结论:通过\n⚠️ 结论不算通过:没有本轮验证证据（命令+结果）。',
+          status: 'completed',
+          createdAt: '',
+          systemKind: 'approval-pending',
+          systemMeta: { verdict: 'incomplete' },
+        }}
+      />,
+    );
+    expect(screen.getByText('缺验证证据，待你决定')).toBeTruthy();
+    expect(screen.queryByText('审查通过，待你确认')).toBeNull();
+    expect(screen.queryByText(/审查通过/)).toBeNull();
+  });
 });

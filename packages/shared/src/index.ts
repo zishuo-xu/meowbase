@@ -43,7 +43,7 @@ export {
   USER_MENTION_MAX_AGE_MS,
 } from './mention-targets.js';
 export type { TurnTargetInput } from './mention-targets.js';
-export { mergeTokenUsage } from './token-usage.js';
+export { mergeTokenUsage, totalTokensOf } from './token-usage.js';
 export {
   generateApprovalId,
   generateEvidenceId,

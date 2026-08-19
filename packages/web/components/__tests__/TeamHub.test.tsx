@@ -559,4 +559,30 @@ describe('TeamHub', () => {
     expect(screen.queryByText('$0')).toBeNull();
     expect(screen.queryByText('NaN')).toBeNull();
   });
+
+  it('没有 totalTokens 的猫显示派生总计,没出场仍是 —', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue({
+      byAgent: {
+        claude: { inputTokens: 21171, outputTokens: 1936, cacheReadTokens: 107008, costUsd: 0.207759 },
+      },
+      total: { inputTokens: 21171, outputTokens: 1936, cacheReadTokens: 107008, costUsd: 0.207759 },
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    const claudeRow = within(ledger).getByText('墨墨').closest('li');
+    expect(claudeRow?.textContent).toMatch(/总计 130,115/);
+    const geminiRow = within(ledger).getByText('闪闪').closest('li');
+    expect(geminiRow?.textContent).toMatch(/总计 —/);
+    expect(geminiRow?.textContent).not.toMatch(/总计 0/);
+  });
 });

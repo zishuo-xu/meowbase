@@ -42,7 +42,7 @@
 - **`hop-interrupted` 没进枚举**。它是助手消息的 `error` 文本（「平台重启,这一跳没写完」），不是系统消息，放进 `SystemKind` 会让类型说谎。
 - **`aborted` / `failed` 归到掉球**。这两句文案本身就含「球还在地上」，所以前端把它们和 `dropped` 一起认，是等价改写不是行为改动。
 - **时间线对「打回」仍不新开一跳**，和改造前一致：有 `relay` kind 时按正文里是否含「打回:」区分，避免互审中途时间线变样。
-- **`systemMeta` 只有 `{ from, to }`**。审批卡的 `ap_` id 和改动统计仍从正文抠——那是卡片解析，不是球权，本刀不扩。
+- **`systemMeta` 第一刀只有 `{ from, to }`**。审批卡的 `ap_` id 和改动统计仍从正文抠——那是卡片解析，不是球权，本刀不扩。后来验证门把已经算好的 `verdict`（`pass` / `revise` / `incomplete`）也写进同一块，卡片标题不再从正文猜结论，见 [verification-gate.md](verification-gate.md)。
 
 ## 入口
 

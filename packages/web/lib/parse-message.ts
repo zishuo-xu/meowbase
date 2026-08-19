@@ -14,6 +14,7 @@ export interface ParsedMessage {
   writerId?: string;
   reviewerId?: string;
   approvalStatus?: ApprovalUiStatus;
+  verdict?: 'pass' | 'revise' | 'incomplete';
 }
 
 const APPROVAL_PATTERN =
@@ -31,6 +32,7 @@ export function parseMessage(message: {
   role: string;
   content: string;
   systemKind?: string;
+  systemMeta?: { from?: string; to?: string; verdict?: 'pass' | 'revise' | 'incomplete' };
 }): ParsedMessage {
   if (message.role === 'system') {
     const approvalKind =
@@ -47,6 +49,7 @@ export function parseMessage(message: {
         stat: (approval[4] ?? '').trim(),
         comment: (approval[5] ?? '').trim(),
         approvalStatus: autoApplied ? 'applied' : 'pending',
+        verdict: message.systemMeta?.verdict,
       };
     }
     const evidence = message.content.match(EVIDENCE_PATTERN);
@@ -90,9 +93,16 @@ function reviewLooksRevise(comment: string): boolean {
   return reviseIdx >= 0 && (passIdx < 0 || reviseIdx <= passIdx);
 }
 
-export function approvalCardTitle(status: ApprovalUiStatus, comment = ''): string {
+export function approvalCardTitle(
+  status: ApprovalUiStatus,
+  comment = '',
+  verdict?: 'pass' | 'revise' | 'incomplete',
+): string {
   if (status === 'applied') return '改动已确认';
   if (status === 'rejected') return '已打回';
+  if (verdict === 'pass') return '审查通过，待你确认';
+  if (verdict === 'revise') return '互审未通过，待你决定';
+  if (verdict === 'incomplete') return '缺验证证据，待你决定';
   if (reviewLooksRevise(comment)) return '互审未通过，待你决定';
   return '审查通过，待你确认';
 }

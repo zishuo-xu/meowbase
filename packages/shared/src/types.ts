@@ -62,10 +62,12 @@ export type SystemKind =
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';
 
-/** 渲染球权/时间线真正要用的字段。只放 from/to。 */
+/** 渲染球权/时间线/审批卡真正要用的字段。 */
 export interface SystemMeta {
   from?: AgentId;
   to?: AgentId;
+  /** 验证门已经算好的审查结论；老消息没有，前端退回正文判断 */
+  verdict?: 'pass' | 'revise' | 'incomplete';
 }
 
 export interface TokenUsage {

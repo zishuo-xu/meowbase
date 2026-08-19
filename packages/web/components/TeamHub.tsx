@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, type AgentConfigDto, type AppConfigDto, type ModelPresetDto, type TokenUsageDto, type UsageDto } from '@/lib/api';
+import { totalTokensOf } from '@/lib/token-usage';
 import { CatAvatar } from './CatAvatar';
 
 function formatTokenCount(n: number | undefined): string {
@@ -405,7 +406,7 @@ export function TeamHub({
                             <span>输入 {formatTokenCount(row?.inputTokens)}</span>
                             <span>输出 {formatTokenCount(row?.outputTokens)}</span>
                             <span>缓存读 {formatTokenCount(row?.cacheReadTokens)}</span>
-                            <span>总计 {formatTokenCount(row?.totalTokens)}</span>
+                            <span>总计 {formatTokenCount(row ? totalTokensOf(row) : undefined)}</span>
                           </div>
                           <div className="mt-1 text-xs font-medium text-[var(--ink)]">
                             <CostCell row={row} />

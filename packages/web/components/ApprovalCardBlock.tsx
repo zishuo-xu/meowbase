@@ -27,6 +27,7 @@ export function ApprovalCardBlock({
   writerName,
   reviewerName,
   status = 'pending',
+  verdict,
   onApprove,
   onReject,
 }: {
@@ -37,6 +38,7 @@ export function ApprovalCardBlock({
   writerName?: string;
   reviewerName?: string;
   status?: ApprovalUiStatus;
+  verdict?: 'pass' | 'revise' | 'incomplete';
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
 }) {
@@ -50,7 +52,7 @@ export function ApprovalCardBlock({
     <div className="w-full max-w-2xl rounded-2xl bg-white p-4 shadow-[0_10px_30px_-18px_rgba(40,30,20,0.45)] ring-1 ring-[var(--border)]">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-bold text-[var(--ink)]">{approvalCardTitle(status, comment)}</div>
+          <div className="text-sm font-bold text-[var(--ink)]">{approvalCardTitle(status, comment, verdict)}</div>
           <div className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
             {writerName ? `${writerName} 写` : '写手'}
             {reviewerName ? ` · ${reviewerName} 审` : ''}

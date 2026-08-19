@@ -51,7 +51,7 @@ export interface MessageDto {
   activities?: ToolActivity[];
   thinking?: string;
   systemKind?: string;
-  systemMeta?: { from?: string; to?: string };
+  systemMeta?: { from?: string; to?: string; verdict?: 'pass' | 'revise' | 'incomplete' };
 }
 
 export interface ToolActivity {

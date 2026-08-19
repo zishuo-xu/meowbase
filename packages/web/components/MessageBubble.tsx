@@ -54,6 +54,7 @@ export function MessageBubble({
           writerName={writerName}
           reviewerName={reviewerName}
           status={approvalStatus ?? parsed.approvalStatus ?? 'pending'}
+          verdict={parsed.verdict}
           onApprove={onApprove ?? (() => {})}
           onReject={onReject ?? (() => {})}
         />
