@@ -27,7 +27,7 @@
 2. **跑完落库再清，而且只清自己那一棒**。`resumePendingTurn` 不再一开始就 `setPendingHop(null)`；跑完、消息和 `settleTurn` 都落库之后，用 `clearPendingHopIfSame(threadId, hopId)` 清。必须比 id：猫这一跳又交棒时 `runSegment` 已经把**下一棒**写进同一个槽，无条件清会把新棒抹掉。
 3. **消息记下它属于哪一棒**。`Message` 加 `hopId?`，这一跳的助手消息带上。这是幂等键。
 4. **重跑时先看这一棒是不是已经产出过**。同 `hopId` 已有 `completed` 的助手消息 → 不再调模型，直接往下走收尾和清棒（进程死在「落库」和「清棒」之间的那一瞬不会产出两条回复）。同 `hopId` 有 `streaming` 的半截消息 → 判定为被打断，标成 `failed` 并写明「平台重启，这一跳没写完」，然后重跑。顺带治好被 `kill -9` 打断后那条永远停在「思考中」的气泡。
-5. **验收**（这次窗口是人类尺度，真机可验）：发一句会交棒的话，等日志出现 `hop start` 且那只猫正在想的时候 `lsof -ti :3200 | xargs kill -9`；重启后不发任何消息，日志应出现 `resume sweep n=1` → `resume claim` → 同一只猫的 `hop start`，最后聊天里那一跳有结果、半截气泡是 `failed` 而不是永远思考中。
+5. **验收**（这次窗口是人类尺度，真机可验）：发一句会交棒的话，等日志出现 `hop start` 且那只猫正在想的时候 `lsof -ti :3200 | xargs kill -9`；重启后不发任何消息。隔十几秒重启（死者 60 秒租约未过期）日志应是 `resume sweep n=1` → `resume steal` → 同一只猫的 `hop start`；隔超过 60 秒才是 `resume claim`。最后聊天里那一跳有结果、半截气泡是 `failed` 而不是永远思考中。
 
 ## 实测（真机一次）
 
