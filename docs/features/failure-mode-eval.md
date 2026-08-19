@@ -2,7 +2,7 @@
 
 给猫的每一种已知坏毛病配一个 fake,断言平台该兜住的都兜住了,跑出一张可引用、CI 每次复验的表。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:他们公开把「验证过才算完成」写进 [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md),最近公开在吵的是 eval 测量可信度([issue #1213](https://github.com/zts212653/clowder-ai/issues/1213))。也就是说「怎么知道这套协作真的有用」在他们那儿也还没解决。
 - 靠拢:靠「测量要可信」这一条。本刀刻意**不**做他们在吵的那种 eval(给 agent 产出质量打分,要真实模型、结果不可复现),只量**平台对已知坏毛病的兜住率**——这个用 fake 就能精确复现,不花钱,能进 CI。
 
@@ -43,4 +43,12 @@
 
 ## 入口
 
-落地后填路径。
+- `scripts/lib/harness.ts` — e2e / eval 共用的起子进程、waitFor、断言
+- `scripts/eval.ts` — 记分板入口(每种毛病 N=3,Redis db 13)
+- `scripts/fixtures/fake-forget-at.mjs` — 忘了行首 `@`
+- `scripts/fixtures/fake-pass-without-evidence.mjs` — 没证据就宣称通过
+- `scripts/fixtures/fake-handoff-revisit.mjs` — 想交回已出场的猫
+- `scripts/fixtures/fake-empty-handoff.mjs` — 什么都没干就交棒(空格子,期望 0)
+- `scripts/fixtures/fake-claude-eval-writer.mjs` — 配套写手(不带证据 / 可换交接对象)
+- `docs/eval.md` — 最近一次跑出的表
+- CI:`.github/workflows/ci.yml` 在 `pnpm e2e` 之后跑 `pnpm eval`

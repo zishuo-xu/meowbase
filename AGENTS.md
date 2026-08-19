@@ -18,10 +18,11 @@ pnpm test         # 全部单测(shared/api/web)
 pnpm -r build     # 三包构建 + 类型检查
 pnpm typecheck:scripts # scripts/ 的类型检查(包不含它,漏了会静默烂掉)
 pnpm e2e          # 整机自检:fake CLI 跑全链 + 杀进程验续跑,不花钱
+pnpm eval         # 失败模式记分板:已知坏毛病 × 平台是否兜住,fake CLI,不花钱
 pnpm smoke        # 真实冒烟(需要真实 claude/opencode 通道,花钱)
 ```
 
-CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`、`pnpm e2e`（`.github/workflows/ci.yml`）。`pnpm smoke` 花钱,不进 CI。
+CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`、`pnpm e2e`、`pnpm eval`（`.github/workflows/ci.yml`）。`pnpm smoke` 花钱,不进 CI。
 
 浏览器打开 http://localhost:3300。API 只读接口可直接 curl localhost:3200。
 
@@ -33,7 +34,7 @@ packages/
 ├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流;启动接线在 `src/app.ts`
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
-scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI;子进程调 `startApp`)、smoke.ts(真实冒烟,也调 `startApp`)、fixtures/(fake CLI)
+scripts/      e2e.ts + eval.ts + e2e-server.ts(整机自检 / 记分板,fake CLI;子进程调 `startApp`)、lib/harness.ts(两者共用)、smoke.ts(真实冒烟,也调 `startApp`)、fixtures/(fake CLI)
 work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
@@ -115,6 +116,10 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 19. **e2e 必须验发货的那份接线**:API 启动顺序只许写在 `startApp` 一处。`index.ts`、`e2e-server.ts` 和 `smoke.ts` 都调它,只用参数区分(`configPath` / `workdirBase` / host / 端口 / `rebuildAdapter`)。以前两份副本时,改生产入口的开机扫,`pnpm e2e` 照样绿——它验的是自己那份。happy-path 不依赖开机扫棒(POST 里的 `void runner.run()` 会把当轮 pending 跟完),反向验分两半:把 `startPendingRunner()` **注掉**,崩溃续跑那一段红(开机没扫棒);把它挪到 `listen` **之前**,`runBindConflictPath` 红(`lease-steal` 会增加——绑不上端口的进程去抢了 #1 的棒)。`PORT=0` 永远绑得上,盖不到后一半,所以绑冲突段先 `listen(0)` 拿一个空闲固定端口(避开 3200/3300),#1 占上再起 #2。见 [e2e-harness.md](docs/features/e2e-harness.md)。
 20. **Redis 单测假绿**:`if (!redis) return` 会被 vitest 算 passed。没 Redis 时要用 `describe.skipIf` / `it.skipIf`(条件得在收集测试前就算好,所以先 `await ping` 再声明套件),输出必须是 skipped 不是 passed。
 21. **listen 失败必须让进程死干净**:`startApp` 在 `listen` 之前已经连了 Redis、建了 Fastify。撞 EADDRINUSE 若只把错误抛出去、不 `app.close()` + `redis.disconnect()`,ioredis 会把进程挂住,e2e 等不到非 0 退出码。`e2e-server` 也要 `process.exit(1)`。另外首扫必须 `await startPendingRunner()`:只 `void` 的话,反向把调用挪到 `listen` 之前,`process.exit` 会在 `lease-steal` 落库前把 #2 杀掉,绑冲突段假绿。
+22. **`pnpm eval` 用 Redis db 13,不要改成 db 0 或 14**:本机 3200 扫 db 0 的 pending,e2e 用 db 14。共用会抢棒甚至打到真 CLI。eval 进出各 `FLUSHDB` 一次,别把真数据放 db 13。
+23. **e2e / eval 公共接线只许一份**:起子进程、`waitFor`、`killHard`、读写线程都在 `scripts/lib/harness.ts`。再复制一份就会像 `smoke.ts` 漏 audit、`e2e-server.ts` 复制生产接线那样漂。
+24. **记分板空格子从 0 变 1 必须改期望**:「什么都没干就交棒」现在没人拦,期望是 0。哪天平台真拦住了,`pnpm eval` 会因「期望 0 实际 1」非 0 退出,逼人来改期望,不许放宽断言装绿。
+25. **反向验补问要 rebuild shared**:eval 子进程走 `@meowbase/shared` 的 dist。只改 `src/a2a.ts` 不 `pnpm --filter @meowbase/shared build`,补问还在,记分板假绿。第一跳忘了行首 `@` 走的是 `hadInlineHint` / `hasDiff`,只把 `wasRelay` 改成 `return false` 不够,要等效关掉整个 `shouldNudgeExit`。
 
 ## 常见操作
 

@@ -9,7 +9,8 @@
     "test": "pnpm -r test",
     "smoke": "pnpm --filter @meowbase/api build && tsx scripts/smoke.ts",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

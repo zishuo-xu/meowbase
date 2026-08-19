@@ -37,17 +37,18 @@
 
 ## 不做(本篇)
 
-- 不做 eval 打分(通过率/跳数/掉球/花费的 before-after)。下一篇。
+- 不做 eval 打分(通过率/跳数/掉球/花费的 before-after)。平台兜住率见 [failure-mode-eval.md](failure-mode-eval.md)。
 - 不做多 provider 矩阵(gemini / opencode 的 fake)。先只走 claude 协议这一条链。
 - 不动 `executeTurn` 和任何协议语义;fake CLI 只待在 `scripts/fixtures/`。
 
 ## 入口
 
 - `packages/api/src/app.ts` — `startApp`:生产 / e2e / smoke 共用启动接线;`listen` 成功之后才 `startPendingRunner()`
+- `scripts/lib/harness.ts` — e2e / eval 共用的起子进程、waitFor、killHard、读写封装
 - `scripts/e2e.ts` — CI 整机自检(fake CLI,不花钱):完整接力链 + 杀进程续跑 + 绑不上端口不抢租约
 - `scripts/e2e-server.ts` — e2e 拉起的 API 子进程(调 `startApp`,不传 `configPath`,不读、不写 `meowbase.config.json`;用环境变量覆盖 bin/端口)
 - `scripts/fixtures/fake-claude-writer.mjs` — 写手 fake(claude stream-json,行首 `@闪闪`)
 - `scripts/fixtures/fake-gemini-reviewer.mjs` — 审查官 fake(gemini stream-json,命令+结果 + 单独一行「通过」)
 - `tsconfig.scripts.json` + `pnpm typecheck:scripts` — 把 `scripts/` 纳入类型检查
 - `scripts/smoke.ts` — 真实 CLI 冒烟(不进 CI);调 `startApp`(仓库根 `configPath` + 临时 `workdirBase`)
-- CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts` 与 `pnpm e2e`
+- CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts`、`pnpm e2e`；记分板见 [failure-mode-eval.md](failure-mode-eval.md)
