@@ -34,7 +34,9 @@ export async function settleTurn(input: {
     });
   }
 
-  const waiting = (await context.stores.threads.get(threadId))?.pendingHop;
+  const pending = (await context.stores.threads.get(threadId))?.pendingHop;
+  // 槽里还是刚跑完的那一棒 ≠ 下一棒已写下;要等下一棒才跳过审查
+  const waiting = Boolean(pending && pending.id !== lastAssistant.hopId);
   const holding = Boolean(parseHoldExit(lastOutput.content ?? ''));
   if (lastOutput.status === 'completed' && !waiting && !holding) {
     try {

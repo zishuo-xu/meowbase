@@ -261,6 +261,11 @@ export function formatHoldCommandDoneNote(input: {
     .join('\n');
 }
 
+/** 半截助手消息:进程死在这一跳没写完。 */
+export function formatHopInterruptedNote(): string {
+  return '平台重启,这一跳没写完';
+}
+
 /** 开机/收尸捡到等跑 hop:命令不重跑,只告诉人/猫平台重启了。 */
 export function formatHoldCommandRestartNote(command: string): string {
   const cmd = clipBody(command, 60);

@@ -15,6 +15,7 @@ import {
   formatHoldCommandRestartNote,
   formatHoldCommandRestartWakePrompt,
   formatHoldCommandWakePrompt,
+  formatHopInterruptedNote,
   formatPickupCommand,
   formatExitNudgeNote,
   formatExitNudgePrompt,
@@ -306,6 +307,12 @@ describe('parseHoldExit', () => {
       timedOut: false,
       previousOutput: '等跑 npm test',
     })).toContain('命令跑完');
+  });
+
+  it('半截 hop 被重启打断:写明这一跳没写完', () => {
+    const note = formatHopInterruptedNote();
+    expect(note).toContain('平台重启');
+    expect(note).toContain('没写完');
   });
 
   it('重启捡到等跑:说没跑完,不说跑完了', () => {

@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在没有设计中。上一刀 [durable-relay.md](durable-relay.md) 已落地。
+`设计中` 同时最多一篇。现在没有设计中。上一刀 [hop-commit-then-clear.md](hop-commit-then-clear.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -36,3 +36,4 @@
 | [live-sync.md](live-sync.md) | 已落地 | 续跑产出即时推到前端 |
 | [review-conclusion.md](review-conclusion.md) | 已落地 | 只认真正的结论段 |
 | [durable-relay.md](durable-relay.md) | 已落地 | 接力不怕重启 |
+| [hop-commit-then-clear.md](hop-commit-then-clear.md) | 已落地 | 跑完落库再清那一棒 |

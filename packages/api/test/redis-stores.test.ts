@@ -32,6 +32,7 @@ describe('Redis 存储', () => {
     await threads.setSession(thread.id, 'claude', 'sess-9');
     expect((await threads.get(thread.id))?.sessions.claude).toBe('sess-9');
     await threads.setPendingHop(thread.id, {
+      id: `hop-${Date.now()}`,
       to: 'gemini',
       from: 'claude',
       task: '请审查',
@@ -78,6 +79,46 @@ describe('Redis 存储', () => {
     await threads.releasePendingHopLease(other.id, 'alive');
     await threads.delete(thread.id);
     await threads.delete(other.id);
+  });
+
+  it('clearPendingHopIfSame:同 id 才清;无 id 旧记录 hydrate 补上', async () => {
+    if (!redis) return;
+    const threads = createThreadStore(redis);
+    const thread = await threads.create({
+      title: `redis-clear-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    const hop = {
+      id: `hop-a-${Date.now()}`,
+      to: 'gemini' as const,
+      from: 'claude' as const,
+      task: '请审查',
+      goal: '写 add.ts',
+      previousOutput: '写完了',
+      visited: ['claude' as const],
+      firstAgent: 'claude' as const,
+      hop: 1,
+    };
+    await threads.setPendingHop(thread.id, hop);
+    expect(await threads.clearPendingHopIfSame(thread.id, 'hop-other')).toBe(false);
+    expect((await threads.get(thread.id))?.pendingHop?.id).toBe(hop.id);
+    expect(await threads.clearPendingHopIfSame(thread.id, hop.id)).toBe(true);
+    expect((await threads.get(thread.id))?.pendingHop).toBeUndefined();
+
+    await redis.hset(`thread:${thread.id}`, 'pendingHop', JSON.stringify({
+      to: 'gemini',
+      from: 'claude',
+      task: '请审查',
+      goal: '写 add.ts',
+      previousOutput: '写完了',
+      visited: ['claude'],
+      firstAgent: 'claude',
+      hop: 1,
+    }));
+    const hydrated = await threads.get(thread.id);
+    expect(hydrated?.pendingHop?.id).toBeTruthy();
+    expect(hydrated?.pendingHop?.to).toBe('gemini');
+    await threads.delete(thread.id);
   });
 
   it('线程 repo 绑定写入并回读', async () => {

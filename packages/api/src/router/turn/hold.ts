@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import {
   formatHoldCommandDoneNote,
@@ -36,6 +37,7 @@ export async function finishHoldCommandThenWake(input: {
   });
   await context.stores.threads.setPendingHop(threadId, {
     ...pending,
+    id: randomUUID(),
     from: pending.to,
     task: formatHoldCommandWakePrompt({
       command: pending.holdCommand,

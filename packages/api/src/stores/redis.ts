@@ -46,6 +46,15 @@ end
 return 0
 `;
 
+/** 比独立 pendingHopId 字段,避免 Lua 里 cjson.decode。写 hop 时一起写这个字段。 */
+const CLEAR_PENDING_HOP_IF_SAME = `
+if redis.call('hget', KEYS[1], 'pendingHopId') == ARGV[1] then
+  redis.call('hdel', KEYS[1], 'pendingHop', 'pendingHopId')
+  return 1
+end
+return 0
+`;
+
 export class RedisThreadStore implements ThreadStore {
   constructor(private readonly redis: Redis) {}
 
@@ -89,6 +98,22 @@ export class RedisThreadStore implements ThreadStore {
     return thread;
   }
 
+  /** 旧记录没有 id 时补一个并写回,开机扫才不会炸,清棒才对得上。 */
+  private async hydratePendingHop(
+    threadId: string,
+    raw: string,
+    storedId?: string,
+  ): Promise<PendingHop> {
+    const hop = JSON.parse(raw) as PendingHop;
+    if (hop.id) return hop;
+    hop.id = storedId || randomUUID();
+    await this.redis.hset(threadKey(threadId), {
+      pendingHop: JSON.stringify(hop),
+      pendingHopId: hop.id,
+    });
+    return hop;
+  }
+
   private async hydrate(id: string): Promise<Thread | null> {
     const raw = await this.redis.hgetall(threadKey(id));
     if (!raw.id) return null;
@@ -99,7 +124,7 @@ export class RedisThreadStore implements ThreadStore {
       workdir: raw.workdir ?? '',
       sessions: JSON.parse(raw.sessions ?? '{}') as Partial<Record<AgentId, string>>,
       ...(raw.pendingHop
-        ? { pendingHop: JSON.parse(raw.pendingHop) as PendingHop }
+        ? { pendingHop: await this.hydratePendingHop(id, raw.pendingHop, raw.pendingHopId) }
         : {}),
       ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
@@ -131,10 +156,20 @@ export class RedisThreadStore implements ThreadStore {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     if (hop) {
-      await this.redis.hset(threadKey(threadId), 'pendingHop', JSON.stringify(hop));
+      await this.redis.hset(threadKey(threadId), {
+        pendingHop: JSON.stringify(hop),
+        pendingHopId: hop.id,
+      });
     } else {
-      await this.redis.hdel(threadKey(threadId), 'pendingHop');
+      await this.redis.hdel(threadKey(threadId), 'pendingHop', 'pendingHopId');
     }
+  }
+
+  async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const n = await this.redis.eval(CLEAR_PENDING_HOP_IF_SAME, 1, threadKey(threadId), hopId);
+    return n === 1;
   }
 
   async claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
@@ -184,6 +219,7 @@ export class RedisMessageStore implements MessageStore {
       content: input.content,
       status: input.status,
       sessionId: input.sessionId,
+      hopId: input.hopId,
       usage: input.usage,
       error: input.error,
       createdAt: new Date().toISOString(),

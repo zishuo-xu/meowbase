@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { killHoldCommand } from '../services/hold-command.js';
 import {
   formatEscalatedBallNote,
+  formatHopInterruptedNote,
   isPlaceholderTitle,
   shouldResumePending,
   parseEvidenceRefs,
@@ -203,31 +204,65 @@ export async function resumePendingTurn(input: {
   thread.workdir = resolve(thread.workdir);
   const pending = thread.pendingHop;
   const roster = await loadRoster(context);
-  await context.stores.threads.setPendingHop(threadId, null);
   turnLog('pending follow', { thread: threadId, to: pending.to });
-  const lastResult = await runSegment(
-    context,
-    thread,
-    { agentId: pending.to, text: pending.goal },
-    input.refs ?? [],
-    new Set<AgentId>(),
-    createWriteQueue(),
-    roster.catalog,
-    roster.team,
-    roster.maxDepth,
-    pending,
-  );
-  return settleTurn({
-    threadId,
-    context,
-    thread,
-    learn: input.learn,
-    lastResult,
-    writeQueue: createWriteQueue(),
-    catalog: roster.catalog,
-    team: roster.team,
-    refs: input.refs ?? [],
-  });
+
+  let lastResult: SegmentRunResult | undefined;
+  try {
+    const history = await context.stores.messages.list(threadId);
+    const forHop = history.filter((m) => m.role === 'assistant' && m.hopId === pending.id);
+    // 补问会让同一棒产出两条消息:认最后一条完成的才是这一跳的结果
+    const completed = forHop.filter((m) => m.status === 'completed').at(-1);
+    const streaming = forHop.filter((m) => m.status === 'streaming');
+    if (completed) {
+      lastResult = {
+        lastAssistant: completed,
+        lastOutput: {
+          sessionId: completed.sessionId ?? '',
+          content: completed.content,
+          status: completed.status,
+          usage: completed.usage,
+          error: completed.error,
+        },
+        visited: new Set<AgentId>([...pending.visited, pending.to]),
+        firstAgent: pending.firstAgent,
+      };
+    } else {
+      for (const stale of streaming) {
+        await context.stores.messages.patch(threadId, stale.id, {
+          status: 'failed',
+          error: formatHopInterruptedNote(),
+        });
+      }
+      lastResult = await runSegment(
+        context,
+        thread,
+        { agentId: pending.to, text: pending.goal },
+        input.refs ?? [],
+        new Set<AgentId>(),
+        createWriteQueue(),
+        roster.catalog,
+        roster.team,
+        roster.maxDepth,
+        pending,
+      );
+    }
+    return await settleTurn({
+      threadId,
+      context,
+      thread,
+      learn: input.learn,
+      lastResult,
+      writeQueue: createWriteQueue(),
+      catalog: roster.catalog,
+      team: roster.team,
+      refs: input.refs ?? [],
+    });
+  } finally {
+    // 有产出才清:崩在模型里(没 lastResult)留下给开机重跑;失败但已落库的清掉,避免开机死循环
+    if (lastResult) {
+      await context.stores.threads.clearPendingHopIfSame(threadId, pending.id);
+    }
+  }
 }
 
 /** 平台自己把 pending 跟完,直到没下一跳、升级、或链深用尽。 */

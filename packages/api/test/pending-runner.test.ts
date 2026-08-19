@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
 import { gitInit } from '../src/services/git.js';
+import { resumePendingTurn } from '../src/router/execute-turn.js';
 import {
   createPendingRunner,
   type PendingRunner,
@@ -28,6 +30,7 @@ function stubAgent(agentId: AgentId, reply: string, sessionId = `sess-${agentId}
 
 function sampleHop(overrides: Partial<PendingHop> = {}): PendingHop {
   return {
+    id: randomUUID(),
     to: 'opencode',
     from: 'claude',
     task: '请审查',
@@ -276,6 +279,150 @@ describe('pending-runner', () => {
     expect(messages.some((m) => m.content.includes('跑完:'))).toBe(false);
     expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
     rmSync(workdirBase, { recursive: true, force: true });
+  });
+
+  it('跑模型期间 pendingHop 还在槽里', async () => {
+    const stores = createMemoryStores();
+    let release!: () => void;
+    const blocked = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered!: () => void;
+    const started = new Promise<void>((r) => {
+      entered = r;
+    });
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          entered();
+          await blocked;
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const hop = sampleHop();
+    await stores.threads.setPendingHop(thread.id, hop);
+    const runner = makeRunner({ stores, registry });
+    const running = runner.run(thread.id);
+    await started;
+    expect((await stores.threads.get(thread.id))?.pendingHop?.id).toBe(hop.id);
+    release();
+    await running;
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+  });
+
+  it('hop 跑完且不再交棒则清掉 pendingHop', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      stubAgent('opencode', '审查通过'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.threads.setPendingHop(thread.id, sampleHop());
+    const runner = makeRunner({ stores, registry });
+    await runner.run(thread.id);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+  });
+
+  it('这一跳又交棒时只清自己,槽里留下下一棒', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return { sessionId: 's2', content: '看完了。\n@gemini 请审查边界', status: 'completed' };
+        },
+      },
+      stubAgent('gemini', '不该本轮出场'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const hop = sampleHop();
+    await stores.threads.setPendingHop(thread.id, hop);
+    await resumePendingTurn({
+      threadId: thread.id,
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    const next = (await stores.threads.get(thread.id))?.pendingHop;
+    expect(next?.to).toBe('gemini');
+    expect(next?.id).toBeTruthy();
+    expect(next?.id).not.toBe(hop.id);
+  });
+
+  it('半截 streaming 消息:sweep 标 failed 后重跑', async () => {
+    const stores = createMemoryStores();
+    let calls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls += 1;
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const hop = sampleHop();
+    await stores.threads.setPendingHop(thread.id, hop);
+    await stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: 'opencode',
+      content: '半截',
+      status: 'streaming',
+      hopId: hop.id,
+    });
+    const runner = makeRunner({ stores, registry });
+    await runner.sweep();
+    expect(calls).toBe(1);
+    const messages = await stores.messages.list(thread.id);
+    const stale = messages.find((m) => m.content === '半截');
+    expect(stale?.status).toBe('failed');
+    expect(stale?.error).toContain('平台重启');
+    expect(stale?.error).toContain('没写完');
+    expect(
+      messages.filter((m) => m.role === 'assistant' && m.agentId === 'opencode' && m.status === 'completed'),
+    ).toHaveLength(1);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+  });
+
+  it('已有 completed 同 hopId 则不再调模型,仍清棒', async () => {
+    const stores = createMemoryStores();
+    let calls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls += 1;
+          return { sessionId: 's2', content: '不该再来', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const hop = sampleHop();
+    await stores.threads.setPendingHop(thread.id, hop);
+    await stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: 'opencode',
+      content: '审查通过',
+      status: 'completed',
+      hopId: hop.id,
+    });
+    const runner = makeRunner({ stores, registry });
+    await runner.sweep();
+    expect(calls).toBe(0);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    const assistants = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'assistant' && m.agentId === 'opencode',
+    );
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]?.content).toBe('审查通过');
   });
 
   it('stop 清掉 interval,不再扫', async () => {

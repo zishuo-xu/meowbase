@@ -13,6 +13,7 @@ export async function runAgentTurn(
   prompt: string,
   systemPrompt: string | undefined,
   writeQueue: WriteQueue,
+  hopId?: string,
 ): Promise<{ assistant: Message; output: AgentTurnOutput; content: string }> {
   const service = context.registry.get(currentAgent);
   if (!service) throw new Error(`没有可用的 agent: ${currentAgent}`);
@@ -24,6 +25,7 @@ export async function runAgentTurn(
       agentId: currentAgent,
       content: '',
       status: 'streaming',
+      hopId,
     }),
   );
 

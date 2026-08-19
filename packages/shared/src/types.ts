@@ -4,6 +4,8 @@ export const AGENT_IDS: readonly AgentId[] = ['claude', 'gemini', 'opencode'];
 
 /** 已交棒、下一跳还没跑。线程内最多一条。 */
 export interface PendingHop {
+  /** 这一棒的身份:跑完只清自己,重跑用它认消息 */
+  id: string;
   to: AgentId;
   from: AgentId;
   task: string;
@@ -70,6 +72,8 @@ export interface Message {
   content: string;
   status: MessageStatus;
   sessionId?: string;
+  /** 这一跳属于哪一棒;重跑时用来认半截/已完成的助手消息 */
+  hopId?: string;
   usage?: TokenUsage;
   error?: string;
   createdAt: string;

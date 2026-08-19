@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   buildSystemPrompt,
   displayName,
@@ -48,6 +49,7 @@ async function rememberHoldCommand(input: {
   const command = parseHoldCommand(input.prevContent);
   if (!command) return;
   const pendingHop: PendingHop = {
+    id: randomUUID(),
     to: input.currentAgent,
     from: input.currentAgent,
     task: command,
@@ -136,6 +138,7 @@ export async function runSegment(
       prompt,
       systemPrompt,
       writeQueue,
+      resume?.id,
     );
     lastAssistant = hopResult.assistant;
     lastOutput = hopResult.output;
@@ -269,6 +272,7 @@ export async function runSegment(
     const relayFiles = await listHandoffFiles(thread.workdir);
     const relayTarget: AgentId = handoff.target;
     const pendingHop: PendingHop = {
+      id: randomUUID(),
       to: relayTarget,
       from: currentAgent,
       task: handoff.task,

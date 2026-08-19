@@ -86,6 +86,7 @@ export {
   formatHoldCommandRestartNote,
   formatHoldCommandRestartWakePrompt,
   formatHoldCommandWakePrompt,
+  formatHopInterruptedNote,
   formatPickupCommand,
   isDroppedBallNote,
   isEscalatedBallNote,

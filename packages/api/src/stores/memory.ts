@@ -63,12 +63,20 @@ export class InMemoryThreadStore implements ThreadStore {
     return thread;
   }
 
+  private ensureHopId(thread: Thread): Thread {
+    if (thread.pendingHop && !thread.pendingHop.id) {
+      thread.pendingHop.id = randomUUID();
+    }
+    return thread;
+  }
+
   async get(id: string): Promise<Thread | null> {
-    return this.threads.get(id) ?? null;
+    const thread = this.threads.get(id);
+    return thread ? this.ensureHopId(thread) : null;
   }
 
   async list(): Promise<Thread[]> {
-    return [...this.threads.values()];
+    return [...this.threads.values()].map((t) => this.ensureHopId(t));
   }
 
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {
@@ -82,6 +90,14 @@ export class InMemoryThreadStore implements ThreadStore {
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     if (hop) thread.pendingHop = hop;
     else delete thread.pendingHop;
+  }
+
+  async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (thread.pendingHop?.id !== hopId) return false;
+    delete thread.pendingHop;
+    return true;
   }
 
   async claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
@@ -131,6 +147,7 @@ export class InMemoryMessageStore implements MessageStore {
       content: input.content,
       status: input.status,
       sessionId: input.sessionId,
+      hopId: input.hopId,
       usage: input.usage,
       error: input.error,
       createdAt: new Date().toISOString(),

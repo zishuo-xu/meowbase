@@ -49,6 +49,7 @@ async function abandonHoldCommand(threadId: string, context: TurnContext): Promi
   });
   await context.stores.threads.setPendingHop(threadId, {
     ...pending,
+    id: randomUUID(),
     from: pending.to,
     task: formatHoldCommandRestartWakePrompt({
       command: pending.holdCommand,

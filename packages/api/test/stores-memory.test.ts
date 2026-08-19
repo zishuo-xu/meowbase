@@ -57,6 +57,28 @@ describe('内存存储', () => {
     expect(await threads.delete('不存在')).toBe(false);
   });
 
+  it('clearPendingHopIfSame:同 id 才清,不同 id 不动槽', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'clear', primaryAgentId: 'claude' });
+    const hop = {
+      id: 'hop-a',
+      to: 'opencode' as const,
+      from: 'claude' as const,
+      task: '请审查',
+      goal: '写 add.ts',
+      previousOutput: '写完了',
+      visited: ['claude' as const],
+      firstAgent: 'claude' as const,
+      hop: 1,
+    };
+    await threads.setPendingHop(thread.id, hop);
+    expect(await threads.clearPendingHopIfSame(thread.id, 'hop-other')).toBe(false);
+    expect((await threads.get(thread.id))?.pendingHop?.id).toBe('hop-a');
+    expect(await threads.clearPendingHopIfSame(thread.id, 'hop-a')).toBe(true);
+    expect((await threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect(await threads.clearPendingHopIfSame(thread.id, 'hop-a')).toBe(false);
+  });
+
   it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: 'lease', primaryAgentId: 'claude' });
