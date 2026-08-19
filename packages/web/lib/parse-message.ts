@@ -18,17 +18,27 @@ export interface ParsedMessage {
 
 const APPROVAL_PATTERN =
   /[📋🤖] 审批卡片 (ap_[a-f0-9]{8})(?:\(写:(\S+) → 审:(\S+)\))?[\s\S]*?改动:([^\n]*)[\s\S]*?审查意见:([\s\S]*?)(?:\n回复 |\n✅ |$)/;
+/** kind 在、卡片套话改了时仍抠 id / 写审 / 改动 / 意见 */
+const APPROVAL_FIELDS_PATTERN =
+  /(ap_[a-f0-9]{8})(?:\(写:(\S+) → 审:(\S+)\))?[\s\S]*?改动:([^\n]*)[\s\S]*?审查意见:([\s\S]*?)(?:\n回复 |\n✅ |$)/;
 const EVIDENCE_PATTERN =
   /💡 建议沉淀为证据:「([^」]*)」[\s\S]*?#confirm (ev_[a-f0-9]{8})/;
 const RECEIPT_PATTERN = /^[✅⛔⚠️]/;
 const PROTOCOL_USER_PATTERN = /^(#approve|#reject|#confirm)\b/;
 const APPROVAL_RECEIPT_PATTERN = /^(✅ 已批准并落地|⛔ 已打回)/;
 
-export function parseMessage(message: { role: string; content: string }): ParsedMessage {
+export function parseMessage(message: {
+  role: string;
+  content: string;
+  systemKind?: string;
+}): ParsedMessage {
   if (message.role === 'system') {
-    const approval = message.content.match(APPROVAL_PATTERN);
+    const approvalKind =
+      message.systemKind === 'approval-pending' || message.systemKind === 'approval-applied';
+    const approval = message.content.match(approvalKind ? APPROVAL_FIELDS_PATTERN : APPROVAL_PATTERN);
     if (approval?.[1]) {
-      const autoApplied = message.content.includes('已自动批准');
+      const autoApplied =
+        message.systemKind === 'approval-applied' || message.content.includes('已自动批准');
       return {
         kind: 'approval',
         approvalId: approval[1],
@@ -54,7 +64,11 @@ export function parseMessage(message: { role: string; content: string }): Parsed
   return { kind: 'text', text: message.content };
 }
 
-export function isHiddenChatMessage(message: { role: string; content: string }): boolean {
+export function isHiddenChatMessage(message: {
+  role: string;
+  content: string;
+  systemKind?: string;
+}): boolean {
   const content = message.content.trim();
   if (message.role === 'user' && PROTOCOL_USER_PATTERN.test(content)) return true;
   if (message.role === 'system' && APPROVAL_RECEIPT_PATTERN.test(content)) return true;

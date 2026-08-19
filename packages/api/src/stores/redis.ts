@@ -227,6 +227,12 @@ export class RedisMessageStore implements MessageStore {
       usage: input.usage,
       error: input.error,
       createdAt: new Date().toISOString(),
+      ...(input.role === 'system'
+        ? {
+            systemKind: input.systemKind,
+            ...(input.systemMeta ? { systemMeta: input.systemMeta } : {}),
+          }
+        : {}),
     };
     const all = await this.readAll(input.threadId);
     all.push(message);

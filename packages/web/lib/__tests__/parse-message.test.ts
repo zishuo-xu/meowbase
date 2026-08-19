@@ -57,6 +57,18 @@ describe('parseMessage', () => {
     expect(parseMessage({ role: 'user', content: 'hi' }).kind).toBe('text');
     expect(parseMessage({ role: 'assistant', content: 'hello' }).kind).toBe('text');
   });
+
+  it('有 approval-pending kind 时改掉卡片套话仍解析为待确认', () => {
+    const parsed = parseMessage({
+      role: 'system',
+      systemKind: 'approval-pending',
+      content:
+        '卡片 ap_a1b2c3d4(写:claude → 审:opencode)\n改动:x.txt | 1 +\n审查意见:通过\n回复 #approve ap_a1b2c3d4 批准',
+    });
+    expect(parsed.kind).toBe('approval');
+    expect(parsed.approvalId).toBe('ap_a1b2c3d4');
+    expect(parsed.approvalStatus).toBe('pending');
+  });
 });
 
 describe('isHiddenChatMessage', () => {

@@ -121,6 +121,24 @@ describe('内存存储', () => {
     expect((await messages.list(thread.id)).map((m) => m.id)).toEqual([m1.id, m2.id]);
   });
 
+  it('系统消息 round-trip 保留 systemKind/systemMeta', async () => {
+    const { threads, messages } = createMemoryStores();
+    const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });
+    const m = await messages.append({
+      threadId: thread.id,
+      role: 'system',
+      content: '🤝 接力:墨墨 → 团团',
+      status: 'completed',
+      systemKind: 'relay',
+      systemMeta: { from: 'claude', to: 'opencode' },
+    });
+    expect(m.systemKind).toBe('relay');
+    expect(m.systemMeta).toEqual({ from: 'claude', to: 'opencode' });
+    expect(await messages.get(thread.id, m.id)).toEqual(m);
+    expect((await messages.list(thread.id))[0]?.systemKind).toBe('relay');
+    expect((await messages.list(thread.id))[0]?.systemMeta).toEqual({ from: 'claude', to: 'opencode' });
+  });
+
   it('patch 更新消息字段', async () => {
     const { threads, messages } = createMemoryStores();
     const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });

@@ -9,6 +9,8 @@ export type {
   Message,
   MessageRole,
   MessageStatus,
+  SystemKind,
+  SystemMeta,
   Skill,
   PendingHop,
   Thread,

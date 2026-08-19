@@ -7,6 +7,8 @@ import type {
   Message,
   PendingHop,
   Skill,
+  SystemKind,
+  SystemMeta,
   Thread,
   ThreadRepo,
 } from '@meowbase/shared';
@@ -38,18 +40,32 @@ export interface ThreadStore {
   delete(id: string): Promise<boolean>;
 }
 
+type AppendBase = {
+  threadId: string;
+  agentId?: AgentId;
+  content: string;
+  status: Message['status'];
+  sessionId?: string;
+  hopId?: string;
+  usage?: Message['usage'];
+  error?: string;
+};
+
+/** role: system 必须带 kind,避免新写入点忘打标。user/assistant 禁止带 kind。 */
+export type AppendMessageInput =
+  | (AppendBase & {
+      role: 'system';
+      systemKind: SystemKind;
+      systemMeta?: SystemMeta;
+    })
+  | (AppendBase & {
+      role: 'user' | 'assistant';
+      systemKind?: never;
+      systemMeta?: never;
+    });
+
 export interface MessageStore {
-  append(input: {
-    threadId: string;
-    role: Message['role'];
-    agentId?: AgentId;
-    content: string;
-    status: Message['status'];
-    sessionId?: string;
-    hopId?: string;
-    usage?: Message['usage'];
-    error?: string;
-  }): Promise<Message>;
+  append(input: AppendMessageInput): Promise<Message>;
   get(threadId: string, messageId: string): Promise<Message | null>;
   list(threadId: string): Promise<Message[]>;
   deleteAll(threadId: string): Promise<void>;

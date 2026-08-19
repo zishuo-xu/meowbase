@@ -31,6 +31,7 @@ export async function handleSystemCommand(input: {
       role: 'system',
       content: reply,
       status: 'completed',
+      systemKind: 'notice',
     });
   }
 
@@ -54,6 +55,7 @@ export async function handleSystemCommand(input: {
       role: 'system',
       content: reply,
       status: 'completed',
+      systemKind: card ? 'approval-applied' : 'notice',
     });
   }
 
@@ -66,6 +68,7 @@ export async function handleSystemCommand(input: {
       role: 'system',
       content: formatFreezeBallNote(),
       status: 'completed',
+      systemKind: 'freeze',
     });
   }
 
@@ -81,6 +84,7 @@ export async function handleSystemCommand(input: {
       role: 'system',
       content: reply,
       status: 'completed',
+      systemKind: 'notice',
     });
   }
 

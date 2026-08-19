@@ -83,6 +83,7 @@ export async function runReviewFixThenCard(input: {
           role: 'system',
           content: `🤝 审查:${displayName(writerAgentId, catalog)} → ${displayName(reviewerAgentId, catalog)}`,
           status: 'completed',
+          systemKind: 'notice',
         }),
       );
       const reviewHop = await runAgentTurn(
@@ -110,6 +111,8 @@ export async function runReviewFixThenCard(input: {
           role: 'system',
           content: `🤝 打回:${displayName(reviewerAgentId, catalog)} → ${displayName(writerAgentId, catalog)}`,
           status: 'completed',
+          systemKind: 'relay',
+          systemMeta: { from: reviewerAgentId, to: writerAgentId },
         }),
       );
       const writerStored = thread.sessions[writerAgentId]
@@ -191,5 +194,6 @@ export async function runReviewFixThenCard(input: {
           ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n⚠️ 结论不算通过:没有本轮验证证据（命令+结果）。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
           : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
     status: 'completed',
+    systemKind: autoApplied ? 'approval-applied' : 'approval-pending',
   });
 }

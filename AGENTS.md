@@ -83,7 +83,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
-- 测试:`pnpm test`(shared 134 + api 212 + web 137 ≈ 483);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
+- **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
+- 测试:`pnpm test`(shared 134 + api 214 + web 146 ≈ 494);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 

@@ -173,6 +173,32 @@ describe('Redis 存储', () => {
     await threads.delete(thread.id);
     expect(await messages.list(thread.id)).toEqual([]);
   });
+
+  it('系统消息 round-trip 保留 systemKind/systemMeta', async () => {
+    if (!redis) return;
+    const threads = createThreadStore(redis);
+    const messages = createMessageStore(redis);
+    const thread = await threads.create({
+      title: `redis-kind-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    const m = await messages.append({
+      threadId: thread.id,
+      role: 'system',
+      content: '🤝 接力:墨墨 → 团团',
+      status: 'completed',
+      systemKind: 'relay',
+      systemMeta: { from: 'claude', to: 'opencode' },
+    });
+    const loaded = await messages.get(thread.id, m.id);
+    expect(loaded?.systemKind).toBe('relay');
+    expect(loaded?.systemMeta).toEqual({ from: 'claude', to: 'opencode' });
+    const listed = await messages.list(thread.id);
+    expect(listed[0]?.systemKind).toBe('relay');
+    expect(listed[0]?.systemMeta).toEqual({ from: 'claude', to: 'opencode' });
+    await messages.deleteAll(thread.id);
+    await threads.delete(thread.id);
+  });
 });
 
 describe('Redis Profile/Evidence 存储', () => {

@@ -76,12 +76,12 @@ export function MessageBubble({
 
   if (message.role === 'system') {
     const text = parsed.text ?? message.content;
-    if (isDroppedBallNote(text) && onPassBall && agents && agents.length > 0) {
+    if (isDroppedBallNote(message) && onPassBall && agents && agents.length > 0) {
       return (
         <DroppedBallBlock text={text} agents={agents} onPass={onPassBall} onSpeak={onSpeak} />
       );
     }
-    const relay = parseRelayNote(text);
+    const relay = parseRelayNote(message);
     if (relay && relay.details.length > 0) {
       return <RelayNoteBlock headline={relay.headline} details={relay.details} />;
     }

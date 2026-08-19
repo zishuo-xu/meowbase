@@ -356,4 +356,78 @@ describe('describeBall', () => {
     expect(isDroppedBallNote('⚠️ 本轮已中止。球还在地上:点下面交给下一只')).toBe(true);
     expect(formatPickupCommand('闪闪')).toBe('@闪闪 接着做');
   });
+
+  it('有 kind 时改掉文案顶栏仍认掉球', () => {
+    const view = describeBall(
+      [{ role: 'system', content: '球掉地上了', systemKind: 'dropped' }],
+      false,
+      nameOf,
+    );
+    expect(view.tone).toBe('ground');
+    expect(view.text).toContain('球掉地上了');
+  });
+
+  it('有 kind 时改掉文案顶栏仍认拉闸', () => {
+    expect(
+      describeBall(
+        [{ role: 'system', content: '停了,罐子收了。等你说话。', systemKind: 'freeze' }],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '已拉闸，等人开口', tone: 'human' });
+  });
+
+  it('有 kind 时改掉文案顶栏仍认待批准', () => {
+    expect(
+      describeBall(
+        [{ role: 'system', content: '改动等人点头 ap_deadbeef', systemKind: 'approval-pending' }],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('有 kind 时改掉文案顶栏仍认持球', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '等 测试跑完', status: 'completed' },
+          { role: 'system', content: '先搁着:墨墨。开口再叫。', systemKind: 'hold' },
+        ],
+        false,
+        nameOf,
+      ).tone,
+    ).toBe('cat');
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '等 测试跑完', status: 'completed' },
+          { role: 'system', content: '先搁着:墨墨。开口再叫。', systemKind: 'hold' },
+        ],
+        false,
+        nameOf,
+      ).text,
+    ).not.toBe('球在墨墨手上');
+  });
+
+  it('接力带 systemMeta.to 时时间线拿到 agentId', () => {
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写完了', status: 'completed' },
+          {
+            role: 'system',
+            content: '🤝 接力:墨墨 → 闪闪',
+            systemKind: 'relay',
+            systemMeta: { from: 'claude', to: 'gemini' },
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual([
+      { name: '墨墨', agentId: 'claude', status: 'done' },
+      { name: '闪闪', agentId: 'gemini', status: 'active' },
+    ]);
+  });
 });

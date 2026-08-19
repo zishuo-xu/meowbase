@@ -34,6 +34,7 @@ export async function finishHoldCommandThenWake(input: {
       timedOut: result.timedOut,
     }),
     status: 'completed',
+    systemKind: 'hold-command-done',
   });
   await context.stores.threads.setPendingHop(threadId, {
     ...pending,

@@ -155,6 +155,12 @@ export class InMemoryMessageStore implements MessageStore {
       usage: input.usage,
       error: input.error,
       createdAt: new Date().toISOString(),
+      ...(input.role === 'system'
+        ? {
+            systemKind: input.systemKind,
+            ...(input.systemMeta ? { systemMeta: input.systemMeta } : {}),
+          }
+        : {}),
     };
     const list = this.listRaw(input.threadId);
     list.push(message);

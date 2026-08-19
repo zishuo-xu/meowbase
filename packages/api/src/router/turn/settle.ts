@@ -31,6 +31,7 @@ export async function settleTurn(input: {
       role: 'system',
       content: `💡 建议沉淀为证据:「${draft.title}」\n回复 #confirm ${draft.id} 确认`,
       status: 'completed',
+      systemKind: 'notice',
     });
   }
 

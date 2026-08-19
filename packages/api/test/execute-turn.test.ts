@@ -1219,6 +1219,8 @@ describe('executeTurn 多角色协作', () => {
     expect(note?.content).toContain('墨墨 → 团团');
     expect(note?.content).toContain('用户目标:');
     expect(note?.content).toContain('任务: 请审查这段代码');
+    expect(note?.systemKind).toBe('relay');
+    expect(note?.systemMeta).toEqual({ from: 'claude', to: 'opencode' });
   });
 
   it('每一跳都注入身份和团队纪律,不因已有 session 漏掉', async () => {

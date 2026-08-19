@@ -46,6 +46,7 @@ async function abandonHoldCommand(threadId: string, context: TurnContext): Promi
     role: 'system',
     content: formatHoldCommandRestartNote(pending.holdCommand),
     status: 'completed',
+    systemKind: 'hold-command-restart',
   });
   await context.stores.threads.setPendingHop(threadId, {
     ...pending,

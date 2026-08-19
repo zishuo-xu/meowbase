@@ -124,6 +124,7 @@ export async function executeTurn(input: {
         role: 'system',
         content: formatEscalatedBallNote('你', '收回了下一棒'),
         status: 'completed',
+        systemKind: 'escalated',
       });
     }
   }
@@ -135,6 +136,7 @@ export async function executeTurn(input: {
       role: 'system',
       content: '⚠️ 没有可执行的任务文本',
       status: 'completed',
+      systemKind: 'notice',
     });
   }
 
@@ -175,6 +177,7 @@ export async function executeTurn(input: {
       role: 'system',
       content: '⚠️ 没有可执行的任务文本',
       status: 'completed',
+      systemKind: 'notice',
     });
   }
 

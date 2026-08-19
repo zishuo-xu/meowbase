@@ -196,6 +196,7 @@ export async function runSegment(
             role: 'system',
             content: formatExitNudgeNote(displayName(currentAgent, catalog)),
             status: 'completed',
+            systemKind: 'exit-nudge',
           }),
         );
         turnLog('a2a nudge', { thread: thread.id, from: currentAgent });
@@ -248,6 +249,7 @@ export async function runSegment(
             role: 'system',
             content: `💡 ${labels.join('、')} 写在句中不会交接 — 请另起一行、行首写 @名字 再跟任务`,
             status: 'completed',
+            systemKind: 'routing-hint',
           }),
         );
       }
@@ -265,6 +267,7 @@ export async function runSegment(
           role: 'system',
           content: `⚠️ 接力链已达上限(${maxDepth}),停止交接`,
           status: 'completed',
+          systemKind: 'notice',
         }),
       );
       break;
@@ -296,6 +299,8 @@ export async function runSegment(
           previousOutput: prevContent,
         }),
         status: 'completed',
+        systemKind: 'relay',
+        systemMeta: { from: currentAgent, to: relayTarget },
       });
     });
     turnLog('a2a defer', {
@@ -316,6 +321,7 @@ export async function runSegment(
         role: 'system',
         content: formatAbortedBallNote(),
         status: 'completed',
+        systemKind: 'aborted',
       }),
     );
   } else if (lastOutput.status === 'failed' || lastOutput.status === 'terminated') {
@@ -326,6 +332,7 @@ export async function runSegment(
         role: 'system',
         content: formatFailedBallNote(),
         status: 'completed',
+        systemKind: 'failed',
       }),
     );
   } else if (lastOutput.status === 'completed' && stop) {
@@ -349,12 +356,15 @@ export async function runSegment(
       if (stop.kind !== 'escalated' && stop.kind !== 'held') {
         turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'dropped-ball' });
       }
+      const systemKind =
+        stop.kind === 'escalated' ? 'escalated' : stop.kind === 'held' ? 'hold' : 'dropped';
       await writeQueue(() =>
         context.stores.messages.append({
           threadId: thread.id,
           role: 'system',
           content: note,
           status: 'completed',
+          systemKind,
         }),
       );
     }

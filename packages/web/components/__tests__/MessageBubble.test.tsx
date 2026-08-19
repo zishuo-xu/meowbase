@@ -43,6 +43,30 @@ describe('MessageBubble', () => {
     expect(screen.getByText(/任务: 请审查 add.ts/)).toBeTruthy();
   });
 
+  it('有 dropped kind 时改掉文案仍可点交给某只猫', () => {
+    const onPass = vi.fn();
+    render(
+      <MessageBubble
+        onPassBall={onPass}
+        agents={[
+          { id: 'claude', name: '墨墨' },
+          { id: 'gemini', name: '闪闪' },
+        ]}
+        message={{
+          id: 'm-ball-kind',
+          threadId: 't',
+          role: 'system',
+          content: '球掉地上了',
+          status: 'completed',
+          createdAt: '',
+          systemKind: 'dropped',
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '交给闪闪' }));
+    expect(onPass).toHaveBeenCalledWith('闪闪');
+  });
+
   it('球还在地上可点交给某只猫', () => {
     const onPass = vi.fn();
     const onSpeak = vi.fn();

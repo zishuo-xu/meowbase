@@ -50,6 +50,8 @@ export interface MessageDto {
   error?: string;
   activities?: ToolActivity[];
   thinking?: string;
+  systemKind?: string;
+  systemMeta?: { from?: string; to?: string };
 }
 
 export interface ToolActivity {

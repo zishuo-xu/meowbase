@@ -44,6 +44,30 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 
 export type MessageStatus = 'streaming' | 'completed' | 'failed' | 'terminated';
 
+/** 平台自己写的系统消息种类。一个 formatter / 写入语义一个 kind。老消息没有。 */
+export type SystemKind =
+  | 'relay'
+  | 'dropped'
+  | 'escalated'
+  | 'hold'
+  | 'hold-command-done'
+  | 'hold-command-restart'
+  | 'freeze'
+  | 'aborted'
+  | 'failed'
+  | 'exit-nudge'
+  | 'approval-pending'
+  | 'approval-applied'
+  | 'routing-hint'
+  /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
+  | 'notice';
+
+/** 渲染球权/时间线真正要用的字段。只放 from/to。 */
+export interface SystemMeta {
+  from?: AgentId;
+  to?: AgentId;
+}
+
 export interface TokenUsage {
   inputTokens?: number;
   outputTokens?: number;
@@ -81,6 +105,10 @@ export interface Message {
   activities?: ToolActivity[];
   /** 模型思考过程,与对用户说的话分开 */
   thinking?: string;
+  /** 平台系统消息的类型;老消息没有,前端走散文兜底 */
+  systemKind?: SystemKind;
+  /** 接力等场景的 from/to,用 agentId 不是显示名 */
+  systemMeta?: SystemMeta;
 }
 
 export type EvidenceKind = 'fact' | 'lesson' | 'decision';

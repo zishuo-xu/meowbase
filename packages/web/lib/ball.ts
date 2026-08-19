@@ -13,6 +13,8 @@ export interface BallMessage {
   agentId?: string;
   content: string;
   status?: string;
+  systemKind?: string;
+  systemMeta?: { from?: string; to?: string };
 }
 
 /** 线程顶常驻:球在谁手上。只读消息,不改路由。 */
@@ -39,29 +41,30 @@ export function describeBall(
   // 对齐 clowder:句中 @ 的系统提示不算出口,从后往前找最后有意义的一条
   for (const last of [...messages].reverse()) {
     if (!last.content?.trim()) continue;
-    if (last.role === 'system' && isRoutingHint(last.content)) continue;
+    if (last.role === 'system' && isRoutingHintMessage(last)) continue;
     if (last.role === 'user' && last.content.trim().startsWith('#')) continue;
 
-    if (last.role === 'system' && last.content.includes('球还在地上')) {
+    if (last.role === 'system' && isDroppedBallNote(last)) {
       return { text: last.content.replace(/^⚠️\s*/, ''), tone: 'ground' };
     }
-    if (last.role === 'system' && (last.content.includes('接力:') || last.content.includes('打回:'))) {
-      const to = hopTargetName(last.content);
-      return { text: to ? `球在${to}手上` : '接力中', tone: 'cat' };
+    if (last.role === 'system' && isRelayBallNote(last)) {
+      const toId = last.systemMeta?.to;
+      const to = toId ? nameOf(toId) : hopTargetName(last.content);
+      return { text: to ? `球在${to}手上` : '接力中', tone: 'cat', ...(toId ? { agentId: toId } : {}) };
     }
-    if (last.role === 'system' && isAppliedApprovalNote(last.content)) {
+    if (last.role === 'system' && isAppliedApprovalMessage(last)) {
       return { text: '已落地，等人开口', tone: 'human' };
     }
-    if (last.role === 'system' && isPendingApprovalNote(last.content)) {
+    if (last.role === 'system' && isPendingApprovalMessage(last)) {
       return { text: '球在人手里', tone: 'human' };
     }
-    if (last.role === 'system' && isFreezeBallNote(last.content)) {
+    if (last.role === 'system' && isFreezeBallMessage(last)) {
       return { text: '已拉闸，等人开口', tone: 'human' };
     }
-    if (last.role === 'system' && isEscalatedBallNote(last.content)) {
+    if (last.role === 'system' && isEscalatedBallMessage(last)) {
       return { text: last.content.replace(/^📋\s*/, ''), tone: 'human' };
     }
-    if (last.role === 'system' && isHoldBallNote(last.content)) {
+    if (last.role === 'system' && isHoldBallMessage(last)) {
       return { text: last.content.replace(/^⏳\s*/, '').replace(/。人开口即取消。$/, ''), tone: 'cat' };
     }
     if (last.role === 'assistant' && last.agentId) {
@@ -90,8 +93,18 @@ export function describeBall(
   return { text: '等人开口', tone: 'human' };
 }
 
-export function isDroppedBallNote(text: string): boolean {
-  return text.includes('球还在地上');
+type Kinded = Pick<BallMessage, 'content' | 'systemKind'>;
+
+export function isDroppedBallNote(source: string | Kinded): boolean {
+  if (typeof source === 'string') return source.includes('球还在地上');
+  if (
+    source.systemKind === 'dropped' ||
+    source.systemKind === 'aborted' ||
+    source.systemKind === 'failed'
+  ) {
+    return true;
+  }
+  return source.content.includes('球还在地上');
 }
 
 export function isEscalatedBallNote(text: string): boolean {
@@ -115,9 +128,39 @@ function isAppliedApprovalNote(text: string): boolean {
   return text.includes('已批准并落地') || text.includes('已自动批准');
 }
 
-/** 句中 @ 提示(对齐 clowder F064):给人看用法,不算球在谁手上。 */
-function isRoutingHint(text: string): boolean {
-  return text.includes('写在句中不会交接');
+function isRoutingHintMessage(message: Kinded): boolean {
+  return message.systemKind === 'routing-hint' || message.content.includes('写在句中不会交接');
+}
+
+function isRelayBallNote(message: Kinded): boolean {
+  if (message.systemKind === 'relay') return true;
+  return message.content.includes('接力:') || message.content.includes('打回:');
+}
+
+function isAppliedApprovalMessage(message: Kinded): boolean {
+  return message.systemKind === 'approval-applied' || isAppliedApprovalNote(message.content);
+}
+
+function isPendingApprovalMessage(message: Kinded): boolean {
+  return message.systemKind === 'approval-pending' || isPendingApprovalNote(message.content);
+}
+
+function isFreezeBallMessage(message: Kinded): boolean {
+  return message.systemKind === 'freeze' || isFreezeBallNote(message.content);
+}
+
+function isEscalatedBallMessage(message: Kinded): boolean {
+  return message.systemKind === 'escalated' || isEscalatedBallNote(message.content);
+}
+
+function isHoldBallMessage(message: Kinded): boolean {
+  return message.systemKind === 'hold' || isHoldBallNote(message.content);
+}
+
+/** 时间线只跟「下一棒」,打回不另开一跳(和改造前一致)。 */
+function isForwardRelayMessage(message: Kinded): boolean {
+  if (message.systemKind === 'relay') return !message.content.includes('打回:');
+  return message.content.includes('接力:');
 }
 
 function isReviewerRole(role?: string): boolean {
@@ -202,12 +245,17 @@ export function describeRelayTimeline(
       touch(nameOf(message.agentId), status, message.agentId);
       continue;
     }
-    if (message.role === 'system' && message.content.includes('接力:')) {
-      const to = relayTargetName(message.content);
-      if (to) touch(to, 'active');
+    if (message.role === 'system' && isForwardRelayMessage(message)) {
+      const toId = message.systemMeta?.to;
+      if (toId) {
+        touch(nameOf(toId), 'active', toId);
+      } else {
+        const to = relayTargetName(message.content);
+        if (to) touch(to, 'active');
+      }
       continue;
     }
-    if (message.role === 'system' && message.content.includes('球还在地上')) {
+    if (message.role === 'system' && isDroppedBallNote(message)) {
       const last = hops[hops.length - 1];
       if (last && last.status === 'done') last.status = 'dropped';
     }
