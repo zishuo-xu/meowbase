@@ -81,6 +81,22 @@ describe('Redis 存储', () => {
     await threads.delete(other.id);
   });
 
+  it('forceClaimPendingHop 覆盖别人的租约,新主人能续旧主人不能', async () => {
+    if (!redis) return;
+    const threads = createThreadStore(redis);
+    const thread = await threads.create({
+      title: `redis-force-lease-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    expect(await threads.claimPendingHop(thread.id, 'old-runner', 60_000)).toBe(true);
+    await threads.forceClaimPendingHop(thread.id, 'new-runner', 60_000);
+    expect(await threads.renewPendingHopLease(thread.id, 'old-runner', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'new-runner', 60_000)).toBe(true);
+    expect(await threads.claimPendingHop(thread.id, 'third', 60_000)).toBe(false);
+    await threads.releasePendingHopLease(thread.id, 'new-runner');
+    await threads.delete(thread.id);
+  });
+
   it('clearPendingHopIfSame:同 id 才清;无 id 旧记录 hydrate 补上', async () => {
     if (!redis) return;
     const threads = createThreadStore(redis);

@@ -57,6 +57,13 @@ import {
 } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** 只有绑上端口的那个进程才该叫:首扫会强抢死者租约 */
+    startPendingRunner: () => void;
+  }
+}
+
 export interface ApiDeps {
   stores: {
     threads: ThreadStore;
@@ -76,9 +83,7 @@ export interface ApiDeps {
   configPath?: string;
   persistConfig?: () => void;
   rebuildAdapter?: (spec: AgentSpec) => void;
-  /** 开机扫一遍还带着 pendingHop 的线程;测试默认关 */
-  resumePendingOnBoot?: boolean;
-  /** 收尸 interval;0 或不传且未开机扫则不挂定时器 */
+  /** 收尸 interval;0 则只在 startPendingRunner 时扫一次,不挂定时器 */
   hopSweepIntervalMs?: number;
 }
 
@@ -462,19 +467,17 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     };
   }
 
-  const resumeOnBoot = deps.resumePendingOnBoot ?? false;
-  const sweepIntervalMs = deps.hopSweepIntervalMs ?? (resumeOnBoot ? HOP_SWEEP_INTERVAL_MS : 0);
   const runner = createPendingRunner({
     threads: stores.threads,
     messages: stores.messages,
     createContext: createTurnContext,
     leaseTtlMs: HOP_LEASE_TTL_MS,
     leaseRenewMs: HOP_LEASE_RENEW_MS,
-    sweepIntervalMs,
+    sweepIntervalMs: deps.hopSweepIntervalMs ?? HOP_SWEEP_INTERVAL_MS,
   });
-  app.addHook('onReady', async () => {
-    if (resumeOnBoot || sweepIntervalMs > 0) runner.start();
-  });
+  // 开机首扫会强抢租约,所以只能等真正绑上端口再叫:onReady 在 EADDRINUSE 时也会跑完,
+  // 那种起不来的进程去强抢,会把旧进程正在跑的一跳跑两遍。绑上端口才是「我是唯一实例」。
+  app.decorate('startPendingRunner', () => runner.start());
   app.addHook('onClose', async () => {
     runner.stop();
   });

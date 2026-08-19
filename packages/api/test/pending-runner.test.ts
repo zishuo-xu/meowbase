@@ -125,6 +125,29 @@ describe('pending-runner', () => {
     expect(calls).toBe(1);
   });
 
+  it('开机扫强抢死者租约', async () => {
+    const stores = createMemoryStores();
+    const logs: string[] = [];
+    let calls = 0;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls += 1;
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.threads.setPendingHop(thread.id, sampleHop());
+    await stores.threads.claimPendingHop(thread.id, 'dead-runner', 60_000);
+    const runner = makeRunner({ stores, registry, logs });
+    await runner.sweep({ steal: true });
+    expect(calls).toBe(1);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect(logs.some((line) => line.includes('resume steal'))).toBe(true);
+  });
+
   it('别人占着租约时 sweep 不跑这一棒', async () => {
     const stores = createMemoryStores();
     let calls = 0;

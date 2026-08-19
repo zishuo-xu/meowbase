@@ -106,6 +106,10 @@ export class InMemoryThreadStore implements ThreadStore {
     return true;
   }
 
+  async forceClaimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<void> {
+    this.leases.set(threadId, { owner: runnerId, expiresAt: Date.now() + ttlMs });
+  }
+
   async renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
     const cur = this.liveLease(threadId);
     if (!cur || cur.owner !== runnerId) return false;

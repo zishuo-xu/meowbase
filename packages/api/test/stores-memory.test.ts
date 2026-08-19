@@ -98,6 +98,16 @@ describe('内存存储', () => {
     expect(await threads.claimPendingHop(other.id, 'alive', 60_000)).toBe(true);
   });
 
+  it('forceClaimPendingHop 覆盖别人的租约,新主人能续旧主人不能', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'force-lease', primaryAgentId: 'claude' });
+    expect(await threads.claimPendingHop(thread.id, 'old-runner', 60_000)).toBe(true);
+    await threads.forceClaimPendingHop(thread.id, 'new-runner', 60_000);
+    expect(await threads.renewPendingHopLease(thread.id, 'old-runner', 60_000)).toBe(false);
+    expect(await threads.renewPendingHopLease(thread.id, 'new-runner', 60_000)).toBe(true);
+    expect(await threads.claimPendingHop(thread.id, 'third', 60_000)).toBe(false);
+  });
+
   it('追加/读取/列表消息', async () => {
     const { threads, messages } = createMemoryStores();
     const thread = await threads.create({ title: 't', primaryAgentId: 'claude' });

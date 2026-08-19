@@ -177,6 +177,10 @@ export class RedisThreadStore implements ThreadStore {
     return reply === 'OK';
   }
 
+  async forceClaimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<void> {
+    await this.redis.set(hopLeaseKey(threadId), runnerId, 'PX', ttlMs);
+  }
+
   async renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean> {
     const n = await this.redis.eval(RENEW_HOP_LEASE, 1, hopLeaseKey(threadId), runnerId, String(ttlMs));
     return n === 1;

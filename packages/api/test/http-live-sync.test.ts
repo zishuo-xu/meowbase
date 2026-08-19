@@ -182,12 +182,50 @@ describe('HTTP pending-runner 生命周期', () => {
       agents: DEFAULT_AGENTS,
       defaultAgentId: 'claude',
       a2aMaxDepth: 3,
-      resumePendingOnBoot: true,
       hopSweepIntervalMs: 40,
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
+    app.startPendingRunner();
     const started = Date.now();
     await app.close();
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('绑不上端口的进程不捡棒,也不抢活着那个的租约', async () => {
+    const stores = createMemoryStores();
+    await ensureSeededProfiles(stores.profiles);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude', workdirBase });
+    await stores.threads.setPendingHop(thread.id, {
+      id: 'hop-live',
+      to: 'gemini',
+      from: 'claude',
+      task: '请审查',
+      goal: '写个文件',
+      previousOutput: '写好了',
+      visited: ['claude'],
+      firstAgent: 'claude',
+      hop: 1,
+    });
+    // 旧进程正握着租约、正在跑这一棒
+    expect(await stores.threads.claimPendingHop(thread.id, 'live-runner', 60_000)).toBe(true);
+    const deps = {
+      stores,
+      registry: createAgentRegistry([writer, reviewer]),
+      workdirBase,
+      agents: DEFAULT_AGENTS,
+      defaultAgentId: 'claude' as const,
+      a2aMaxDepth: 3,
+      hopSweepIntervalMs: 20,
+    };
+    const live = await buildServer(deps);
+    await live.listen({ port: 0, host: '127.0.0.1' });
+    const port = (live.server.address() as AddressInfo).port;
+    const loser = await buildServer(deps);
+    await expect(loser.listen({ port, host: '127.0.0.1' })).rejects.toThrow();
+    await new Promise((r) => setTimeout(r, 80));
+    expect((await stores.threads.get(thread.id))?.pendingHop?.id).toBe('hop-live');
+    expect(await stores.threads.renewPendingHopLease(thread.id, 'live-runner', 60_000)).toBe(true);
+    await loser.close();
+    await live.close();
   });
 });

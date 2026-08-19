@@ -76,6 +76,8 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       return cleared;
     },
     claimPendingHop: (threadId, runnerId, ttlMs) => store.claimPendingHop(threadId, runnerId, ttlMs),
+    forceClaimPendingHop: (threadId, runnerId, ttlMs) =>
+      store.forceClaimPendingHop(threadId, runnerId, ttlMs),
     renewPendingHopLease: (threadId, runnerId, ttlMs) =>
       store.renewPendingHopLease(threadId, runnerId, ttlMs),
     releasePendingHopLease: (threadId, runnerId) => store.releasePendingHopLease(threadId, runnerId),

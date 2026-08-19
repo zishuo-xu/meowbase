@@ -51,8 +51,9 @@ const app = await buildServer({
   models: config.models,
   configPath,
   rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)),
-  resumePendingOnBoot: true,
 });
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 console.log(`meowbase api 已启动: http://localhost:${config.port}`);
+// 绑上端口之后才捡搁着的棒:抢不到端口的进程不该去强抢别人的租约
+app.startPendingRunner();

@@ -33,7 +33,7 @@ export interface PendingRunnerDeps {
 
 export interface PendingRunner {
   run(threadId: string, prepared?: PendingRunnerPrepared): Promise<void>;
-  sweep(): Promise<void>;
+  sweep(opts?: { steal?: boolean }): Promise<void>;
   start(): void;
   stop(): void;
 }
@@ -68,14 +68,27 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
   let timer: ReturnType<typeof setInterval> | undefined;
   let sweeping = false;
 
-  async function run(threadId: string, prepared?: PendingRunnerPrepared): Promise<void> {
+  async function run(
+    threadId: string,
+    prepared?: PendingRunnerPrepared,
+    steal = false,
+  ): Promise<void> {
     const runnerId = randomUUID();
-    const claimed = await deps.threads.claimPendingHop(threadId, runnerId, leaseTtlMs);
-    if (!claimed) {
-      prepared?.release?.();
-      return;
+    if (steal) {
+      await deps.threads.forceClaimPendingHop(threadId, runnerId, leaseTtlMs);
+    } else {
+      const claimed = await deps.threads.claimPendingHop(threadId, runnerId, leaseTtlMs);
+      if (!claimed) {
+        prepared?.release?.();
+        return;
+      }
     }
-    write(formatTurnLog('resume claim', { thread: threadId, runner: runnerId.slice(0, 8) }));
+    write(
+      formatTurnLog(steal ? 'resume steal' : 'resume claim', {
+        thread: threadId,
+        runner: runnerId.slice(0, 8),
+      }),
+    );
     let release: (() => void) | undefined;
     let renewTimer: ReturnType<typeof setInterval> | undefined;
     try {
@@ -108,7 +121,7 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
   }
 
   /** 一次只捡一棒:开机时几条线程都搁着棒,不要同时叫醒好几只猫。 */
-  async function sweep(): Promise<void> {
+  async function sweep(opts?: { steal?: boolean }): Promise<void> {
     if (sweeping) return;
     sweeping = true;
     try {
@@ -120,7 +133,7 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
           write(formatTurnLog('resume skip', { thread: thread.id, ageMs: Math.round(ageMs) }));
           continue;
         }
-        await run(thread.id);
+        await run(thread.id, undefined, opts?.steal);
       }
     } finally {
       sweeping = false;
@@ -135,7 +148,7 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
 
   function start(): void {
     stop();
-    void sweep();
+    void sweep({ steal: true });
     if (sweepIntervalMs) {
       timer = setInterval(() => {
         void sweep();

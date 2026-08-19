@@ -28,6 +28,8 @@ export interface ThreadStore {
   clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean>;
   /** 抢下这一棒的主人:抢到才跑,防止两个跑者跑同一 hop。 */
   claimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<boolean>;
+  /** 开机那一次强抢:单实例下没有活着的主人,死者的租约不该拦住续跑。 */
+  forceClaimPendingHop(threadId: string, runnerId: string, ttlMs: number): Promise<void>;
   /** 跑的时候续期;不是主人则 false。 */
   renewPendingHopLease(threadId: string, runnerId: string, ttlMs: number): Promise<boolean>;
   /** 跑完释放;不是主人则不动。 */
