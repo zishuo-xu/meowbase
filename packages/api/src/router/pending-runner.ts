@@ -36,7 +36,8 @@ export interface PendingRunnerDeps {
 export interface PendingRunner {
   run(threadId: string, prepared?: PendingRunnerPrepared): Promise<void>;
   sweep(opts?: { steal?: boolean }): Promise<void>;
-  start(): void;
+  /** 首扫(强抢)的 Promise;interval 照旧立刻挂上 */
+  start(): Promise<void>;
   stop(): void;
 }
 
@@ -171,15 +172,16 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
     timer = undefined;
   }
 
-  function start(): void {
+  function start(): Promise<void> {
     stop();
-    void sweep({ steal: true });
+    const first = sweep({ steal: true });
     if (sweepIntervalMs) {
       timer = setInterval(() => {
         void sweep();
       }, sweepIntervalMs);
       timer.unref();
     }
+    return first;
   }
 
   return { run, sweep, start, stop };

@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。现在没有设计中。上一刀 [e2e-harness.md](e2e-harness.md) 已落地。
+`设计中` 同时最多一篇。现在在做 [failure-mode-eval.md](failure-mode-eval.md)。上一刀 [e2e-harness.md](e2e-harness.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -41,3 +41,4 @@
 | [audit-trail.md](audit-trail.md) | 已落地 | 平台的决定留可查的存根 |
 | [quota-board.md](quota-board.md) | 已落地 | 按猫看 token 和花费 |
 | [e2e-harness.md](e2e-harness.md) | 已落地 | 整机自检:全链和崩溃恢复进 CI |
+| [failure-mode-eval.md](failure-mode-eval.md) | 设计中 | 坏毛病记分板:平台兜住率 |

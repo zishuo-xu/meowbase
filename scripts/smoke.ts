@@ -1,52 +1,20 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
-import { buildServer } from '../packages/api/src/http/server.js';
-import { agentSpec, loadConfig } from '../packages/api/src/config.js';
-import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
-import { createRedisStores } from '../packages/api/src/stores/factories.js';
-import { ensureSeededProfiles } from '../packages/api/src/stores/seeds.js';
-import { ClaudeAdapter } from '../packages/api/src/providers/claude.js';
-import { GeminiAdapter } from '../packages/api/src/providers/gemini.js';
-import { OpenCodeAdapter } from '../packages/api/src/providers/opencode.js';
-import { createAgentRegistry } from '../packages/api/src/providers/registry.js';
+import { join, resolve } from 'node:path';
+import { startApp } from '../packages/api/src/app.js';
 
-const config = loadConfig();
-const redis = createRedisClient(config.redisUrl);
-await assertStorageReady(redis);
-
-const stores = createRedisStores(redis, join(process.cwd(), 'skills'));
-await ensureSeededProfiles(stores.profiles);
-
+const repoRoot = resolve(import.meta.dirname, '..');
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-smoke-'));
-const claude = agentSpec(config, 'claude');
-const gemini = agentSpec(config, 'gemini');
-const opencode = agentSpec(config, 'opencode');
-const app = await buildServer({
-  stores,
-  registry: createAgentRegistry([
-    new ClaudeAdapter({ bin: claude.bin, timeoutMs: config.agentTimeoutMs }),
-    new GeminiAdapter({
-      bin: gemini.bin,
-      model: gemini.model,
-      timeoutMs: config.agentTimeoutMs,
-    }),
-    new OpenCodeAdapter({
-      bin: opencode.bin,
-      model: opencode.model,
-      timeoutMs: config.agentTimeoutMs,
-    }),
-  ]),
+
+// 真实名册:读仓库根配置。smoke 不调 PATCH,不会回写。
+const started = await startApp({
+  repoRoot,
+  configPath: resolve(repoRoot, 'meowbase.config.json'),
   workdirBase,
-  a2aMaxDepth: config.a2aMaxDepth,
-  defaultAgentId: config.defaultAgentId,
-  agents: config.agents,
+  host: '127.0.0.1',
+  port: 0,
 });
-await app.listen({ port: 0, host: '127.0.0.1' });
-app.startPendingRunner();
-const address = app.server.address() as AddressInfo;
-const baseUrl = `http://127.0.0.1:${address.port}`;
+const baseUrl = `http://127.0.0.1:${started.port}`;
 
 try {
   const createRes = await fetch(`${baseUrl}/api/threads`, {
@@ -96,7 +64,6 @@ try {
   console.log('review:', approvals[0]?.reviewComment);
   console.log('✅ 冒烟通过');
 } finally {
-  await app.close();
-  await redis.disconnect();
+  await started.close();
   rmSync(workdirBase, { recursive: true, force: true });
 }

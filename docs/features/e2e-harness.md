@@ -11,7 +11,7 @@
 - **功能**:push 一次,CI 就把「写手改文件 → 行首交棒 → 审查官下结论 → 审批卡」跑完,并且杀一次进程验证那一棒被捡回来。
 - **价值**:人不用每次开浏览器手动验;断言从「我们那次验过」变成「每次 push 都验」。
 - **愿景**:仍是邮差。不改协议、不给猫加能力,只把平台自己的行为架到可复验的位置。
-- **落点**:`scripts/`(fake CLI + e2e 入口)、`packages/api/src/app.ts`(`startApp`,生产和 e2e 共用接线)、`.github/workflows/ci.yml`、`tsconfig.scripts.json`。不进 `executeTurn`,不改 store 契约。
+- **落点**:`scripts/`(fake CLI + e2e 入口)、`packages/api/src/app.ts`(`startApp`,生产 / e2e / smoke 共用接线)、`.github/workflows/ci.yml`、`tsconfig.scripts.json`。不进 `executeTurn`,不改 store 契约。
 
 ## 为什么
 
@@ -25,14 +25,15 @@
 
 ## 怎么做
 
-1. 修 `scripts/smoke.ts`:改用 `createRedisStores`(含 audit),`listen` 成功之后调 `startPendingRunner()`。它继续是「真实 CLI、花钱、手动」那条路,不进 CI。
+1. 修 `scripts/smoke.ts`:也走 `startApp`(真实名册传仓库根 `configPath`,临时目录走可选 `workdirBase`)。它继续是「真实 CLI、花钱、手动」那条路,不进 CI。
 2. 加 `tsconfig.scripts.json`(extends `tsconfig.base.json`,include `scripts/` 与它引用的包源码),CI 加一步 `tsc --noEmit -p tsconfig.scripts.json`。
-3. 补 fake CLI:现有 `fake-claude-writer.mjs` 补一行行首 `@` 交棒;新增 fake 审查官,输出命令+结果和单独一行「通过」;两者支持用环境变量控制延时(给第 5 步留口)。
+3. 补 fake CLI:现有 `fake-claude-writer.mjs` 补一行行首 `@` 交棒;新增 fake 审查官,输出命令+结果和单独一行「通过」;两者支持用环境变量控制延时(给第 5、7 步留口)。
 4. 新增 `scripts/e2e.ts`:把 API 当子进程起(fake bin 走环境变量),建线程 → 发一条消息 → 轮询到链跑完 → 断言 relay 系统消息在、审批卡建了一张、审计动作顺序对、账本能加出 token。
 5. 崩溃一段:让 fake 审查官睡到一半时 `kill -9` 子进程,再起一个,断言那一棒被捡回来跑完、半截助手气泡标 `failed`、最终审批卡仍然只有一张(不重复建)。
 6. CI 加一步跑 `pnpm e2e`,用 fake bin,不花钱。
+7. 绑端口冲突一段(`runBindConflictPath`):先 `listen(0)` 拿一个空闲固定端口(避开 3200/3300),#1 占上并让审查官那一跳在跑,再起 #2 撞 EADDRINUSE。断言 #2 退出码非 0、`lease-steal` 没增加、#1 跑完后审批卡仍正好一张。
 
-验收:本地 `pnpm e2e` 全绿;CI 同样绿。反向验——把 `startApp` 里的 `startPendingRunner()` **注掉**,崩溃续跑那一段必须红(happy-path 不依赖开机扫棒,只看它绿看不出问题)。把调用挪到 `listen` 之前**盖不到**:e2e 用 `PORT=0`,总能绑上,扫棒照样发生。生产入口和 e2e 子进程都调 `startApp`,所以注掉这一刀对两处同时生效。`listen` 之后才捡棒这条不变量(EADDRINUSE 时不抢租约)要靠别的办法验,现有崩溃段验的是「开机有没有扫」。
+验收:本地 `pnpm e2e` 全绿;CI 同样绿。反向验现在盖住两半——把 `startApp` 里的 `startPendingRunner()` **注掉**,崩溃续跑那一段必须红(happy-path 不依赖开机扫棒,只看它绿看不出问题);把它**挪到 `listen` 之前**,绑冲突段必须红(`lease-steal` 增加:没起来的进程去抢了 #1 的棒)。`PORT=0` 永远绑得上,盖不到后一半。生产 / e2e / smoke 都调 `startApp`,所以这两刀对三处同时生效。
 
 ## 不做(本篇)
 
@@ -42,11 +43,11 @@
 
 ## 入口
 
-- `packages/api/src/app.ts` — `startApp`:生产和 e2e 共用启动接线;`listen` 成功之后才 `startPendingRunner()`
-- `scripts/e2e.ts` — CI 整机自检(fake CLI,不花钱):完整接力链 + 杀进程续跑
+- `packages/api/src/app.ts` — `startApp`:生产 / e2e / smoke 共用启动接线;`listen` 成功之后才 `startPendingRunner()`
+- `scripts/e2e.ts` — CI 整机自检(fake CLI,不花钱):完整接力链 + 杀进程续跑 + 绑不上端口不抢租约
 - `scripts/e2e-server.ts` — e2e 拉起的 API 子进程(调 `startApp`,不传 `configPath`,不读、不写 `meowbase.config.json`;用环境变量覆盖 bin/端口)
 - `scripts/fixtures/fake-claude-writer.mjs` — 写手 fake(claude stream-json,行首 `@闪闪`)
 - `scripts/fixtures/fake-gemini-reviewer.mjs` — 审查官 fake(gemini stream-json,命令+结果 + 单独一行「通过」)
 - `tsconfig.scripts.json` + `pnpm typecheck:scripts` — 把 `scripts/` 纳入类型检查
-- `scripts/smoke.ts` — 真实 CLI 冒烟(不进 CI);`createRedisStores` + `listen` 之后 `startPendingRunner()`
+- `scripts/smoke.ts` — 真实 CLI 冒烟(不进 CI);调 `startApp`(仓库根 `configPath` + 临时 `workdirBase`)
 - CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts` 与 `pnpm e2e`

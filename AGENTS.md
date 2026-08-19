@@ -33,7 +33,7 @@ packages/
 ├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流;启动接线在 `src/app.ts`
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
-scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI;子进程调 `startApp`)、smoke.ts(真实冒烟)、fixtures/(fake CLI)
+scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI;子进程调 `startApp`)、smoke.ts(真实冒烟,也调 `startApp`)、fixtures/(fake CLI)
 work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
@@ -45,7 +45,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 关键文件(按阅读顺序):
 1. `packages/api/src/router/execute-turn.ts` —— **心脏**（阶段在 `router/turn/`）。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 若有搁着的棒先续跑或清掉 → 多 @ 同题并行 → 每目标跑 A2A 接力链(交棒后记下 pending,该交棒没出口则再问同一只一次) → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
 2. `packages/api/src/router/pending-runner.ts` —— 交棒后那一棒谁接着跑:抢租约才跑、跑时续期、开机扫一遍、30 秒收尸。API 重启也不丢球
-3. `packages/api/src/app.ts` —— 生产和 e2e 共用启动接线(`startApp`):loadConfig → stores → registry → `listen` → **之后**才 `startPendingRunner()`。`index.ts` 与 `scripts/e2e-server.ts` 都调它,只用参数区分
+3. `packages/api/src/app.ts` —— 生产 / e2e / smoke 共用启动接线(`startApp`):loadConfig → stores → registry → `listen` → **之后**才 `startPendingRunner()`。`index.ts`、`scripts/e2e-server.ts` 与 `scripts/smoke.ts` 都调它,只用参数区分(`configPath` / `workdirBase` / host / 端口 / `rebuildAdapter`)
 4. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
 5. `packages/api/src/providers/` —— ClaudeAdapter / GeminiAdapter / OpenCodeAdapter,统一 `runTurn` 契约
 6. `packages/shared/src/` —— 所有解析/拼装纯函数,单测覆盖最全
@@ -112,8 +112,9 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 16. **写 fake CLI 别忘了可执行位**:`scripts/fixtures/` 下新加的 fake 若是 `644`,适配器 `spawn` 直接 `EACCES`,链会在那一跳静默失败(日志只有「启动失败」)。新文件 `chmod +x` 并确认 git 记的是 `100755`。
 17. **`pnpm e2e` 用 Redis db 14,不要改成 db 0**:本机 3200 的 API 也在扫 pending,共用一个 db 时它可能把 e2e 的棒抢走、甚至打到真 CLI 上花钱。e2e 进出各 `FLUSHDB` 一次,所以别把真数据放 db 14。
 18. **fake 写手的正文必须落在 claude 的 `result` 事件里**:`StreamAccumulator` 收到 `result` 会用它整段覆盖 assistant 增量。行首 `@` 只写在 assistant 事件里会被覆盖掉,交棒不成立。
-19. **e2e 必须验发货的那份接线**:API 启动顺序只许写在 `startApp` 一处。`index.ts` 和 `e2e-server.ts` 都调它,只用参数区分(`configPath` / host / 端口 / `rebuildAdapter`)。以前两份副本时,改生产入口的开机扫,`pnpm e2e` 照样绿——它验的是自己那份。happy-path 不依赖开机扫棒(POST 里的 `void runner.run()` 会把当轮 pending 跟完),反向验必须看崩溃续跑那一段。把 `startPendingRunner()` **注掉**崩溃段才会红;挪到 `listen` 之前盖不到(e2e 用 `PORT=0`,总能绑上)。`listen` 成功之后才捡棒(EADDRINUSE 时不抢租约)要靠别的办法验。见 [e2e-harness.md](docs/features/e2e-harness.md)。
+19. **e2e 必须验发货的那份接线**:API 启动顺序只许写在 `startApp` 一处。`index.ts`、`e2e-server.ts` 和 `smoke.ts` 都调它,只用参数区分(`configPath` / `workdirBase` / host / 端口 / `rebuildAdapter`)。以前两份副本时,改生产入口的开机扫,`pnpm e2e` 照样绿——它验的是自己那份。happy-path 不依赖开机扫棒(POST 里的 `void runner.run()` 会把当轮 pending 跟完),反向验分两半:把 `startPendingRunner()` **注掉**,崩溃续跑那一段红(开机没扫棒);把它挪到 `listen` **之前**,`runBindConflictPath` 红(`lease-steal` 会增加——绑不上端口的进程去抢了 #1 的棒)。`PORT=0` 永远绑得上,盖不到后一半,所以绑冲突段先 `listen(0)` 拿一个空闲固定端口(避开 3200/3300),#1 占上再起 #2。见 [e2e-harness.md](docs/features/e2e-harness.md)。
 20. **Redis 单测假绿**:`if (!redis) return` 会被 vitest 算 passed。没 Redis 时要用 `describe.skipIf` / `it.skipIf`(条件得在收集测试前就算好,所以先 `await ping` 再声明套件),输出必须是 skipped 不是 passed。
+21. **listen 失败必须让进程死干净**:`startApp` 在 `listen` 之前已经连了 Redis、建了 Fastify。撞 EADDRINUSE 若只把错误抛出去、不 `app.close()` + `redis.disconnect()`,ioredis 会把进程挂住,e2e 等不到非 0 退出码。`e2e-server` 也要 `process.exit(1)`。另外首扫必须 `await startPendingRunner()`:只 `void` 的话,反向把调用挪到 `listen` 之前,`process.exit` 会在 `lease-steal` 落库前把 #2 杀掉,绑冲突段假绿。
 
 ## 常见操作
 

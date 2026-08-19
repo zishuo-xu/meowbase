@@ -55,8 +55,8 @@ import { loadUsage } from '../services/usage.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
-    /** 只有绑上端口的那个进程才该叫:首扫会强抢死者租约 */
-    startPendingRunner: () => void;
+    /** 只有绑上端口的那个进程才该叫:首扫会强抢死者租约。返回首扫 Promise。 */
+    startPendingRunner: () => Promise<void>;
   }
 }
 

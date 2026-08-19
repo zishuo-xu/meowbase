@@ -20,6 +20,11 @@ export interface StartAppOptions {
   port?: number;
   /** 生产入口给 PATCH 名册后重建适配器;e2e 不需要 */
   rebuildAdapter?: boolean;
+  /**
+   * 有则用它当沙箱根,不读、不改 config 里的 workdirBase。
+   * 不传才按 repoRoot + config.workdirBase 解析(e2e 走这条,WORKDIR_BASE 已是绝对路径)。
+   */
+  workdirBase?: string;
 }
 
 export interface StartedApp {
@@ -30,14 +35,14 @@ export interface StartedApp {
 }
 
 /**
- * 生产和 e2e 共用的启动接线。
+ * 生产 / e2e / smoke 共用的启动接线。
  * `startPendingRunner()` 只在这里、且必须在 `listen` 成功之后——
  * 绑不上端口的进程不该去强抢别人的租约(onReady 在 EADDRINUSE 后照样会跑完)。
  */
 export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
   const config = loadConfig(process.env, opts.configPath ? { configPath: opts.configPath } : {});
   const skillsDir = resolve(opts.repoRoot, config.skillsDir);
-  const workdirBase = resolve(opts.repoRoot, config.workdirBase);
+  const workdirBase = opts.workdirBase ?? resolve(opts.repoRoot, config.workdirBase);
   mkdirSync(workdirBase, { recursive: true });
 
   const redis = createRedisClient(config.redisUrl);
@@ -65,12 +70,19 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
   });
 
   const listenPort = opts.port ?? config.port;
-  await app.listen({ port: listenPort, host: opts.host });
+  try {
+    await app.listen({ port: listenPort, host: opts.host });
+  } catch (err) {
+    // 绑不上就收摊退出:Redis 连接会把进程挂住,e2e 等不到非 0 退出码
+    await app.close().catch(() => undefined);
+    redis.disconnect();
+    throw err;
+  }
   const address = app.server.address() as AddressInfo | null;
   const bound = typeof address === 'object' && address ? address.port : listenPort;
 
   // 绑上端口之后才捡搁着的棒:抢不到端口的进程不该去强抢别人的租约
-  app.startPendingRunner();
+  await app.startPendingRunner();
 
   return {
     app,

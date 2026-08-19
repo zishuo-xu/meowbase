@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
@@ -15,6 +16,8 @@ const READY_RE = /E2E_API_READY (http:\/\/127\.0\.0\.1:\d+)/;
 const START_TIMEOUT_MS = 20_000;
 const POLL_TIMEOUT_MS = 30_000;
 const REVIEWER_CRASH_DELAY_MS = 8_000;
+const REVIEWER_BIND_DELAY_MS = 10_000;
+const FORBIDDEN_PORTS = new Set([3200, 3300]);
 
 interface ApiHandle {
   proc: ChildProcess;
@@ -62,13 +65,14 @@ function killHard(proc: ChildProcess): void {
   }
 }
 
-function startApi(opts: {
+function e2eEnv(opts: {
   workdirBase: string;
   reviewerDelayMs?: number;
-}): Promise<ApiHandle> {
+  port?: number;
+}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    PORT: '0',
+    PORT: String(opts.port ?? 0),
     REDIS_URL,
     WORKDIR_BASE: opts.workdirBase,
     SKILLS_DIR: resolve(root, 'skills'),
@@ -84,10 +88,17 @@ function startApi(opts: {
   if (opts.reviewerDelayMs && opts.reviewerDelayMs > 0) {
     env.FAKE_REVIEWER_DELAY_MS = String(opts.reviewerDelayMs);
   }
+  return env;
+}
 
+function startApi(opts: {
+  workdirBase: string;
+  reviewerDelayMs?: number;
+  port?: number;
+}): Promise<ApiHandle> {
   const proc = spawn('tsx', [serverPath], {
     cwd: root,
-    env,
+    env: e2eEnv(opts),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -335,6 +346,144 @@ async function runCrashPath(workdirBase: string): Promise<void> {
   }
 }
 
+function pickFreePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      server.close((err) => {
+        if (err) reject(err);
+        else if (!port || FORBIDDEN_PORTS.has(port)) {
+          reject(new Error(`探测到的端口不能用: ${port}`));
+        } else resolvePort(port);
+      });
+    });
+    server.on('error', reject);
+  });
+}
+
+async function pickFreePortRetry(tries = 5): Promise<number> {
+  let last: unknown;
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      return await pickFreePort();
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last instanceof Error ? last : new Error('拿不到空闲端口');
+}
+
+function startApiExpectBindFail(opts: {
+  workdirBase: string;
+  port: number;
+}): Promise<{ code: number | null; output: string }> {
+  const proc = spawn('tsx', [serverPath], {
+    cwd: root,
+    env: e2eEnv(opts),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+
+  return new Promise((resolveFail, reject) => {
+    let buf = '';
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killHard(proc);
+      reject(new Error(`#2 该因 EADDRINUSE 退出,却还活着\n${buf}`));
+    }, START_TIMEOUT_MS);
+
+    // #2 的 EADDRINUSE 是本段期望的结果,不转发到父进程 stderr:
+    // 绿色运行里躺一行 Error 会让人以为出事了。断言用的是 buf。
+    const onChunk = (chunk: Buffer) => {
+      const text = chunk.toString();
+      buf += text;
+      if (!settled && READY_RE.test(buf)) {
+        settled = true;
+        clearTimeout(timer);
+        killHard(proc);
+        reject(new Error(`#2 不该绑上端口(固定端口被抢走?)\n${buf}`));
+      }
+    };
+    proc.stdout?.on('data', onChunk);
+    proc.stderr?.on('data', onChunk);
+    proc.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+    proc.on('exit', (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolveFail({ code, output: buf || `signal=${signal}` });
+    });
+  });
+}
+
+function countAction(rows: AuditRow[], action: string): number {
+  return rows.filter((r) => r.action === action).length;
+}
+
+async function runBindConflictPath(workdirBase: string): Promise<void> {
+  const port = await pickFreePortRetry();
+  const first = await startApi({
+    workdirBase,
+    port,
+    reviewerDelayMs: REVIEWER_BIND_DELAY_MS,
+  });
+  const title = `e2e-bind-${Date.now()}`;
+  let threadId = '';
+  try {
+    threadId = await createThread(first.baseUrl, title);
+    await postMessage(first.baseUrl, threadId, '@墨墨 创建一个 hello.txt 文件');
+
+    await waitFor('pendingHop 已被 #1 租走、审查官在跑', async () => {
+      const threads = await json<Array<{ id: string; pendingHop?: { to?: string } }>>(
+        await fetch(`${first.baseUrl}/api/threads`),
+        'GET /threads',
+      );
+      const hopTo = threads.find((t) => t.id === threadId)?.pendingHop?.to;
+      const rows = await getMessages(first.baseUrl, threadId);
+      const running = rows.some(
+        (m) => m.role === 'assistant' && m.agentId === 'gemini' && m.status === 'streaming',
+      );
+      const audit = await getAudit(first.baseUrl, threadId);
+      const claimed = audit.some((r) => r.action === 'lease-claim');
+      return hopTo === 'gemini' && running && claimed ? true : undefined;
+    });
+
+    const stealsBefore = countAction(await getAudit(first.baseUrl, threadId), 'lease-steal');
+
+    const failed = await startApiExpectBindFail({ workdirBase, port });
+    if (failed.code === 0) {
+      throw new Error(`#2 退出码应为非 0,实际 0\n${failed.output}`);
+    }
+    if (!failed.output.includes('EADDRINUSE')) {
+      throw new Error(`#2 stderr 应有 EADDRINUSE,退出码=${failed.code}\n${failed.output}`);
+    }
+    console.log(`   (预期) #2 撞 EADDRINUSE 起不来,退出码 ${failed.code}`);
+
+    const stealsAfter = countAction(await getAudit(first.baseUrl, threadId), 'lease-steal');
+    if (stealsAfter !== stealsBefore) {
+      throw new Error(
+        `lease-steal 从 ${stealsBefore} 增到 ${stealsAfter}:绑不上端口的进程不该抢租约`,
+      );
+    }
+
+    await assertHappyChain(first.baseUrl, threadId);
+    console.log('✅ e2e bind-conflict');
+  } finally {
+    if (threadId) await deleteThread(first.baseUrl, threadId);
+    killHard(first.proc);
+    await sleep(200);
+  }
+}
+
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-e2e-'));
 const redis = createRedisClient(REDIS_URL);
 
@@ -343,6 +492,7 @@ try {
   await redis.flushdb();
   await runHappyPath(workdirBase);
   await runCrashPath(workdirBase);
+  await runBindConflictPath(workdirBase);
   console.log('✅ e2e 全绿');
 } finally {
   try {
