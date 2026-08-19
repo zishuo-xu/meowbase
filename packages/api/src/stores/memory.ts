@@ -5,6 +5,7 @@ import type {
   AgentId,
   AgentProfile,
   ApprovalCard,
+  AuditRow,
   EvidenceEntry,
   Message,
   PendingHop,
@@ -14,12 +15,15 @@ import type {
 } from '@meowbase/shared';
 import type {
   ApprovalStore,
+  AuditListQuery,
+  AuditStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
   SkillStore,
   ThreadStore,
 } from './ports.js';
+import { filterAuditRows } from './ports.js';
 
 export class InMemoryThreadStore implements ThreadStore {
   private readonly threads = new Map<string, Thread>();
@@ -337,5 +341,23 @@ export class InMemoryApprovalStore implements ApprovalStore {
     const updated: ApprovalCard = { ...card, status: 'applied' };
     this.cards.set(id, updated);
     return updated;
+  }
+}
+
+export class InMemoryAuditStore implements AuditStore {
+  private readonly rows: AuditRow[] = [];
+
+  async append(input: Omit<AuditRow, 'id' | 'ts'>): Promise<AuditRow> {
+    const row: AuditRow = {
+      ...input,
+      id: randomUUID(),
+      ts: new Date().toISOString(),
+    };
+    this.rows.unshift(row);
+    return row;
+  }
+
+  async list(query?: AuditListQuery): Promise<AuditRow[]> {
+    return filterAuditRows(this.rows, query);
   }
 }

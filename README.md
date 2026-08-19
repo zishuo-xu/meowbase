@@ -44,6 +44,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 | `stores/ports.ts` | 业务只依赖接口,Redis 可换 |
 | 名册 `handoffTo` / `handoff` | 交给谁、何时交,写在配置里,不写 `if (墨墨)` |
 | Provider 适配器 | claude / gemini / opencode,统一 `runTurn` |
+| 审计流水 | 平台的决定在 store 边界自动落存根,`GET /api/audit?threadId=` 可查:谁交给谁、哪张卡被批过、重启后哪一棒被重跑 |
 
 定位:墨墨主架构师、闪闪审查官、团团执行者。写完默认交闪闪审。演示步骤见 [docs/DEMO.md](docs/DEMO.md)。A2A 怎么传信息、怎么隔离上下文，见 [docs/A2A.md](docs/A2A.md)。设计理由与面试提纲见 [docs/features/](docs/features/)。
 

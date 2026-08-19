@@ -3,6 +3,9 @@ export type {
   AgentProfile,
   ApprovalCard,
   ApprovalStatus,
+  AuditAction,
+  AuditActor,
+  AuditRow,
   EvidenceEntry,
   EvidenceKind,
   EvidenceStatus,
@@ -71,6 +74,7 @@ export type {
   DroppedBallInput,
   ExitNudgeInput,
 } from './a2a.js';
+export { clipAuditSubject, AUDIT_SUBJECT_MAX } from './audit-subject.js';
 export {
   findInlineA2AMentions,
   findInlineEscalateTokens,

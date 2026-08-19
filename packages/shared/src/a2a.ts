@@ -126,7 +126,7 @@ function stripHandoffLines(text: string): string {
     .trim();
 }
 
-function clipBody(text: string, max = 1800): string {
+export function clipBody(text: string, max = 1800): string {
   const one = text.trim();
   if (one.length <= max) return one;
   return `${one.slice(0, max)}…`;

@@ -62,6 +62,7 @@ function makeRunner(input: {
   const runner = createPendingRunner({
     threads: input.stores.threads,
     messages: input.stores.messages,
+    audit: input.stores.audit,
     createContext: (): { context: TurnContext } => ({
       context: {
         stores: input.stores,
@@ -102,6 +103,8 @@ describe('pending-runner', () => {
     const messages = await stores.messages.list(thread.id);
     expect(messages.some((m) => m.role === 'assistant' && m.agentId === 'opencode')).toBe(true);
     expect(messages.filter((m) => m.role === 'user')).toHaveLength(0);
+    const auditActions = (await stores.audit.list({ threadId: thread.id })).map((r) => r.action);
+    expect(auditActions).toContain('lease-claim');
   });
 
   it('两个 run 并发只让模型跑一棒', async () => {
@@ -146,6 +149,9 @@ describe('pending-runner', () => {
     expect(calls).toBe(1);
     expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
     expect(logs.some((line) => line.includes('resume steal'))).toBe(true);
+    const stealRows = await stores.audit.list({ threadId: thread.id, action: 'lease-steal' });
+    expect(stealRows.length).toBeGreaterThan(0);
+    expect(stealRows[0]?.actor).toBe('platform');
   });
 
   it('别人占着租约时 sweep 不跑这一棒', async () => {
@@ -411,6 +417,7 @@ describe('pending-runner', () => {
       messages.filter((m) => m.role === 'assistant' && m.agentId === 'opencode' && m.status === 'completed'),
     ).toHaveLength(1);
     expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect((await stores.audit.list({ threadId: thread.id, action: 'hop-rerun' })).length).toBeGreaterThan(0);
   });
 
   it('已有 completed 同 hopId 则不再调模型,仍清棒', async () => {

@@ -3,14 +3,7 @@ import { resolve } from 'node:path';
 import { buildServer } from './http/server.js';
 import { loadConfig } from './config.js';
 import { assertStorageReady, createRedisClient } from './redis.js';
-import {
-  createApprovalStore,
-  createEvidenceStore,
-  createMessageStore,
-  createProfileStore,
-  createSkillStore,
-  createThreadStore,
-} from './stores/factories.js';
+import { createRedisStores } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
 import { createAdapter } from './providers/factory.js';
 import { createAgentRegistry } from './providers/registry.js';
@@ -27,14 +20,7 @@ mkdirSync(workdirBase, { recursive: true });
 const redis = createRedisClient(config.redisUrl);
 await assertStorageReady(redis);
 
-const stores = {
-  threads: createThreadStore(redis),
-  messages: createMessageStore(redis),
-  profiles: createProfileStore(redis),
-  evidence: createEvidenceStore(redis),
-  skills: createSkillStore(skillsDir),
-  approvals: createApprovalStore(redis),
-};
+const stores = createRedisStores(redis, skillsDir);
 await ensureSeededProfiles(stores.profiles);
 
 const registry = createAgentRegistry(

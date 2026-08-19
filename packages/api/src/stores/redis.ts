@@ -6,6 +6,7 @@ import type {
   AgentId,
   AgentProfile,
   ApprovalCard,
+  AuditRow,
   EvidenceEntry,
   Message,
   PendingHop,
@@ -14,11 +15,14 @@ import type {
 } from '@meowbase/shared';
 import type {
   ApprovalStore,
+  AuditListQuery,
+  AuditStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
   ThreadStore,
 } from './ports.js';
+import { AUDIT_GLOBAL_CAP, filterAuditRows } from './ports.js';
 
 function threadKey(id: string): string {
   return `thread:${id}`;
@@ -504,5 +508,45 @@ export class RedisApprovalStore implements ApprovalStore {
     const updated: ApprovalCard = { ...card, status: 'applied' };
     await this.write(updated);
     return updated;
+  }
+}
+
+function auditThreadKey(threadId: string): string {
+  return `audit:${threadId}`;
+}
+
+const AUDIT_ALL_KEY = 'audit:all';
+
+export class RedisAuditStore implements AuditStore {
+  constructor(private readonly redis: Redis) {}
+
+  async append(input: Omit<AuditRow, 'id' | 'ts'>): Promise<AuditRow> {
+    const row: AuditRow = {
+      ...input,
+      id: randomUUID(),
+      ts: new Date().toISOString(),
+    };
+    const json = JSON.stringify(row);
+    await this.redis
+      .multi()
+      .lpush(auditThreadKey(input.threadId), json)
+      .lpush(AUDIT_ALL_KEY, json)
+      .ltrim(AUDIT_ALL_KEY, 0, AUDIT_GLOBAL_CAP - 1)
+      .exec();
+    return row;
+  }
+
+  async list(query?: AuditListQuery): Promise<AuditRow[]> {
+    const key = query?.threadId ? auditThreadKey(query.threadId) : AUDIT_ALL_KEY;
+    const raw = await this.redis.lrange(key, 0, -1);
+    const rows: AuditRow[] = [];
+    for (const item of raw) {
+      try {
+        rows.push(JSON.parse(item) as AuditRow);
+      } catch {
+        // 坏行跳过,不当成整次 list 失败
+      }
+    }
+    return filterAuditRows(rows, query);
   }
 }

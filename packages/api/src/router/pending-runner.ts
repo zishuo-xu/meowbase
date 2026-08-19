@@ -4,7 +4,8 @@ import {
   formatHoldCommandRestartWakePrompt,
 } from '@meowbase/shared';
 import { clip, formatTurnLog } from '../services/turn-log.js';
-import type { MessageStore, ThreadStore } from '../stores/ports.js';
+import type { AuditStore, MessageStore, ThreadStore } from '../stores/ports.js';
+import { safeAppendAudit } from '../stores/audit-log.js';
 import { followPendingChain } from './execute-turn.js';
 import type { TurnContext } from './turn/types.js';
 
@@ -22,6 +23,7 @@ export interface PendingRunnerPrepared {
 export interface PendingRunnerDeps {
   threads: ThreadStore;
   messages: MessageStore;
+  audit: AuditStore;
   /** 每次跑一棒时现拼 TurnContext(HTTP 那份带 WS 回调和 AbortSignal)。 */
   createContext: (threadId: string) => PendingRunnerPrepared;
   log?: (line: string) => void;
@@ -90,6 +92,14 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
         runner: runnerId.slice(0, 8),
       }),
     );
+    const pending = (await deps.threads.get(threadId))?.pendingHop;
+    await safeAppendAudit(deps.audit, {
+      threadId,
+      actor: 'platform',
+      action: steal ? 'lease-steal' : 'lease-claim',
+      subject: steal ? '开机强抢租约' : '抢到租约',
+      meta: { runner: runnerId, hopId: pending?.id },
+    });
     let release: (() => void) | undefined;
     let renewTimer: ReturnType<typeof setInterval> | undefined;
     try {
@@ -111,6 +121,13 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
       if (renewTimer) clearInterval(renewTimer);
       release?.();
       await deps.threads.releasePendingHopLease(threadId, runnerId);
+      await safeAppendAudit(deps.audit, {
+        threadId,
+        actor: 'platform',
+        action: 'lease-release',
+        subject: '释放租约',
+        meta: { runner: runnerId },
+      });
     }
   }
 
@@ -132,6 +149,13 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
         const ageMs = await hopAgeMs(thread.id, thread.createdAt);
         if (staleAfterMs > 0 && ageMs > staleAfterMs) {
           write(formatTurnLog('resume skip', { thread: thread.id, ageMs: Math.round(ageMs) }));
+          await safeAppendAudit(deps.audit, {
+            threadId: thread.id,
+            actor: 'platform',
+            action: 'hop-skip-stale',
+            subject: '跳过搁太久的旧棒',
+            meta: { ageMs: Math.round(ageMs), hopId: thread.pendingHop?.id },
+          });
           continue;
         }
         await run(thread.id, undefined, opts?.steal);

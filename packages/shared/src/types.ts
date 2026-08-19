@@ -159,3 +159,37 @@ export interface ApprovalCard {
   rejectReason?: string;
   createdAt: string;
 }
+
+/** 谁做了这件事:猫 / 人 / 平台。 */
+export type AuditActor = AgentId | 'human' | 'platform';
+
+/**
+ * 平台决定的种类。系统消息复用 SystemKind,不再另造中文 action。
+ * 其余是 store 边界派生或不经 store 的租约/重跑。
+ */
+export type AuditAction =
+  | SystemKind
+  | 'user-say'
+  | 'hop-done'
+  | 'hop-failed'
+  | 'hop-rerun'
+  | 'approval-created'
+  | 'approval-approved'
+  | 'approval-rejected'
+  | 'approval-applied'
+  | 'lease-claim'
+  | 'lease-steal'
+  | 'lease-release'
+  | 'hop-skip-stale';
+
+/** 邮局收发存根:只存指针和短摘要,不存消息全文。 */
+export interface AuditRow {
+  id: string;
+  /** ISO 时间 */
+  ts: string;
+  threadId: string;
+  actor: AuditActor;
+  action: AuditAction;
+  subject?: string;
+  meta?: Record<string, unknown>;
+}

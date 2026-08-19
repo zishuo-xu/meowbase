@@ -19,6 +19,7 @@ import type {
   Message,
 } from '@meowbase/shared';
 import { clip, turnLog } from '../services/turn-log.js';
+import { safeAppendAudit } from '../stores/audit-log.js';
 import {
   MAX_A2A_DEPTH,
   type SegmentRunResult,
@@ -234,6 +235,15 @@ export async function resumePendingTurn(input: {
         await context.stores.messages.patch(threadId, stale.id, {
           status: 'failed',
           error: formatHopInterruptedNote(),
+        });
+      }
+      if (streaming.length > 0) {
+        await safeAppendAudit(context.stores.audit, {
+          threadId,
+          actor: 'platform',
+          action: 'hop-rerun',
+          subject: '半截消息标失败后重跑',
+          meta: { hopId: pending.id, messageId: streaming[0]?.id },
         });
       }
       lastResult = await runSegment(

@@ -4,16 +4,11 @@ import { join, resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
-import type { AgentId } from '@meowbase/shared';
+import type { AgentId, AuditAction, AuditActor } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
-import type {
-  ApprovalStore,
-  EvidenceStore,
-  MessageStore,
-  ProfileStore,
-  SkillStore,
-  ThreadStore,
-} from '../stores/ports.js';
+import type { AppStores } from '../stores/ports.js';
+import { AUDIT_LIST_MAX } from '../stores/ports.js';
+import { auditApprovals, auditMessages } from '../stores/audit-log.js';
 import type { AgentPatchInput, AgentSpec, ModelPreset } from '../config.js';
 import {
   applyAgentPatch,
@@ -65,14 +60,7 @@ declare module 'fastify' {
 }
 
 export interface ApiDeps {
-  stores: {
-    threads: ThreadStore;
-    messages: MessageStore;
-    profiles: ProfileStore;
-    evidence: EvidenceStore;
-    skills: SkillStore;
-    approvals: ApprovalStore;
-  };
+  stores: AppStores;
   registry: AgentRegistry;
   workdirBase: string;
   a2aMaxDepth?: number;
@@ -92,6 +80,14 @@ interface LiveConfig {
   defaultAgentId: AgentId;
   agents: AgentSpec[];
   models: ModelPreset[];
+}
+
+function parseAuditLimit(raw: unknown): { ok: true; limit?: number } | { ok: false } {
+  if (raw === undefined || raw === '') return { ok: true };
+  if (typeof raw !== 'string' && typeof raw !== 'number') return { ok: false };
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > AUDIT_LIST_MAX) return { ok: false };
+  return { ok: true, limit: n };
 }
 
 function parsePatchDepth(raw: unknown): number | null {
@@ -118,11 +114,15 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   };
   const stores = {
     threads: broadcastThreadSync(deps.stores.threads, emitSync),
-    messages: broadcastMessageSync(deps.stores.messages, emitSync),
+    messages: broadcastMessageSync(auditMessages(deps.stores.messages, deps.stores.audit), emitSync),
     profiles: deps.stores.profiles,
     evidence: deps.stores.evidence,
     skills: deps.stores.skills,
-    approvals: broadcastApprovalSync(deps.stores.approvals, emitSync),
+    approvals: broadcastApprovalSync(
+      auditApprovals(deps.stores.approvals, deps.stores.audit),
+      emitSync,
+    ),
+    audit: deps.stores.audit,
   };
   const live: LiveConfig = {
     a2aMaxDepth: deps.a2aMaxDepth ?? 3,
@@ -430,6 +430,25 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return stores.approvals.list(threadId);
   });
 
+  app.get('/api/audit', async (request, reply) => {
+    const query = request.query as {
+      threadId?: string;
+      actor?: string;
+      action?: string;
+      since?: string;
+      limit?: string;
+    };
+    const parsedLimit = parseAuditLimit(query.limit);
+    if (!parsedLimit.ok) return reply.code(400).send({ error: 'limit 无效' });
+    return stores.audit.list({
+      threadId: query.threadId,
+      actor: query.actor as AuditActor | undefined,
+      action: query.action as AuditAction | undefined,
+      since: query.since,
+      limit: parsedLimit.limit,
+    });
+  });
+
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };
     return stores.messages.list(threadId);
@@ -470,6 +489,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   const runner = createPendingRunner({
     threads: stores.threads,
     messages: stores.messages,
+    audit: stores.audit,
     createContext: createTurnContext,
     leaseTtlMs: HOP_LEASE_TTL_MS,
     leaseRenewMs: HOP_LEASE_RENEW_MS,

@@ -84,7 +84,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **文档同轮更新**:改协议或用户可见行为时,同一轮改 `AGENTS.md` 协议表、`README.md`、`docs/DEMO.md`、对应 `docs/features/` 设计稿,不要留到下次
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
-- 测试:`pnpm test`(shared 134 + api 214 + web 146 ≈ 494);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
+- **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补(见 [audit-trail.md](docs/features/audit-trail.md))
+- 测试:`pnpm test`(shared 136 + api 231 + web 146 ≈ 513);api 的 Redis 测试需要本地 Redis 在跑(未启动则自动跳过)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -110,4 +111,5 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:编辑仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`),重启 API;`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
+- **查一条线程都发生过什么**:`curl "localhost:3200/api/audit?threadId=t_xxx"`(倒序;可加 `actor` / `action` / `since` / `limit`)。球停在哪一跳、谁交给谁、哪张卡被批过、重启后哪一棒被强抢重跑,都在这里,不用翻终端
 - **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api;步骤和期望见 [docs/DEMO.md](docs/DEMO.md)。费用按 token 计(一次完整流程约 $0.2-0.4)。人和猫都只认行首 `@`;句中「不要 `@闪闪`」不会叫它

@@ -1,7 +1,9 @@
 import { Redis } from 'ioredis';
 import type { Skill } from '@meowbase/shared';
 import type {
+  AppStores,
   ApprovalStore,
+  AuditStore,
   EvidenceStore,
   MessageStore,
   ProfileStore,
@@ -10,6 +12,7 @@ import type {
 } from './ports.js';
 import {
   InMemoryApprovalStore,
+  InMemoryAuditStore,
   InMemoryEvidenceStore,
   InMemoryMessageStore,
   InMemoryProfileStore,
@@ -18,6 +21,7 @@ import {
 } from './memory.js';
 import {
   RedisApprovalStore,
+  RedisAuditStore,
   RedisEvidenceStore,
   RedisMessageStore,
   RedisProfileStore,
@@ -25,14 +29,7 @@ import {
 } from './redis.js';
 import { FileSkillStore } from './file-skill-store.js';
 
-export function createMemoryStores(skills: Skill[] = []): {
-  threads: ThreadStore;
-  messages: MessageStore;
-  profiles: ProfileStore;
-  evidence: EvidenceStore;
-  skills: SkillStore;
-  approvals: ApprovalStore;
-} {
+export function createMemoryStores(skills: Skill[] = []): AppStores {
   return {
     threads: new InMemoryThreadStore(),
     messages: new InMemoryMessageStore(),
@@ -40,6 +37,19 @@ export function createMemoryStores(skills: Skill[] = []): {
     evidence: new InMemoryEvidenceStore(),
     skills: new InMemorySkillStore(skills),
     approvals: new InMemoryApprovalStore(),
+    audit: new InMemoryAuditStore(),
+  };
+}
+
+export function createRedisStores(redis: Redis, skillsDir: string): AppStores {
+  return {
+    threads: new RedisThreadStore(redis),
+    messages: new RedisMessageStore(redis),
+    profiles: new RedisProfileStore(redis),
+    evidence: new RedisEvidenceStore(redis),
+    skills: new FileSkillStore(skillsDir),
+    approvals: new RedisApprovalStore(redis),
+    audit: new RedisAuditStore(redis),
   };
 }
 
@@ -65,4 +75,8 @@ export function createSkillStore(skillsDir: string): SkillStore {
 
 export function createApprovalStore(redis: Redis): ApprovalStore {
   return new RedisApprovalStore(redis);
+}
+
+export function createAuditStore(redis: Redis): AuditStore {
+  return new RedisAuditStore(redis);
 }

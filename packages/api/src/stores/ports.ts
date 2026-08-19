@@ -2,6 +2,9 @@ import type {
   AgentId,
   AgentProfile,
   ApprovalCard,
+  AuditAction,
+  AuditActor,
+  AuditRow,
   EvidenceEntry,
   EvidenceKind,
   Message,
@@ -115,4 +118,50 @@ export interface ApprovalStore {
   approve(id: string): Promise<ApprovalCard | null>;
   reject(id: string, reason: string): Promise<ApprovalCard | null>;
   markApplied(id: string): Promise<ApprovalCard | null>;
+}
+
+export const AUDIT_LIST_DEFAULT = 100;
+export const AUDIT_LIST_MAX = 500;
+/** Redis 全局列表封顶,避免 audit:all 无限长。 */
+export const AUDIT_GLOBAL_CAP = 5000;
+
+export interface AuditListQuery {
+  threadId?: string;
+  actor?: AuditActor;
+  action?: AuditAction;
+  since?: string;
+  limit?: number;
+}
+
+export interface AuditStore {
+  append(input: Omit<AuditRow, 'id' | 'ts'>): Promise<AuditRow>;
+  list(query?: AuditListQuery): Promise<AuditRow[]>;
+}
+
+export type AppStores = {
+  threads: ThreadStore;
+  messages: MessageStore;
+  profiles: ProfileStore;
+  evidence: EvidenceStore;
+  skills: SkillStore;
+  approvals: ApprovalStore;
+  audit: AuditStore;
+};
+
+export function resolveAuditLimit(limit?: number): number {
+  if (limit === undefined || !Number.isFinite(limit)) return AUDIT_LIST_DEFAULT;
+  return Math.min(Math.max(1, Math.floor(limit)), AUDIT_LIST_MAX);
+}
+
+export function filterAuditRows(rows: AuditRow[], query?: AuditListQuery): AuditRow[] {
+  const limit = resolveAuditLimit(query?.limit);
+  return rows
+    .filter((row) => {
+      if (query?.threadId && row.threadId !== query.threadId) return false;
+      if (query?.actor && row.actor !== query.actor) return false;
+      if (query?.action && row.action !== query.action) return false;
+      if (query?.since && row.ts < query.since) return false;
+      return true;
+    })
+    .slice(0, limit);
 }

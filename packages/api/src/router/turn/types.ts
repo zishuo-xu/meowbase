@@ -5,14 +5,7 @@ import type {
   ToolActivity,
 } from '@meowbase/shared';
 import type { AgentRegistry, AgentTurnOutput } from '../../providers/types.js';
-import type {
-  ApprovalStore,
-  EvidenceStore,
-  MessageStore,
-  ProfileStore,
-  SkillStore,
-  ThreadStore,
-} from '../../stores/ports.js';
+import type { AppStores } from '../../stores/ports.js';
 import type { AgentSpec } from '../../config.js';
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
@@ -29,14 +22,7 @@ export type ThreadRuntime = {
 };
 
 export interface TurnContext {
-  stores: {
-    threads: ThreadStore;
-    messages: MessageStore;
-    profiles: ProfileStore;
-    evidence: EvidenceStore;
-    skills: SkillStore;
-    approvals: ApprovalStore;
-  };
+  stores: AppStores;
   registry: AgentRegistry;
   /** A2A 接力链深上限,默认 MAX_A2A_DEPTH */
   a2aMaxDepth?: number;
