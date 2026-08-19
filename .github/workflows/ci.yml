@@ -29,4 +29,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
+      - run: pnpm typecheck:scripts
       - run: pnpm test
+      - run: pnpm e2e

@@ -5,14 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { buildServer } from '../packages/api/src/http/server.js';
 import { agentSpec, loadConfig } from '../packages/api/src/config.js';
 import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
-import {
-  createApprovalStore,
-  createEvidenceStore,
-  createMessageStore,
-  createProfileStore,
-  createSkillStore,
-  createThreadStore,
-} from '../packages/api/src/stores/factories.js';
+import { createRedisStores } from '../packages/api/src/stores/factories.js';
 import { ensureSeededProfiles } from '../packages/api/src/stores/seeds.js';
 import { ClaudeAdapter } from '../packages/api/src/providers/claude.js';
 import { GeminiAdapter } from '../packages/api/src/providers/gemini.js';
@@ -23,14 +16,7 @@ const config = loadConfig();
 const redis = createRedisClient(config.redisUrl);
 await assertStorageReady(redis);
 
-const stores = {
-  threads: createThreadStore(redis),
-  messages: createMessageStore(redis),
-  profiles: createProfileStore(redis),
-  evidence: createEvidenceStore(redis),
-  skills: createSkillStore(join(process.cwd(), 'skills')),
-  approvals: createApprovalStore(redis),
-};
+const stores = createRedisStores(redis, join(process.cwd(), 'skills'));
 await ensureSeededProfiles(stores.profiles);
 
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-smoke-'));
@@ -58,6 +44,7 @@ const app = await buildServer({
   agents: config.agents,
 });
 await app.listen({ port: 0, host: '127.0.0.1' });
+app.startPendingRunner();
 const address = app.server.address() as AddressInfo;
 const baseUrl = `http://127.0.0.1:${address.port}`;
 

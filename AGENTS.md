@@ -16,10 +16,12 @@ pnpm install
 pnpm dev          # 起 Redis + API(3200)+ Web(3300)
 pnpm test         # 全部单测(shared/api/web)
 pnpm -r build     # 三包构建 + 类型检查
+pnpm typecheck:scripts # scripts/ 的类型检查(包不含它,漏了会静默烂掉)
+pnpm e2e          # 整机自检:fake CLI 跑全链 + 杀进程验续跑,不花钱
 pnpm smoke        # 真实冒烟(需要真实 claude/opencode 通道,花钱)
 ```
 
-CI 在 push/PR 上跑 `pnpm -r build` 与 `pnpm test`（`.github/workflows/ci.yml`）。
+CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`、`pnpm e2e`（`.github/workflows/ci.yml`）。`pnpm smoke` 花钱,不进 CI。
 
 浏览器打开 http://localhost:3300。API 只读接口可直接 curl localhost:3200。
 
@@ -31,7 +33,7 @@ packages/
 ├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
-scripts/      smoke.ts(真实冒烟)、fixtures/(fake CLI,测试/演示用)
+scripts/      e2e.ts + e2e-server.ts(整机自检,fake CLI)、smoke.ts(真实冒烟)、fixtures/(fake CLI)
 work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
@@ -106,6 +108,9 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 13. **未跟踪源码会被沙箱清扫误搬走**:新文件若还没 `git add`,旧版 `sweepStrayFiles` 会把它 `rename` 进 `work/<threadId>/`,tsx 记成 `unlink`,API 重启后模块找不到、3200 掉线。规避:新适配器/测试立刻提交(或至少 `git add`);改清扫规则后只允许浅层散落文件;API 日志出现 `sweepStrayFiles: 移回沙箱` 时去对应线程目录找回。
 14. **`meowbase.config.json` 改了不会热重载**:文件在仓库根,`tsx watch` 只盯 `src/`。改完 `GET /api/config` 还是旧值,必须重启 API 才生效。名册里改 `handoffTo` / 模型也一样。常见操作「改 agent / 模型」写了重启,就是这个原因。
 15. **`kill -9` 掉 3200 上的进程后,`tsx watch` 不会自动重生**:它只在文件变化时重启,进程崩了不管。第 1 条说了必须按端口杀、重启后平台会捡棒;杀完还得自己再起一次(`pnpm --filter @meowbase/api dev`),别以为它会自愈。
+16. **写 fake CLI 别忘了可执行位**:`scripts/fixtures/` 下新加的 fake 若是 `644`,适配器 `spawn` 直接 `EACCES`,链会在那一跳静默失败(日志只有「启动失败」)。新文件 `chmod +x` 并确认 git 记的是 `100755`。
+17. **`pnpm e2e` 用 Redis db 14,不要改成 db 0**:本机 3200 的 API 也在扫 pending,共用一个 db 时它可能把 e2e 的棒抢走、甚至打到真 CLI 上花钱。e2e 进出各 `FLUSHDB` 一次,所以别把真数据放 db 14。
+18. **fake 写手的正文必须落在 claude 的 `result` 事件里**:`StreamAccumulator` 收到 `result` 会用它整段覆盖 assistant 增量。行首 `@` 只写在 assistant 事件里会被覆盖掉,交棒不成立。
 
 ## 常见操作
 

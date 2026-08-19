@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "typeRoots": ["./packages/api/node_modules/@types"]
+  },
+  "include": ["scripts/**/*.ts", "packages/api/src/**/*.ts", "packages/shared/src/**/*.ts"]
+}

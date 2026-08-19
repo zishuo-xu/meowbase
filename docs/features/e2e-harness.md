@@ -2,7 +2,7 @@
 
 一条完整接力链和一次「进程被杀」的续跑,由 CI 每次 push 自己跑一遍,不花钱。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:他们公开把「验证过才算完成」写进 [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md),最近公开在吵的是 eval 测量可信度([issue #1213](https://github.com/zts212653/clowder-ai/issues/1213))——「机器自己证明」在他们那儿是协作纪律的一部分,不是测试细节。
 - 靠拢:靠「验证不靠人复述,靠机器每次复验」这一条。本刀没更近的地方是不做 eval 打分(通过率/跳数的 before-after 另开一篇),只做「全链在 CI 里能跑通」。
 
@@ -42,4 +42,10 @@
 
 ## 入口
 
-落地后填路径。
+- `scripts/e2e.ts` — CI 整机自检(fake CLI,不花钱):完整接力链 + 杀进程续跑
+- `scripts/e2e-server.ts` — e2e 拉起的 API 子进程(不读、不写 `meowbase.config.json`,用环境变量覆盖 bin/端口)
+- `scripts/fixtures/fake-claude-writer.mjs` — 写手 fake(claude stream-json,行首 `@闪闪`)
+- `scripts/fixtures/fake-gemini-reviewer.mjs` — 审查官 fake(gemini stream-json,命令+结果 + 单独一行「通过」)
+- `tsconfig.scripts.json` + `pnpm typecheck:scripts` — 把 `scripts/` 纳入类型检查
+- `scripts/smoke.ts` — 真实 CLI 冒烟(不进 CI);`createRedisStores` + `listen` 之后 `startPendingRunner()`
+- CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts` 与 `pnpm e2e`

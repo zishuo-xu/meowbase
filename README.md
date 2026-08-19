@@ -134,6 +134,8 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 ```bash
 pnpm test              # 全部单测(shared/api/web);api 的 Redis 测试需本机 Redis,连不上则该条直接 return
+pnpm typecheck:scripts # scripts/ 的类型检查(三个包的 build 不覆盖它)
+pnpm e2e               # 整机自检:fake CLI 跑通全链 + 杀进程验续跑,不花钱
 pnpm smoke             # 真实冒烟(需要 Redis + claude CLI)
 ```
 
