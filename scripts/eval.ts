@@ -279,9 +279,10 @@ function formatTable(rows: RowResult[]): string {
     `|---|---|---|---|`,
   ];
   for (const row of rows) {
-    // 空格子的 0/3 是正确结果,不能显示成像测试没过的样子
+    // 空格子真的没人拦时,0/3 是正确结果,不能显示成像测试没过的样子。
+    // 但它一旦被拦住(格子从 0 翻到 1),必须报真实次数——那正是要逼人改期望的时刻。
     const times =
-      row.scenario.expectedCatch === 0
+      row.scenario.expectedCatch === 0 && row.passed === 0
         ? `${N} 次都没人拦(如期)`
         : `${row.passed}/${N}`;
     lines.push(
