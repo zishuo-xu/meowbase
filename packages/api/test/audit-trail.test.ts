@@ -22,7 +22,7 @@ describe('审计流水集成', () => {
         async runTurn() {
           return {
             sessionId: 's1',
-            content: '写完了。\n@opencode 请审查',
+            content: '方案已经写在上面:先落地加法函数并导出,再补零、负数和小数的边界测试,最后接到现有入口,不要顺手改无关文件,也不要另开一条。\n写完了。\n@opencode 请审查',
             status: 'completed',
             usage: { inputTokens: 4, outputTokens: 6 },
           };

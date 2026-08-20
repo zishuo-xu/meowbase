@@ -64,6 +64,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | `@墨墨` 与 `@团团` 各占一行 | 同题并行(同一正文发给所有行首目标);同一行第二个 `@` 不算 |
 | 句中 `@闪闪` /「不要 `@闪闪`」 | 不当目标,不路由 |
 | 回复中行首 `@团团 任务` | A2A 接力:本轮先结束,平台自己唤下一只。中文名与英文 id 等价;链深默认 3;句中 @ 不会交接 |
+| 行首 `@` 了但这一跳空手 | 没新文件、没结论、去掉交接行后正文短于 60 字 → 平台不传,球回人手里。有文件或长方案照传 |
 | 回复无行首 `@` 且该交棒 | 平台再问同一只一次补出口;仍没有则「球还在地上」。问答收尾、审查已写结论不问 |
 | 回复中行首 `@人` / `@owner` | 升级给人拍板,停接力;球回到人手里 |
 | 审查官写出「通过」 | 顶栏球回人手里;不必等审批卡刷出来 |
@@ -118,8 +119,9 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 21. **listen 失败必须让进程死干净**:`startApp` 在 `listen` 之前已经连了 Redis、建了 Fastify。撞 EADDRINUSE 若只把错误抛出去、不 `app.close()` + `redis.disconnect()`,ioredis 会把进程挂住,e2e 等不到非 0 退出码。`e2e-server` 也要 `process.exit(1)`。另外首扫必须 `await startPendingRunner()`:只 `void` 的话,反向把调用挪到 `listen` 之前,`process.exit` 会在 `lease-steal` 落库前把 #2 杀掉,绑冲突段假绿。
 22. **`pnpm eval` 用 Redis db 13,不要改成 db 0 或 14**:本机 3200 扫 db 0 的 pending,e2e 用 db 14。共用会抢棒甚至打到真 CLI。eval 进出各 `FLUSHDB` 一次,别把真数据放 db 13。
 23. **e2e / eval 公共接线只许一份**:起子进程、`waitFor`、`killHard`、读写线程都在 `scripts/lib/harness.ts`。再复制一份就会像 `smoke.ts` 漏 audit、`e2e-server.ts` 复制生产接线那样漂。
-24. **记分板空格子从 0 变 1 必须改期望**:「什么都没干就交棒」现在没人拦,期望是 0。哪天平台真拦住了,`pnpm eval` 会因「期望 0 实际 1」非 0 退出,逼人来改期望,不许放宽断言装绿。
-25. **反向验补问要 rebuild shared**:eval 子进程走 `@meowbase/shared` 的 dist。只改 `src/a2a.ts` 不 `pnpm --filter @meowbase/shared build`,补问还在,记分板假绿。第一跳忘了行首 `@` 走的是 `hadInlineHint` / `hasDiff`,只把 `wasRelay` 改成 `return false` 不够,要等效关掉整个 `shouldNudgeExit`。
+24. **记分板空格子从 0 变 1 必须改期望**:哪一格从没人拦变成兜住,`pnpm eval` 会因「期望 0 实际 1」非 0 退出,逼人来改期望,不许放宽断言装绿。「什么都没干就交棒」已经由虚空传球门禁兜住,期望是 1。
+25. **反向验补问要 rebuild shared**:eval 子进程走 `@meowbase/shared` 的 dist。只改 `src/a2a.ts` 不 `pnpm --filter @meowbase/shared build`,补问还在、虚空门禁也像没装,记分板假绿。第一跳忘了行首 `@` 走的是 `hadInlineHint` / `hasDiff`,只把 `wasRelay` 改成 `return false` 不够,要等效关掉整个 `shouldNudgeExit`。
+26. **`formatDroppedBallNote` 的 `'void'` 必须写在 early return 之前**:`hadInlineHint` / 审查结论 / 持球那几行会直接 `return null`。虚空那句放后面就发不出来,球像没落地。单测锁住 `hadInlineHint: true` 时 `'void'` 仍出「球还在地上」。
 
 ## 常见操作
 

@@ -14,6 +14,7 @@ import {
   formatFailedBallNote,
   formatHoldBallNote,
   hasExplicitReviewVerdict,
+  isVoidHandoff,
   matchSkills,
   parseA2AHandoff,
   parseHoldCommand,
@@ -91,6 +92,7 @@ export async function runSegment(
     hadInlineHint?: boolean;
     escalateTask?: string;
     holdReason?: string;
+    handoffTask?: string;
   } | undefined;
   if (resume) {
     for (const id of resume.visited) visited.add(id);
@@ -274,6 +276,10 @@ export async function runSegment(
     }
     const relayFiles = await listHandoffFiles(thread.workdir);
     const relayTarget: AgentId = handoff.target;
+    if (isVoidHandoff({ changedFiles: relayFiles, reply: prevContent })) {
+      stop = { kind: 'void', blockedTarget: relayTarget, handoffTask: handoff.task };
+      break;
+    }
     const pendingHop: PendingHop = {
       id: randomUUID(),
       to: relayTarget,
@@ -351,6 +357,7 @@ export async function runSegment(
             blockedTargetName: stop.blockedTarget
               ? displayName(stop.blockedTarget, catalog)
               : undefined,
+            handoffTask: stop.handoffTask,
           });
     if (note) {
       if (stop.kind !== 'escalated' && stop.kind !== 'held') {

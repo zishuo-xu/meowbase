@@ -218,7 +218,32 @@ export function parseA2ARelayNote(text: string): { headline: string; details: st
   return { headline, details: lines.slice(1) };
 }
 
-export type A2AStopKind = 'no-handoff' | 'reviewer-closeout' | 'blocked' | 'escalated' | 'held';
+export type A2AStopKind =
+  | 'no-handoff'
+  | 'reviewer-closeout'
+  | 'blocked'
+  | 'escalated'
+  | 'held'
+  | 'void';
+
+/** 去掉行首 @ 行后剩下的正文短于这个字数才算空手。宁可漏拦。 */
+export const VOID_HANDOFF_BODY_MAX = 60;
+
+export interface VoidHandoffInput {
+  changedFiles: readonly string[];
+  reply: string;
+}
+
+/**
+ * 即将交棒时:没有新文件、没有结论、剩下正文又太短 → 虚空传球。
+ * 三条全中才拦;任何一条不成立就照传。
+ */
+export function isVoidHandoff(input: VoidHandoffInput): boolean {
+  if (input.changedFiles.length > 0) return false;
+  if (hasExplicitReviewVerdict(input.reply)) return false;
+  const body = stripHandoffLines(input.reply);
+  return body.length < VOID_HANDOFF_BODY_MAX;
+}
 
 const HOLD_LINE = /^\s*(?:HOLD|hold|等)[:：\s]+(\S.*)$/;
 const HOLD_COMMAND_LINE = /^\s*(?:HOLDCMD|holdcmd|等跑)[:：\s]+(\S.*)$/;
@@ -338,10 +363,18 @@ export interface DroppedBallInput {
   wasRelay: boolean;
   hadInlineHint?: boolean;
   blockedTargetName?: string;
+  handoffTask?: string;
 }
 
 /** 链停了但球没落地时给人看的一句;问答收尾和审查官明确结论不提示。 */
 export function formatDroppedBallNote(input: DroppedBallInput): string | null {
+  if (input.stop === 'void') {
+    const to = input.blockedTargetName ?? '下一棒';
+    const what = input.handoffTask?.trim()
+      ? `把「${clipBody(input.handoffTask.trim(), 40)}」交给`
+      : '交给';
+    return `⚠️ 球还在地上:${input.speakerName}想${what}${to},但这一跳什么都没留下,平台没传。`;
+  }
   const reviewer = Boolean(input.role?.includes('审查'));
   if (reviewer && hasExplicitReviewVerdict(input.lastContent)) return null;
   if (parseHoldExit(input.lastContent) || parseHoldCommand(input.lastContent)) return null;

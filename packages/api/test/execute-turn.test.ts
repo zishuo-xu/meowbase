@@ -10,6 +10,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gitInit } from '../src/services/git.js';
 
+/** 够长、没文件也会照传,避免虚空门禁误拦测交棒的用例 */
+const KEPT_HANDOFF_BODY =
+  '方案已经写在上面:先落地加法函数并导出,再补零、负数和小数的边界测试,最后接到现有入口,不要顺手改无关文件,也不要另开一条。';
+
 function stubAgent(agentId: AgentId, reply: string, sessionId = `sess-${agentId}`): AgentService {
   return {
     agentId,
@@ -1058,6 +1062,34 @@ describe('executeTurn 审批流', () => {
 });
 
 describe('executeTurn 多角色协作', () => {
+  it('虚空交棒:不写 pending、不发 relay,落一条 dropped', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '先交给闪闪看一眼。\n\n@闪闪 请审查'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          throw new Error('虚空交棒不该叫闪闪');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 先看一眼',
+      context: { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) },
+    });
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    const messages = await stores.messages.list(thread.id);
+    expect(messages.some((m) => m.role === 'system' && m.systemKind === 'relay')).toBe(false);
+    const dropped = messages.find((m) => m.role === 'system' && m.systemKind === 'dropped');
+    expect(dropped).toBeTruthy();
+    expect(dropped?.content).toContain('球还在地上');
+    expect(dropped?.content).toContain('没传');
+    expect(dropped?.content).toContain('墨墨');
+    expect(dropped?.content).toContain('闪闪');
+  });
+
   it('A2A 交棒后本轮不跑下一只,再触发才吃同一份包', async () => {
     const stores = createMemoryStores();
     const calls: string[] = [];
@@ -1069,7 +1101,7 @@ describe('executeTurn 多角色协作', () => {
           calls.push('claude');
           return {
             sessionId: 's1',
-            content: '代码写完了。\n@opencode 请审查这段代码\n注意边界条件。',
+            content: `${KEPT_HANDOFF_BODY}\n代码写完了。\n@opencode 请审查这段代码\n注意边界条件。`,
             status: 'completed',
           };
         },
@@ -1114,7 +1146,7 @@ describe('executeTurn 多角色协作', () => {
           calls.push('claude');
           return {
             sessionId: 's1',
-            content: '写完了。\n@opencode 请审查',
+            content: `${KEPT_HANDOFF_BODY}\n写完了。\n@opencode 请审查`,
             status: 'completed',
           };
         },
@@ -1185,7 +1217,7 @@ describe('executeTurn 多角色协作', () => {
         async runTurn() {
           return {
             sessionId: 's1',
-            content: '代码写完了。\n@opencode 请审查这段代码\n注意边界条件。',
+            content: `${KEPT_HANDOFF_BODY}\n代码写完了。\n@opencode 请审查这段代码\n注意边界条件。`,
             status: 'completed',
           };
         },
@@ -1235,7 +1267,7 @@ describe('executeTurn 多角色协作', () => {
           prompts.push(input.systemPrompt ?? '');
           return {
             sessionId: 's-claude',
-            content: prompts.length === 1 ? '写完了\n@gemini 请审查' : '已按意见改',
+            content: prompts.length === 1 ? `${KEPT_HANDOFF_BODY}\n写完了\n@gemini 请审查` : '已按意见改',
             status: 'completed',
           };
         },
@@ -1274,7 +1306,7 @@ describe('executeTurn 多角色协作', () => {
         agentId: 'claude',
         async runTurn() {
           calls.push('claude');
-          return { sessionId: 's1', content: '写完了\n@gemini 请审查 add.ts', status: 'completed' };
+          return { sessionId: 's1', content: `${KEPT_HANDOFF_BODY}\n写完了\n@gemini 请审查 add.ts`, status: 'completed' };
         },
       },
       {
@@ -1312,7 +1344,7 @@ describe('executeTurn 多角色协作', () => {
       {
         agentId: 'claude',
         async runTurn() {
-          return { sessionId: 's1', content: '写完了\n@gemini 请审查', status: 'completed' };
+          return { sessionId: 's1', content: `${KEPT_HANDOFF_BODY}\n写完了\n@gemini 请审查`, status: 'completed' };
         },
       },
       {
@@ -1547,7 +1579,7 @@ describe('executeTurn 多角色协作', () => {
         agentId: 'claude',
         async runTurn() {
           calls.push('claude');
-          return { sessionId: 's1', content: '@opencode 你来', status: 'completed' };
+          return { sessionId: 's1', content: `${KEPT_HANDOFF_BODY}\n@opencode 你来`, status: 'completed' };
         },
       },
       {
@@ -1576,7 +1608,7 @@ describe('executeTurn 多角色协作', () => {
         agentId: 'claude',
         async runTurn() {
           calls.push('claude');
-          return { sessionId: 's1', content: '@团团 请接着做', status: 'completed' };
+          return { sessionId: 's1', content: `${KEPT_HANDOFF_BODY}\n@团团 请接着做`, status: 'completed' };
         },
       },
       {

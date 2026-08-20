@@ -73,6 +73,7 @@ export type {
   A2AStopKind,
   DroppedBallInput,
   ExitNudgeInput,
+  VoidHandoffInput,
 } from './a2a.js';
 export { clipAuditSubject, AUDIT_SUBJECT_MAX } from './audit-subject.js';
 export {
@@ -94,6 +95,8 @@ export {
   formatHoldCommandWakePrompt,
   formatHopInterruptedNote,
   formatPickupCommand,
+  isVoidHandoff,
+  VOID_HANDOFF_BODY_MAX,
   isDroppedBallNote,
   isEscalatedBallNote,
   isExitNudgeNote,

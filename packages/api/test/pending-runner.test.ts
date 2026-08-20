@@ -363,7 +363,7 @@ describe('pending-runner', () => {
       {
         agentId: 'opencode',
         async runTurn() {
-          return { sessionId: 's2', content: '看完了。\n@gemini 请审查边界', status: 'completed' };
+          return { sessionId: 's2', content: '方案已经写在上面:先落地加法函数并导出,再补零、负数和小数的边界测试,最后接到现有入口,不要顺手改无关文件,也不要另开一条。\n看完了。\n@gemini 请审查边界', status: 'completed' };
         },
       },
       stubAgent('gemini', '不该本轮出场'),

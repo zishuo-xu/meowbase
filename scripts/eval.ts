@@ -175,7 +175,7 @@ async function runRevisit(workdirBase: string): Promise<boolean> {
   );
 }
 
-/** true = 平台拦住了虚空传球。现在应是 false;哪天变 true,期望 0 对不上就红。 */
+/** true = 平台拦住了虚空传球。门禁落地后期望 1。 */
 async function runEmptyHandoff(workdirBase: string): Promise<boolean> {
   return withApi(
     { workdirBase, writerBin: emptyHandoffBin, reviewerBin: defaultReviewerBin },
@@ -246,8 +246,8 @@ const scenarios: Scenario[] = [
   {
     id: 'empty-handoff',
     name: '什么都没干就交棒',
-    expectedCatch: 0,
-    expectNote: '现在没人拦(空格子)',
+    expectedCatch: 1,
+    expectNote: '判 void,不写 pending,球还在地上',
     run: runEmptyHandoff,
   },
   {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 坏毛病:不改文件、不写结论就往下丢。平台现在没有机制拦它,记分板这一行如期是 0。
+// 坏毛病:不改文件、不写结论就往下丢。虚空传球门禁应拦住,记分板这一行期望 1。
 const delayMs = Number(process.env.FAKE_WRITER_DELAY_MS ?? process.env.FAKE_DELAY_MS ?? 0);
 if (Number.isFinite(delayMs) && delayMs > 0) {
   await new Promise((resolve) => setTimeout(resolve, delayMs));

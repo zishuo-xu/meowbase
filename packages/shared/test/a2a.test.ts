@@ -7,6 +7,7 @@ import {
   formatA2ARelayNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
+  isVoidHandoff,
   formatEscalatedBallNote,
   formatFreezeBallNote,
   formatFailedBallNote,
@@ -198,6 +199,72 @@ describe('formatDroppedBallNote', () => {
         hadInlineHint: true,
       }),
     ).toBeNull();
+  });
+
+  it('虚空交棒要出一句,hadInlineHint 也吞不掉', () => {
+    const note = formatDroppedBallNote({
+      stop: 'void',
+      lastContent: '先交给闪闪看一眼。\n\n@闪闪 请审查',
+      speakerName: '墨墨',
+      role: '主架构师',
+      wasRelay: false,
+      hadInlineHint: true,
+      blockedTargetName: '闪闪',
+      handoffTask: '请审查',
+    });
+    expect(note).toBeTruthy();
+    expect(note).toContain('球还在地上');
+    expect(note).toContain('墨墨');
+    expect(note).toContain('闪闪');
+    expect(note).toContain('请审查');
+    expect(note).toMatch(/没留下|没传/);
+    expect(isDroppedBallNote(note!)).toBe(true);
+  });
+});
+
+describe('isVoidHandoff', () => {
+  it('fake 那种空手交棒判虚空', () => {
+    expect(
+      isVoidHandoff({
+        changedFiles: [],
+        reply: '先交给闪闪看一眼。\n\n@闪闪 请审查',
+      }),
+    ).toBe(true);
+  });
+
+  it('正文很长的方案交棒不许判虚空', () => {
+    const plan = [
+      '方案已经想清楚了。',
+      '先在沙箱写加法函数,入参两个 number,返回它们的和,并导出。',
+      '再补一组边界:零、负数、小数,别只测快乐路径。',
+      '入口接到现有脚本,不要顺手重构旁边的文件。',
+      '自检跑过再交棒,下一棒按这个顺序落地,不要自己另开一条。',
+    ].join('');
+    expect(plan.length).toBeGreaterThan(60);
+    expect(
+      isVoidHandoff({
+        changedFiles: [],
+        reply: `${plan}\n@团团 去实现`,
+      }),
+    ).toBe(false);
+  });
+
+  it('有新文件就照传,哪怕正文很短', () => {
+    expect(
+      isVoidHandoff({
+        changedFiles: ['add.ts'],
+        reply: '写好了。\n@闪闪 请审查',
+      }),
+    ).toBe(false);
+  });
+
+  it('有结论段就照传,哪怕没改文件', () => {
+    expect(
+      isVoidHandoff({
+        changedFiles: [],
+        reply: '结论:通过\n@团团 接着做',
+      }),
+    ).toBe(false);
   });
 });
 
