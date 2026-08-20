@@ -8,6 +8,10 @@ import {
 import { extractMentionTargets } from './mention-targets.js';
 import { hasExplicitReviewVerdict } from './review-verdict.js';
 import { hasVerificationEvidence } from './verification.js';
+import {
+  formatDeniedHoldCommandNote,
+  type HoldCommandDenyReason,
+} from './hold-command.js';
 
 /** 行首 @人 / @owner 升给人,不是 registry 里的猫(对齐 clowder @owner)。 */
 export const HUMAN_ESCALATE_TOKENS = ['人', 'owner', 'co-worker', 'coworker'] as const;
@@ -224,7 +228,8 @@ export type A2AStopKind =
   | 'blocked'
   | 'escalated'
   | 'held'
-  | 'void';
+  | 'void'
+  | 'denied-command';
 
 /** 去掉行首 @ 行后剩下的正文短于这个字数才算空手。宁可漏拦。 */
 export const VOID_HANDOFF_BODY_MAX = 60;
@@ -364,10 +369,18 @@ export interface DroppedBallInput {
   hadInlineHint?: boolean;
   blockedTargetName?: string;
   handoffTask?: string;
+  deniedCommand?: string;
+  denyReason?: HoldCommandDenyReason;
 }
 
 /** 链停了但球没落地时给人看的一句;问答收尾和审查官明确结论不提示。 */
 export function formatDroppedBallNote(input: DroppedBallInput): string | null {
+  if (input.stop === 'denied-command') {
+    return formatDeniedHoldCommandNote({
+      command: input.deniedCommand ?? input.lastContent,
+      reason: input.denyReason ?? 'not-allowlisted',
+    });
+  }
   if (input.stop === 'void') {
     const to = input.blockedTargetName ?? '下一棒';
     const what = input.handoffTask?.trim()

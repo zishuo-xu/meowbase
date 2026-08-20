@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。上一刀 [void-handoff-gate.md](void-handoff-gate.md) 已落地。
+`设计中` 同时最多一篇。上一刀 [command-allowlist.md](command-allowlist.md) 已落地。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -43,3 +43,4 @@
 | [e2e-harness.md](e2e-harness.md) | 已落地 | 整机自检:全链和崩溃恢复进 CI |
 | [failure-mode-eval.md](failure-mode-eval.md) | 已落地 | 坏毛病记分板:平台兜住率 |
 | [void-handoff-gate.md](void-handoff-gate.md) | 已落地 | 空手不许交棒 |
+| [command-allowlist.md](command-allowlist.md) | 已落地 | 平台只跑认得的命令 |

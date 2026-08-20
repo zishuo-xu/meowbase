@@ -120,6 +120,21 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(agentSpec(cfg, 'claude').handoffTo).toBe('opencode');
     expect(agentSpec(cfg, 'claude').handoff).toEqual(['写完交 {to}']);
   });
+
+  it('文件里的 holdCommands 覆盖默认白名单', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-hold-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        holdCommands: [{ program: 'git', args: ['status'] }],
+        holdCommandEnv: ['FOO'],
+      }),
+    );
+    const cfg = loadConfig({}, { configPath: path });
+    expect(cfg.holdCommands).toEqual([{ program: 'git', args: ['status'] }]);
+    expect(cfg.holdCommandEnv).toEqual(['FOO']);
+  });
 });
 
 describe('模型目录', () => {

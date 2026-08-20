@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
-import type { AgentId, AuditAction, AuditActor } from '@meowbase/shared';
+import type { AgentId, AuditAction, AuditActor, HoldCommandRule } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
 import type { AppStores } from '../stores/ports.js';
 import { AUDIT_LIST_MAX } from '../stores/ports.js';
@@ -74,6 +74,8 @@ export interface ApiDeps {
   rebuildAdapter?: (spec: AgentSpec) => void;
   /** 收尸 interval;0 则只在 startPendingRunner 时扫一次,不挂定时器 */
   hopSweepIntervalMs?: number;
+  holdCommands?: readonly HoldCommandRule[];
+  holdCommandEnv?: readonly string[];
 }
 
 interface LiveConfig {
@@ -483,6 +485,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       onThinking: (tid, messageId, delta, agentId) => {
         emitter.emit(`thinking:${tid}`, { messageId, delta, agentId });
       },
+      holdCommands: deps.holdCommands,
+      holdCommandEnv: deps.holdCommandEnv,
     };
     return {
       context,

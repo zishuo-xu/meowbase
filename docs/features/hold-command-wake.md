@@ -6,7 +6,7 @@
 
 - 状态:`已落地`
 - 对照 clowder:公开 `hold_ball({ wakeWhen: { command } })` — 等本地 gate/test/build 时，服务端托管命令，完成后带结果唤醒；猫不把长命令塞进同一轮 CLI。
-- 靠拢:本刀只认行首 `等跑` / `HOLDCMD` + 命令。平台在沙箱跑完，再唤同一只一次，把退出码和输出尾巴注入。不 MCP，不定时器，不队列。
+- 靠拢:本刀只认行首 `等跑` / `HOLDCMD` + 命令。平台在沙箱跑完，再唤同一只一次，把退出码和输出尾巴注入。不 MCP，不定时器，不队列。**后来** [command-allowlist.md](command-allowlist.md) 收了执行面:不是什么命令都跑,先降成 argv、对上白名单才 `spawn`;不认得就不跑、球回人手里。
 
 ## 门（各一句）
 
@@ -25,7 +25,7 @@
 
 1. 行首 `等跑` / `HOLDCMD` / `holdcmd`，后面跟命令 → 持球 + 记下命令。句中「等跑」不算。空命令不算。
 2. 写出则不补问、不掉地上、当轮不建审批卡。系统句：`球在等:墨墨 — 跑 \`npm test\`。人开口即取消。`
-3. HTTP 先返回本轮（和交棒跟跑同一拍）。同一进程在线程沙箱 `cwd` 跑这条命令，单独超时（默认 3 分钟，短于 CLI 5 分钟）。
+3. HTTP 先返回本轮（和交棒跟跑同一拍）。同一进程在线程沙箱 `cwd` 跑这条命令，单独超时（默认 3 分钟，短于 CLI 5 分钟）。**现在**只跑白名单内的形状(`npm test` / `git status` 那种);带分号管道或 `node -e` 一律拒,见 [command-allowlist.md](command-allowlist.md)。
 4. 结束（退出 / 超时 / 被杀）后注入系统句（退出码 + stdout/stderr 尾巴），`resumePendingTurn` 唤**同一只**，不追加用户消息。人下一条照常进 `executeTurn`，取消持球并停还没跑完的命令。
 5. 验收：有 diff 仍写 `等跑 npm test` → 只叫一次、有「球在等」、没有「球还在地上」、没有审批卡；命令结束后同一只再被 `runTurn`，prompt 里看得到测试输出。
 
@@ -46,5 +46,5 @@
 - `parseHoldCommand` / `formatHoldCommandWakePrompt`：`packages/shared/src/a2a.ts`
 - 记下命令：`packages/api/src/router/turn/segment.ts` `rememberHoldCommand`
 - 跑完再叫醒：`packages/api/src/router/execute-turn.ts` `followPendingChain` → `packages/api/src/router/turn/hold.ts`
-- 沙箱执行：`packages/api/src/services/hold-command.ts`
+- 沙箱执行：`packages/api/src/services/hold-command.ts`（白名单闸见 [command-allowlist.md](command-allowlist.md)）
 - 顶栏仍认「球在等」：`packages/web/lib/ball.ts`

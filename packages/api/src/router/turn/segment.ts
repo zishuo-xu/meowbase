@@ -20,7 +20,9 @@ import {
   parseHoldCommand,
   parseHoldExit,
   shouldNudgeExit,
+  authorizeHoldCommand,
   type A2AStopKind,
+  type HoldCommandDenyReason,
   type PendingHop,
 } from '@meowbase/shared';
 import type {
@@ -93,6 +95,8 @@ export async function runSegment(
     escalateTask?: string;
     holdReason?: string;
     handoffTask?: string;
+    deniedCommand?: string;
+    denyReason?: HoldCommandDenyReason;
   } | undefined;
   if (resume) {
     for (const id of resume.visited) visited.add(id);
@@ -147,6 +151,23 @@ export async function runSegment(
     prevContent = hopResult.content;
 
     const applyHoldExit = async (holdReason: string): Promise<void> => {
+      const command = parseHoldCommand(prevContent);
+      if (command) {
+        const decision = authorizeHoldCommand(command, context.holdCommands);
+        if (!decision.ok) {
+          turnLog('a2a stop', {
+            thread: thread.id,
+            from: currentAgent,
+            reason: 'denied-command',
+          });
+          stop = {
+            kind: 'denied-command',
+            deniedCommand: command,
+            denyReason: decision.reason,
+          };
+          return;
+        }
+      }
       turnLog('a2a stop', { thread: thread.id, from: currentAgent, reason: 'held' });
       stop = { kind: 'held', holdReason };
       await rememberHoldCommand({
@@ -358,6 +379,8 @@ export async function runSegment(
               ? displayName(stop.blockedTarget, catalog)
               : undefined,
             handoffTask: stop.handoffTask,
+            deniedCommand: stop.deniedCommand,
+            denyReason: stop.denyReason,
           });
     if (note) {
       if (stop.kind !== 'escalated' && stop.kind !== 'held') {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import {
+  formatDeniedHoldCommandNote,
   formatHoldCommandDoneNote,
   formatHoldCommandWakePrompt,
 } from '@meowbase/shared';
@@ -20,9 +21,26 @@ export async function finishHoldCommandThenWake(input: {
     command: pending.holdCommand,
     cwd: resolve(thread.workdir),
     signal: context.signal,
+    allowlist: context.holdCommands,
+    extraEnvKeys: context.holdCommandEnv,
+    spawn: context.holdCommandSpawn,
   });
   const still = (await context.stores.threads.get(threadId))?.pendingHop;
   if (!still?.holdCommand || still.holdCommand !== pending.holdCommand) return;
+  if (result.denied) {
+    await context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: formatDeniedHoldCommandNote({
+        command: pending.holdCommand,
+        reason: result.reason ?? 'not-allowlisted',
+      }),
+      status: 'completed',
+      systemKind: 'dropped',
+    });
+    await context.stores.threads.setPendingHop(threadId, null);
+    return;
+  }
   await context.stores.messages.append({
     threadId,
     role: 'system',

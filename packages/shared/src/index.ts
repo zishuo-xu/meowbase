@@ -111,3 +111,19 @@ export {
   shouldResumePending,
 } from './a2a.js';
 export { isPlaceholderTitle, titleFromUserMessage, TITLE_MAX_LEN } from './thread-title.js';
+export type {
+  AuthorizeHoldCommandResult,
+  HoldCommandArgvResult,
+  HoldCommandDenyReason,
+  HoldCommandRule,
+} from './hold-command.js';
+export {
+  DEFAULT_HOLD_COMMAND_ALLOWLIST,
+  DEFAULT_HOLD_COMMAND_ENV_KEYS,
+  authorizeHoldCommand,
+  formatDeniedHoldCommandNote,
+  matchesHoldCommandAllowlist,
+  parseHoldCommandAllowlist,
+  parseHoldCommandArgv,
+  pickHoldCommandEnv,
+} from './hold-command.js';

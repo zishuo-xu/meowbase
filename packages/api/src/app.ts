@@ -63,6 +63,8 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     defaultAgentId: config.defaultAgentId,
     agents: config.agents,
     models: config.models,
+    holdCommands: config.holdCommands,
+    holdCommandEnv: config.holdCommandEnv,
     ...(opts.configPath ? { configPath: opts.configPath } : {}),
     ...(opts.rebuildAdapter
       ? { rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)) }

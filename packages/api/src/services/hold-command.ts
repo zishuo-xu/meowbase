@@ -1,6 +1,18 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import {
+  authorizeHoldCommand,
+  pickHoldCommandEnv,
+  type HoldCommandDenyReason,
+  type HoldCommandRule,
+} from '@meowbase/shared';
 
 export const HOLD_COMMAND_TIMEOUT_MS = 180_000;
+
+export type HoldCommandSpawn = (
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+) => ChildProcess;
 
 const running = new Map<string, { kill: () => void }>();
 
@@ -15,20 +27,42 @@ export async function runHoldCommand(input: {
   cwd: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  spawn?: HoldCommandSpawn;
+  allowlist?: readonly HoldCommandRule[];
+  extraEnvKeys?: readonly string[];
+  envSource?: NodeJS.ProcessEnv;
 }): Promise<{
+  denied?: boolean;
+  reason?: HoldCommandDenyReason;
   exitCode: number | null;
   stdout: string;
   stderr: string;
   timedOut: boolean;
   cancelled: boolean;
 }> {
+  const decision = authorizeHoldCommand(input.command, input.allowlist);
+  if (!decision.ok) {
+    return {
+      denied: true,
+      reason: decision.reason,
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      timedOut: false,
+      cancelled: false,
+    };
+  }
+
   killHoldCommand(input.threadId);
   const timeoutMs = input.timeoutMs ?? HOLD_COMMAND_TIMEOUT_MS;
+  const spawnFn = input.spawn ?? spawn;
+  const env = pickHoldCommandEnv(input.envSource ?? process.env, input.extraEnvKeys);
+  const [file, ...args] = decision.argv;
   return new Promise((resolve) => {
-    const child = spawn(input.command, {
+    const child = spawnFn(file!, args, {
       cwd: input.cwd,
-      shell: true,
-      env: process.env,
+      shell: false,
+      env,
     });
     let stdout = '';
     let stderr = '';

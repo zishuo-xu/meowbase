@@ -1,7 +1,12 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { AgentId, AgentProfile } from '@meowbase/shared';
-import { AGENT_IDS, DEFAULT_ROSTER } from '@meowbase/shared';
+import type { AgentId, AgentProfile, HoldCommandRule } from '@meowbase/shared';
+import {
+  AGENT_IDS,
+  DEFAULT_HOLD_COMMAND_ALLOWLIST,
+  DEFAULT_ROSTER,
+  parseHoldCommandAllowlist,
+} from '@meowbase/shared';
 
 export const MODEL_PROTOCOLS = ['anthropic', 'openai', 'gemini'] as const;
 export type ModelProtocol = (typeof MODEL_PROTOCOLS)[number];
@@ -66,6 +71,10 @@ export interface Config {
   defaultAgentId: AgentId;
   agents: AgentSpec[];
   models: ModelPreset[];
+  /** 等跑白名单;配置可覆盖,默认用 shared 那张短表 */
+  holdCommands: HoldCommandRule[];
+  /** 子进程额外放行的环境变量名 */
+  holdCommandEnv: string[];
 }
 
 export const DEFAULT_A2A_MAX_DEPTH = 3;
@@ -150,6 +159,8 @@ interface TeamFile {
   defaultAgentId?: string;
   models?: Array<Partial<ModelPreset> & { id: string }>;
   agents?: Array<Partial<AgentSpec> & { id: string }>;
+  holdCommands?: unknown;
+  holdCommandEnv?: unknown;
 }
 
 function parseA2AMaxDepth(raw: string | number | undefined): number {
@@ -462,6 +473,7 @@ export function writeTeamFile(
     models?: ModelPreset[];
   },
 ): void {
+  const existing = readTeamFile(configPath);
   const payload: TeamFile = {
     a2a: { maxDepth: input.a2aMaxDepth },
     defaultAgentId: input.defaultAgentId,
@@ -486,6 +498,8 @@ export function writeTeamFile(
       ...(a.handoff && a.handoff.length > 0 ? { handoff: a.handoff } : {}),
       ...(a.doneWhen && a.doneWhen.length > 0 ? { doneWhen: a.doneWhen } : {}),
     })),
+    ...(existing.holdCommands !== undefined ? { holdCommands: existing.holdCommands } : {}),
+    ...(existing.holdCommandEnv !== undefined ? { holdCommandEnv: existing.holdCommandEnv } : {}),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
 }
@@ -709,5 +723,15 @@ export function loadConfig(
     defaultAgentId,
     agents: bound,
     models,
+    holdCommands: parseHoldCommandAllowlist(file.holdCommands) ?? [...DEFAULT_HOLD_COMMAND_ALLOWLIST],
+    holdCommandEnv: parseHoldCommandEnv(file.holdCommandEnv),
   };
+}
+
+function parseHoldCommandEnv(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

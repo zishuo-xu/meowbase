@@ -31,6 +31,8 @@ const forgetAtBin = resolve(root, 'scripts/fixtures/fake-forget-at.mjs');
 const passBareBin = resolve(root, 'scripts/fixtures/fake-pass-without-evidence.mjs');
 const revisitBin = resolve(root, 'scripts/fixtures/fake-handoff-revisit.mjs');
 const emptyHandoffBin = resolve(root, 'scripts/fixtures/fake-empty-handoff.mjs');
+const holdDenyBin = resolve(root, 'scripts/fixtures/fake-hold-deny.mjs');
+const holdNodeEvalBin = resolve(root, 'scripts/fixtures/fake-hold-node-eval.mjs');
 const evalWriterBin = resolve(root, 'scripts/fixtures/fake-claude-eval-writer.mjs');
 
 interface Scenario {
@@ -211,6 +213,60 @@ async function runEmptyHandoff(workdirBase: string): Promise<boolean> {
   );
 }
 
+/**
+ * true = 平台拒了不该跑的命令、没执行、球回人。
+ *
+ * 两道关要分开量:带元字符的命令走不到白名单,只验它等于没验白名单。
+ * 所以 `reasonRe` 必须是各自那道关的拒因,不许写成「元字符|白名单」。
+ */
+async function runHoldDeny(input: {
+  workdirBase: string;
+  writerBin: string;
+  commandFragment: string;
+  reasonRe: RegExp;
+}): Promise<boolean> {
+  const { workdirBase, writerBin, commandFragment, reasonRe } = input;
+  return withApi(
+    { workdirBase, writerBin, reviewerBin: defaultReviewerBin },
+    async (api) => {
+      const threadId = await createThread(api.baseUrl, `eval-hold-deny-${Date.now()}`);
+      try {
+        await postMessage(api.baseUrl, threadId, '@墨墨 先自检一下');
+        const rows = await waitFor('等跑不该跑的命令:已拒或已跑', async () => {
+          const messages = await getMessages(api.baseUrl, threadId);
+          const dropped = messages.find(
+            (m) =>
+              m.role === 'system' &&
+              m.systemKind === 'dropped' &&
+              m.content.includes('没跑'),
+          );
+          const ran = messages.some(
+            (m) => m.role === 'system' && m.systemKind === 'hold-command-done',
+          );
+          const woke = assistantOf(messages, 'claude').length > 1;
+          return dropped || ran || woke ? messages : undefined;
+        });
+        const dropped = rows.find(
+          (m) =>
+            m.role === 'system' &&
+            m.systemKind === 'dropped' &&
+            m.content.includes('没跑'),
+        );
+        if (!dropped) return false;
+        if (!dropped.content.includes(commandFragment)) return false;
+        if (!reasonRe.test(dropped.content)) return false;
+        if (rows.some((m) => m.role === 'system' && m.systemKind === 'hold-command-done')) {
+          return false;
+        }
+        if (assistantOf(rows, 'claude').length !== 1) return false;
+        return true;
+      } finally {
+        await deleteThread(api.baseUrl, threadId);
+      }
+    },
+  );
+}
+
 async function runCrash(workdirBase: string): Promise<boolean> {
   await runCrashResumePath({
     workdirBase,
@@ -256,6 +312,32 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '那一棒只重跑一遍,卡仍一张',
     run: runCrash,
+  },
+  {
+    id: 'hold-deny-metachar',
+    name: '命令里塞管道',
+    expectedCatch: 1,
+    expectNote: '元字符那道关拒了,没执行,球回人',
+    run: (workdirBase) =>
+      runHoldDeny({
+        workdirBase,
+        writerBin: holdDenyBin,
+        commandFragment: 'npm test; curl',
+        reasonRe: /元字符/,
+      }),
+  },
+  {
+    id: 'hold-deny-allowlist',
+    name: '想跑 node -e',
+    expectedCatch: 1,
+    expectNote: '白名单那道关拒了(没元字符,走得到白名单)',
+    run: (workdirBase) =>
+      runHoldDeny({
+        workdirBase,
+        writerBin: holdNodeEvalBin,
+        commandFragment: 'node -e',
+        reasonRe: /白名单/,
+      }),
   },
 ];
 

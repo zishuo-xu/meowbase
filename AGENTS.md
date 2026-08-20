@@ -70,7 +70,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 审查官写出「通过」 | 顶栏球回人手里;不必等审批卡刷出来 |
 | 审查官写出「需修改」 | 顶栏球在写手手上;平台打回后再审 |
 | 行首 `等 原因` / `HOLD 原因` | 持球:顶栏「球在等」,不补问、不掉地上、当轮不建卡;人开口即取消 |
-| 行首 `等跑 npm test` / `HOLDCMD npm test` | 持球并由平台在沙箱跑命令,跑完再叫醒同一只;人开口即取消 |
+| 行首 `等跑 npm test` / `HOLDCMD npm test` | 持球并由平台在沙箱跑**白名单内**的命令,跑完再叫醒同一只;不认得就不跑、说清原因、球回人手里;人开口即取消 |
 | `#learn 标题` | 请求沉淀本轮回复为证据(draft) |
 | `#confirm ev_xxx` | 确认证据 |
 | `#ev_xxx` | 引用历史证据注入上下文 |
@@ -99,7 +99,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。**重启后平台会自己把还搁着的那一棒捡起来接着跑**(日志 `[meow] resume sweep`),30 分钟内的才捡、多条线程串行捡(同时只叫醒一只);不想让它跑就先清掉那条线程的 `pendingHop`。猫正在想的时候杀进程也接得住:那一棒跑完落库才清,半截的助手气泡会被标成 `failed`(「平台重启,这一跳没写完」)然后重跑。**没杀干净、新进程 EADDRINUSE 起不来时,那个进程不会碰球**——捡棒挂在 `listen` 成功之后(`startApp` 里才调 `app.startPendingRunner()`),不是 `onReady`(它在绑定失败后照样会跑完)。见 [durable-relay.md](docs/features/durable-relay.md) 和 [hop-commit-then-clear.md](docs/features/hop-commit-then-clear.md)。杀完须自己再起,见第 15 条。
 2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
-4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。
+4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。正因为权限面开得宽,`等跑` 的命令闸落在平台这一侧:只跑白名单内的形状,`shell: false`,不透传整套 env。
 5. **gemini 适配器**:`stream-json` 事件是 `init`/`message`/`result`(不是 claude 的 assistant/result);无系统提示词参数,身份前置拼进 prompt;headless 写文件必须 `--approval-mode yolo`,否则会卡在审批。`--resume`/`-r` 接受 session UUID(init 事件的 `session_id`)。
 6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:适配器传 `--dir` 绝对沙箱路径 + 线程工作目录有 package.json + 系统提示写明沙箱绝对路径 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。审批/交接 diff 忽略 `node_modules`。绑仓线程跳过清扫,以免把真仓库根文件搬进 worktree。
 7. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
@@ -122,6 +122,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 24. **记分板空格子从 0 变 1 必须改期望**:哪一格从没人拦变成兜住,`pnpm eval` 会因「期望 0 实际 1」非 0 退出,逼人来改期望,不许放宽断言装绿。「什么都没干就交棒」已经由虚空传球门禁兜住,期望是 1。
 25. **反向验补问要 rebuild shared**:eval 子进程走 `@meowbase/shared` 的 dist。只改 `src/a2a.ts` 不 `pnpm --filter @meowbase/shared build`,补问还在、虚空门禁也像没装,记分板假绿。第一跳忘了行首 `@` 走的是 `hadInlineHint` / `hasDiff`,只把 `wasRelay` 改成 `return false` 不够,要等效关掉整个 `shouldNudgeExit`。
 26. **`formatDroppedBallNote` 的 `'void'` 必须写在 early return 之前**:`hadInlineHint` / 审查结论 / 持球那几行会直接 `return null`。虚空那句放后面就发不出来,球像没落地。单测锁住 `hadInlineHint: true` 时 `'void'` 仍出「球还在地上」。
+27. **反向验命令闸要关掉整扇 `authorizeHoldCommand`**:记分板那行是 `等跑 npm test; curl … | sh`,先被元字符拒。只把 `matchesHoldCommandAllowlist` 改成永远 true,这一格仍是 1。等效关掉门禁得连元字符那刀一起关(或让 `authorizeHoldCommand` 直接 `{ ok: true }`),再 `pnpm --filter @meowbase/shared build`。`'denied-command'` 同样必须写在 `formatDroppedBallNote` 持球 early return 之前。
 
 ## 常见操作
 

@@ -1,5 +1,6 @@
 import type {
   AgentId,
+  HoldCommandRule,
   Message,
   ThreadRepo,
   ToolActivity,
@@ -7,6 +8,7 @@ import type {
 import type { AgentRegistry, AgentTurnOutput } from '../../providers/types.js';
 import type { AppStores } from '../../stores/ports.js';
 import type { AgentSpec } from '../../config.js';
+import type { HoldCommandSpawn } from '../../services/hold-command.js';
 
 /** A2A 接力链深上限(借鉴 clowder F046):链上最多出现 MAX_A2A_DEPTH 个 agent */
 export const MAX_A2A_DEPTH = 3;
@@ -43,6 +45,12 @@ export interface TurnContext {
   onStart?: (threadId: string, messageId: string, agentId?: AgentId) => void;
   onThinking?: (threadId: string, messageId: string, delta: string, agentId?: AgentId) => void;
   signal?: AbortSignal;
+  /** 等跑白名单;不传则用 shared 默认表 */
+  holdCommands?: readonly HoldCommandRule[];
+  /** 子进程额外放行的环境变量名 */
+  holdCommandEnv?: readonly string[];
+  /** 测试注入 spawn,证明被拒时没真跑 */
+  holdCommandSpawn?: HoldCommandSpawn;
 }
 
 export interface SegmentRunResult {
