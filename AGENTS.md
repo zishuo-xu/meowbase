@@ -122,7 +122,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 24. **记分板空格子从 0 变 1 必须改期望**:哪一格从没人拦变成兜住,`pnpm eval` 会因「期望 0 实际 1」非 0 退出,逼人来改期望,不许放宽断言装绿。「什么都没干就交棒」已经由虚空传球门禁兜住,期望是 1。
 25. **反向验补问要 rebuild shared**:eval 子进程走 `@meowbase/shared` 的 dist。只改 `src/a2a.ts` 不 `pnpm --filter @meowbase/shared build`,补问还在、虚空门禁也像没装,记分板假绿。第一跳忘了行首 `@` 走的是 `hadInlineHint` / `hasDiff`,只把 `wasRelay` 改成 `return false` 不够,要等效关掉整个 `shouldNudgeExit`。
 26. **`formatDroppedBallNote` 的 `'void'` 必须写在 early return 之前**:`hadInlineHint` / 审查结论 / 持球那几行会直接 `return null`。虚空那句放后面就发不出来,球像没落地。单测锁住 `hadInlineHint: true` 时 `'void'` 仍出「球还在地上」。
-27. **反向验命令闸要关掉整扇 `authorizeHoldCommand`**:记分板那行是 `等跑 npm test; curl … | sh`,先被元字符拒。只把 `matchesHoldCommandAllowlist` 改成永远 true,这一格仍是 1。等效关掉门禁得连元字符那刀一起关(或让 `authorizeHoldCommand` 直接 `{ ok: true }`),再 `pnpm --filter @meowbase/shared build`。`'denied-command'` 同样必须写在 `formatDroppedBallNote` 持球 early return 之前。
+27. **记分板要按「关」分行,不是按「坏毛病」分行**:命令闸是两道关(元字符、白名单)。最初只有一行 `等跑 npm test; curl … | sh`,它先被元字符拒,**白名单那道关根本走不到**——整个白名单坏掉(比如 `node` 被放进表)记分板照样绿。现在拆成两行:「命令里塞管道」量元字符关,「想跑 node -e」不带元字符、专量白名单关,两行各自断言自己的拒因(`/元字符/` vs `/白名单/`),不许写成 `/元字符|白名单/`。所以反向验也能分开做:只掐白名单 → `node -e` 那行掉到 0、塞管道那行仍是 1。**以后加新的关,同一轮加上能单独量它的那一行。**`'denied-command'` 同样必须写在 `formatDroppedBallNote` 持球 early return 之前(同第 26 条)。
+28. **`tsc` 报错时照样会写出 dist**:`pnpm --filter @meowbase/shared build` 退出码非 0 **不代表** `dist` 没变。反向验时若看见 build 失败就以为「这次改动没生效」,结论会正好反过来——`dist` 已经是改后的,eval 跑的就是被掐的行为。所以掐门禁做反向验后,复原必须 `rg` 确认 `src` 和 `dist` 两边都干净,不能只看 build 有没有过。
 
 ## 常见操作
 
