@@ -8,8 +8,9 @@ import { createMemoryStores } from '../src/stores/factories.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
 import type { AgentService } from '../src/providers/types.js';
 import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
-import { gitInit } from '../src/services/git.js';
-import { resumePendingTurn } from '../src/router/execute-turn.js';
+import { gitAddAll, gitInit } from '../src/services/git.js';
+import { executeTurn, resumePendingTurn } from '../src/router/execute-turn.js';
+import { auditApprovals, auditMessages } from '../src/stores/audit-log.js';
 import {
   createPendingRunner,
   type PendingRunner,
@@ -105,6 +106,80 @@ describe('pending-runner', () => {
     expect(messages.filter((m) => m.role === 'user')).toHaveLength(0);
     const auditActions = (await stores.audit.list({ threadId: thread.id })).map((r) => r.action);
     expect(auditActions).toContain('lease-claim');
+  });
+
+  it('没有 pendingHop 时 run 不落租约行并立刻释放租约', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '不该来')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const runner = makeRunner({ stores, registry });
+    await runner.run(thread.id);
+    const actions = (await stores.audit.list({ threadId: thread.id })).map((r) => r.action);
+    expect(actions).not.toContain('lease-claim');
+    expect(actions).not.toContain('lease-release');
+    expect(await stores.threads.claimPendingHop(thread.id, 'next-runner', 5_000)).toBe(true);
+  });
+
+  it('#approve 后跟 run 不落 lease-claim / lease-release', async () => {
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-approve-lease-'));
+    const raw = createMemoryStores();
+    const stores = {
+      ...raw,
+      messages: auditMessages(raw.messages, raw.audit),
+      approvals: auditApprovals(raw.approvals, raw.audit),
+    };
+    const registry = createAgentRegistry([stubAgent('claude', '不该来')]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    writeFileSync(join(thread.workdir, 'applied.txt'), 'v1');
+    await gitAddAll(thread.workdir);
+    const card = await stores.approvals.create({
+      threadId: thread.id,
+      writerAgentId: 'claude',
+      reviewerAgentId: 'opencode',
+      diffText: 'd',
+      diffStat: 's',
+    });
+    await executeTurn({
+      threadId: thread.id,
+      content: `#approve ${card.id}`,
+      context: { stores, registry },
+    });
+    const runner = makeRunner({ stores, registry });
+    await runner.run(thread.id);
+    const actions = (await raw.audit.list({ threadId: thread.id })).map((r) => r.action);
+    expect(actions).not.toContain('lease-claim');
+    expect(actions).not.toContain('lease-release');
+    rmSync(workdirBase, { recursive: true, force: true });
+  });
+
+  it('正常交棒 lease-claim 带 hopId,且与 hop-done 一致', async () => {
+    const raw = createMemoryStores();
+    const stores = {
+      ...raw,
+      messages: auditMessages(raw.messages, raw.audit),
+    };
+    const hop = sampleHop();
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      stubAgent('opencode', '审查通过'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.threads.setPendingHop(thread.id, hop);
+    const runner = makeRunner({ stores, registry });
+    await runner.run(thread.id);
+    const rows = await raw.audit.list({ threadId: thread.id });
+    const claim = rows.find((r) => r.action === 'lease-claim');
+    const done = rows.find((r) => r.action === 'hop-done');
+    const released = rows.find((r) => r.action === 'lease-release');
+    expect(claim?.meta?.hopId).toBe(hop.id);
+    expect(done?.meta?.hopId).toBe(hop.id);
+    expect(released).toBeTruthy();
   });
 
   it('两个 run 并发只让模型跑一棒', async () => {

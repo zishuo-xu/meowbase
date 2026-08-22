@@ -153,6 +153,48 @@ describe('auditApprovals 装饰器', () => {
       approvalId: card.id,
     });
   });
+
+  it('批准成功只落一条 approval-applied,带 approvalId;回执消息不重复落', async () => {
+    const raw = createMemoryStores();
+    const messages = auditMessages(raw.messages, raw.audit);
+    const approvals = auditApprovals(raw.approvals, raw.audit);
+    const card = await approvals.create({
+      threadId: 't-once',
+      writerAgentId: 'claude',
+      reviewerAgentId: 'gemini',
+      diffText: 'diff',
+      diffStat: '1 file changed',
+    });
+    await approvals.approve(card.id);
+    await approvals.markApplied(card.id);
+    await messages.append({
+      threadId: 't-once',
+      role: 'system',
+      content: `✅ 已批准并落地:${card.id}`,
+      status: 'completed',
+      systemKind: 'approval-applied',
+    });
+    const applied = (await raw.audit.list({ threadId: 't-once' })).filter(
+      (r) => r.action === 'approval-applied',
+    );
+    expect(applied).toHaveLength(1);
+    expect(applied[0]?.meta).toMatchObject({ approvalId: card.id });
+  });
+
+  it('approval-failed 仍从消息派生', async () => {
+    const raw = createMemoryStores();
+    const messages = auditMessages(raw.messages, raw.audit);
+    await messages.append({
+      threadId: 't-fail',
+      role: 'system',
+      content: '⚠️ 批准记下了，但提交失败：index.lock',
+      status: 'completed',
+      systemKind: 'approval-failed',
+    });
+    const rows = await raw.audit.list({ threadId: 't-fail' });
+    expect(rows.map((r) => r.action)).toEqual(['approval-failed']);
+    expect(rows[0]?.subject).toContain('提交失败');
+  });
 });
 
 describe('auditMessages 判别联合透传', () => {

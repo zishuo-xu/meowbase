@@ -87,13 +87,18 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
         return;
       }
     }
+    const pending = (await deps.threads.get(threadId))?.pendingHop;
+    if (!pending) {
+      prepared?.release?.();
+      await deps.threads.releasePendingHopLease(threadId, runnerId);
+      return;
+    }
     write(
       formatTurnLog(steal ? 'resume steal' : 'resume claim', {
         thread: threadId,
         runner: runnerId.slice(0, 8),
       }),
     );
-    const pending = (await deps.threads.get(threadId))?.pendingHop;
     await safeAppendAudit(deps.audit, {
       threadId,
       actor: 'platform',

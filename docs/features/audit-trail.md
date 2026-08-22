@@ -46,6 +46,9 @@
 - **全局列表封顶 5000 行**（`audit:all`，`LTRIM`）。按线程的 `audit:<threadId>` 不截，和「先封顶不删」一致。
 - **同一毫秒的 `ts` 会让 `since` 把那几行都算进去**（ISO 字符串相等）。没给行加序号，测试里靠间隔 2ms 回避；真要严格排序再说。
 - 顺带补齐了 redis 侧一直缺的 bundle 工厂 `createRedisStores`（memory 侧本来就有），`index.ts` 改走它——同一批类、同样参数，等价重构。
+- **subject 取第一个非空行**。模型正文常以 `\n\n` 开头，取字面第一行会落成 `''`，关键一跳在流水里像什么都没说。只有空白的行也算空；全都是空行才返回空串。超长仍按 `AUDIT_SUBJECT_MAX` 截。
+- **回执不重复落行**。`approval-applied` 既是 `markApplied` 的 store 动作，也是回执 `systemKind`。`auditMessages` 对 `STORE_OWNED_SYSTEM_KINDS` 跳过，状态变更那条是真事件，回执从 `GET /messages` 能拿到。`approval-created` / `approval-approved` / `approval-rejected` 没有对应系统消息 kind，不进集合；`approval-failed` 只有消息、没有 store 动作，必须留。
+- **没有棒不落租约行**。`POST /messages` 结尾无条件 `runner.run()`。抢到租约后先看 `pendingHop`，没有就释放租约、一行审计都不写（纯系统命令 `#approve` / `#confirm` / 星星罐子会走这条）。真有棒时 `lease-claim` 带 hopId，和后面的 `hop-done` 对得上。开机强抢（`steal`）同一道守卫；提前返回必须释放租约，否则线程被锁 TTL。
 
 ## 入口
 

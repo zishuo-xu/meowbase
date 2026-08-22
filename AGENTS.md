@@ -110,8 +110,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **文档同轮更新**:协议只改本文件协议表;演示只改现象;功能稿只改为什么。不要再抄一份完整规则。其余入口改成引用,见 [docs/README.md](docs/README.md)
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
-- **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))
-- 测试:`pnpm test`(shared 159 + api 262 + web 165 = 586);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
+- **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))。store 已经负责的 kind(`STORE_OWNED_SYSTEM_KINDS`,现为 `approval-applied`)消息侧不再重复派生,回执从 `GET /messages` 能拿到;`approval-failed` 只有消息没有 store 动作,仍从消息落。没有 `pendingHop` 不落租约行。
+- 测试:`pnpm test`(shared 164 + api 267 + web 165 = 596);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -147,6 +147,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 28. **`tsc` 报错时照样会写出 dist**:`pnpm --filter @meowbase/shared build` 退出码非 0 **不代表** `dist` 没变。反向验时若看见 build 失败就以为「这次改动没生效」,结论会正好反过来——`dist` 已经是改后的,eval 跑的就是被掐的行为。所以掐门禁做反向验后,复原必须 `rg` 确认 `src` 和 `dist` 两边都干净,不能只看 build 有没有过。**做反向验的人半路没了(掉链、被打断、换会话),工作区默认停在「门禁关着」那一侧**——这已经真的发生过一次:`resolveDiffMarker` 被打回永远返回 `'HEAD'` 剩在工作区,`git status` 里它只是一个普通 modified、混在另外六个文件里毫不显眼,接手的人很容易当成正常改动继续往下跑。接手别人半截的活,第一件事是 `git diff` 门禁那几个文件,别假设「没提交 = 没改」。掐点写成带 `RV` 之类的记号,好让 `rg` 一次扫出来。
 29. **绑仓线程猫自己提交后会补问**:`shouldNudgeExit` 看 `hasDiff`,diff 基准改成 marker 后,已经提交的改动仍算有 diff。测试 stub 若每跳都 `git commit`,补问那次会 nothing to commit 炸掉——只提交一次,或第二次只回正文。批准时**不要**补 `gitAddAll`,那会把人没在卡上看过的改动一起提交。
 30. **记分板绑仓行要自带 git 身份,默认分支从仓库读**:CI 没有全局 `user.email` / `user.name`,临时仓不配 `commit` 会失败;不同 git 版本默认分支是 `master` 或 `main`,写死会 400。`makeScratchRepo` 里配身份、`git branch --show-current` 读出来再当 `baseBranch`。新 fake 记得 `chmod +x`(第 16 条)。
+31. **审计别把回执和空抢租约当第二份真相**:`approval-applied` 既是 `markApplied` 的 store 动作,也是回执 `systemKind`。消息装饰器再按 kind 落一行,同一秒两条,读的人以为落地了两遍。store 已经负责的 kind 写进 `STORE_OWNED_SYSTEM_KINDS`,消息侧跳过;`approval-failed` 只有消息没有 store 动作,必须留。另一边:`POST /messages` 结尾无条件 `runner.run()`,`#approve` / `#confirm` / 星星罐子没有棒也会先抢租约再读 hop,落一对空 hopId 的 `lease-claim` + `lease-release`,DEMO 里「claim 和 hop-done 同一 hopId」那条不变量就破了。没有棒就释放租约、一行都不写;提前返回必须释放,否则线程被锁 TTL。subject 取第一个非空行:模型正文常以 `\n\n` 开头,取字面第一行会落成空白。
 
 ## 常见操作
 

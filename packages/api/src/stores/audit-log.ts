@@ -1,6 +1,14 @@
-import { clipAuditSubject, type AuditRow } from '@meowbase/shared';
+import { clipAuditSubject, type AuditRow, type SystemKind } from '@meowbase/shared';
 import { clip, turnLog } from '../services/turn-log.js';
 import type { ApprovalStore, AuditStore, MessageStore } from './ports.js';
+
+/**
+ * 这些 kind 已由 ApprovalStore 装饰器按状态变更落行。
+ * 回执系统消息会复用同名 kind，消息侧再派生就会同一秒两行。
+ * 状态变更是真事件，回执是「告诉人了」——审计要前者。
+ * approval-failed 只有消息、没有 store 动作，不要放进来。
+ */
+const STORE_OWNED_SYSTEM_KINDS = new Set<SystemKind>(['approval-applied']);
 
 export async function safeAppendAudit(
   audit: AuditStore,
@@ -23,13 +31,15 @@ export function auditMessages(store: MessageStore, audit: AuditStore): MessageSt
     append: async (input) => {
       const result = await store.append(input);
       if (input.role === 'system') {
-        await safeAppendAudit(audit, {
-          threadId: input.threadId,
-          actor: 'platform',
-          action: input.systemKind,
-          subject: clipAuditSubject(input.content),
-          meta: { messageId: result.id, ...input.systemMeta },
-        });
+        if (!STORE_OWNED_SYSTEM_KINDS.has(input.systemKind)) {
+          await safeAppendAudit(audit, {
+            threadId: input.threadId,
+            actor: 'platform',
+            action: input.systemKind,
+            subject: clipAuditSubject(input.content),
+            meta: { messageId: result.id, ...input.systemMeta },
+          });
+        }
       } else if (input.role === 'user') {
         await safeAppendAudit(audit, {
           threadId: input.threadId,
