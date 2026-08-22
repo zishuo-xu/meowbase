@@ -10,7 +10,7 @@
 
 ## 门（各一句）
 
-- **功能**：猫行首写 `等跑 npm test`，顶栏「球在等」，测试由平台跑；跑完同一只再开口，人不用捡球
+- **功能**：猫行首写 `等跑 npm test`，顶栏「球在等」，测试由平台跑；跑完同一只再开口。语法见 [AGENTS.md](../../AGENTS.md) 协议表
 - **价值**：难任务不再把 `npm test` 卡在 5 分钟 CLI 里，球不掉地上
 - **愿景**：邮差代跑沙箱命令并回信，不替猫推理
 - **落点**：`parseHoldCommand` + `executeTurn` 当持球停链 + HTTP 返回后在 `workdir` 跑命令 + `resumePendingTurn` 唤同一只

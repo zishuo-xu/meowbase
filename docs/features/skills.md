@@ -6,7 +6,7 @@
 
 ## 功能
 
-消息命中触发词（如 `tdd`、`脚手架`）时，把对应 md 拼进当轮 system prompt。加技能 = 加文件，不改路由。
+当跳任务正文命中触发词（如 `tdd`、`脚手架`）时，把对应 md 拼进这一跳 system prompt。加技能 = 加文件，不改路由。人消息里的词不一定带到下一只。
 
 ## 价值
 
@@ -18,7 +18,7 @@
 
 ## 架构落点
 
-`skills/manifest.json` + `skills/prompts/*.md`。`executeTurn` 按触发词取 skill，交给 `buildSystemPrompt`。
+`skills/manifest.json` + `skills/prompts/*.md`。`runSegment` 对**当跳任务正文**做 `matchSkills`，交给 `buildSystemPrompt`。第一跳是人的正文，交棒之后是平台拼的交接任务。
 
 ## 为什么这样设计
 

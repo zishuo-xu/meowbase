@@ -1,8 +1,8 @@
 # Meowbase(喵窝)
 
-> **愿景**:让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
+> **愿景**(还不是现状):让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
 >
-> **现状**:M1–M6 已闭环。人说目标 → 墨墨写+自检 → 行首交闪闪 → 审批卡 → 人批准落地。忘了行首 `@` 且该交棒时,平台再问同一只一次。顶栏显示球在谁手上;审查通过后球回人,需修改则球在写手手上;行首 `等` 持球;`@人` 可升级拍板;接力条可点开交接包。说「之前约定」会召回已确认证据;整行 `星星罐子` 停棒。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑,不丢球;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，见 [docs/features/](docs/features/)。
+> **现状**:猫按名册交棒;忘了行首 `@`、有文件改动、或要拍板时,平台和人还在场(补问、建卡、批卡、`#confirm`)。完整协议见 [AGENTS.md](AGENTS.md) 协议表。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，已落地 29 篇，见 [docs/features/](docs/features/)。
 
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。
@@ -49,15 +49,17 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 定位:墨墨主架构师、闪闪审查官、团团执行者。写完默认交闪闪审。演示步骤见 [docs/DEMO.md](docs/DEMO.md)。A2A 怎么传信息、怎么隔离上下文，见 [docs/A2A.md](docs/A2A.md)。设计理由与面试提纲见 [docs/features/](docs/features/)。
 
-## 审批流(M4)
+**难在哪、凭什么说它没坏**（五个真问题 + 三层证明 + 哪些只有人手验过）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-- 写手 agent 改动文件后,平台自动生成审批卡片并请另一 agent 审查。刚交棒、下一跳还没跑时本轮不建卡
+## 审批流
+
+- 写手改了文件、链停了、没持球时,平台建审批卡并拉审查(条件见 [AGENTS.md](AGENTS.md) 协议表「平台自己做的」)
 - 在卡片上点「批准落地」或「打回」(也可发 `#approve` / `#reject`)
 - `tsconfig.tsbuildinfo`、`.DS_Store` 等缓存文件不会出卡
 
-## Skills(M3)
+## Skills
 
-消息中带触发词(如 "tdd"、"review"、"debug")时,对应技能会注入该轮上下文:
+当跳任务正文命中触发词(如 "tdd"、"review"、"debug")时,对应技能会注入这一跳。人消息里的词不一定带到下一只。目录:
 
 - `tdd` / `测试驱动` → 测试驱动开发
 - `review` / `审查` / `代码评审` → 代码审查
@@ -67,7 +69,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 ## 配置
 
-`.env` / 环境变量只管 Redis、端口、超时。**猫是谁、用哪条 CLI、什么模型**写在仓库根 `meowbase.config.json`。也可以在页面里打开 **团队 Hub** 改名册和模型目录,保存后立即生效,不必重启 API。
+`.env` / 环境变量只管 Redis、端口、超时。**猫是谁、用哪条 CLI、什么模型**写在仓库根 `meowbase.config.json`。也可以在页面里打开 **团队 Hub** 改名册和模型目录:保存走 `PATCH /api/config`,改内存再落盘,立即生效,不必重启。手改仓库根那份 json 则必须重启(`tsx watch` 只盯 `src/`)。
 
 ```json
 {
@@ -86,11 +88,11 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 第三方模型在 Hub 填网关 URL 和 API Key。密钥写入本机 `meowbase.secrets.json`(已 gitignore),不会进仓库。
 环境变量仍可覆盖单字段:`CLAUDE_BIN` / `GEMINI_BIN` / `OPENCODE_BIN`、`GEMINI_MODEL` / `OPENCODE_MODEL`、`A2A_MAX_DEPTH`。
-`GET /api/config` 返回合并后的名册。手动改 json 后仍需重启 API;Hub 里点保存是热更新。
+`GET /api/config` 返回合并后的名册。两条路不要混:Hub 保存是热更新;手改仓库根 json 必须重启。
 
-## 人怎么下任务,猫怎么交接
+## 人怎么下任务
 
-对齐 clowder F046:**只有另起一行、行首的 `@名字` 才会路由**。
+对齐 clowder F046:**只有另起一行、行首的 `@名字` 才会路由**。完整协议(谁打什么、猫写什么、平台自己做什么)见 [AGENTS.md](AGENTS.md) 协议表。
 
 ```
 帮我把加法做成可测的
@@ -106,29 +108,19 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 同一道题
 ```
 
-- 人和猫都只认行首 `@`。句中「不要 `@闪闪`」不会叫它;同一行 `@墨墨 @团团` 只叫墨墨
-- 猫回复里行首 `@闪闪 请审查` = **A2A 接力**:本轮先结束,平台自己唤闪闪;插入可点开的 `🤝 接力:墨墨 → 闪闪`。这一跳没新文件、没结论、去掉交接行后正文又很短,平台不传,球回人手里
-- 猫回复里行首 `@人` / `@owner` = **升级给人拍板**,停链,顶栏「球在人手里」
-- 句中写「请 @团团 看看」**不会交接**;该交棒却没行首 `@` 时,平台再问同一只一次,仍没有才提示「球还在地上」
-- 链深默认 3(可配),已出场的猫不再回来(防环)
-- 下一棒看到的是平台拼的交接包 + 同一沙箱,不是另一只猫的 CLI 聊天记录。展开见 [docs/A2A.md](docs/A2A.md)
+下一棒看到的是平台拼的交接包 + 同一沙箱,不是另一只猫的 CLI 聊天记录。展开见 [docs/A2A.md](docs/A2A.md)。
+
+除了点名,人还能打这几样。这里只列**有什么**,规则和边界都在 [AGENTS.md](AGENTS.md) 协议表:
+
+- `#learn 标题` → `#confirm ev_xxx` —— 把这轮结论沉淀成公共证据。**人确认才进**,猫说了不算
+- 说「之前我们约定…」—— 从已确认证据里召回,不必手打 `#ev_`;可跨线程
+- 整行 `星星罐子` —— 拉闸,本轮不再叫猫
+- `#approve ap_xxx` / `#reject ap_xxx 理由` —— 审批决策(也可以直接在卡片上点)
 
 ## 多角色协作
 
-- **跨模型审查**:写手改动默认请闪闪审;墨墨写完应 `@闪闪`,团团做完也交闪闪
-- 分工由猫们自己协调,你不必当"路由器"
-
-## 消息协议(M2)
-
-- `#learn <标题>` —— 请求沉淀本轮回复为证据,系统会给出确认提示
-- `#confirm ev_xxxxxxxx` —— 确认沉淀
-- `#ev_xxxxxxxx` —— 在消息中引用历史证据,注入 agent 上下文
-- 说「之前我们约定 / 讨论过」+ 关键词 —— 从已确认证据匹配注入,可跨线程
-- 行首 `等 原因` / `HOLD 原因` —— 猫持球,顶栏「球在等」,人开口即取消
-- 行首 `等跑 npm test` / `HOLDCMD npm test` —— 平台在沙箱跑白名单内的命令,跑完再叫醒同一只;不认得就不跑、球回人手里;人开口即取消
-- 整行 `星星罐子` —— 停棒拉闸,不调猫
-- `脚手架` / `绕路了` / `喵约` —— 当轮注入对照技能
-- 三个 agent 有内置身份(墨墨/闪闪/团团),新会话自动注入
+- 默认名册是墨墨 → 闪闪;`selectReviewer` 只看 `handoffTo` 和谁还活着,不看 bin / 模型。三只可以挂同一条 CLI;是否跨模型取决于配置
+- 猫按名册交。漏交、有文件、或要拍板时,平台和人还在场(补问、建卡、批卡)。「你不必当路由器」是愿景,不是现状
 
 ## 测试
 
@@ -137,7 +129,7 @@ pnpm test              # 全部单测(shared/api/web);api 的 Redis 测试需本
 pnpm typecheck:scripts # scripts/ 的类型检查(三个包的 build 不覆盖它)
 pnpm e2e               # 整机自检:fake CLI 跑通全链 + 杀进程验续跑 + 绑不上端口不抢租约,不花钱
 pnpm eval              # 失败模式记分板:已知坏毛病 × 平台兜住率,fake CLI,不花钱
-pnpm smoke             # 真实冒烟(需要 Redis + claude CLI)
+pnpm smoke             # 真实冒烟:调 startApp,读仓库根配置;bin 可被 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 覆盖。脚本点的是 @claude,还要审查官那一跳,配置里挂了哪几条真实 CLI 就得哪几条能跑。需要本机 Redis,花钱,不进 CI
 ```
 
-> 提示:冒烟需要 claude CLI 可用(能正常认证)。若 CLI 配置了中转/自定义 provider,请先确保 key 有效。
+> 提示:冒烟走真实 CLI(能正常认证)。若 CLI 配置了中转/自定义 provider,请先确保 key 有效。

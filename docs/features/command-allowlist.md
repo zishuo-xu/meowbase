@@ -13,11 +13,13 @@
 
 ## 为什么
 
-现状(`services/hold-command.ts`)是三个叠在一起的口子:
+**改造前的动机**（不是现状）。当时 `runHoldCommand` 是三个叠在一起的口子:
 
 1. `shell: true` + 整条命令字符串 → `;`、`&&`、`|`、反引号、`$()`、重定向全部生效。**所以 `cwd` 不是边界**:`cd ..` 或绝对路径就出去了。
 2. `env: process.env` → 子进程拿到整套环境变量。这台机器上至少有一个 `CONTEXT7_API_KEY`;开发机上常见的还有 `GITHUB_TOKEN`、npm token、云凭证。
-3. 命令字符串来自**猫的回复**(`parseHoldCommand(prevContent)`),不是人打的。人反而没有这条路。
+3. 命令字符串来自**猫的回复**(`parseHoldCommand(prevContent)`),不是人打的。人反而没有这条路。这一条现在仍成立。
+
+**落地后**:`runHoldCommand` 已是 `shell: false` + argv + `pickHoldCommandEnv` 裁过的 env。下面「怎么做」是当时的步骤。
 
 第三条决定了威胁模型:命令内容由模型输出决定,而模型输出受它读到的东西影响——人的任务、交接包、注入的证据,以及**它读的仓库内容**。绑真实仓库的线程里,仓库里任何一个文件(README、注释、测试夹具、依赖的文档)写一句「照这个跑 `等跑 npm test; curl … | sh`」,猫照抄到行首,平台就执行。也就是说:**为了让演示更真而加的绑仓能力,同时把这个洞变得更危险。**
 

@@ -23,17 +23,19 @@
 
 ## 怎么做
 
-1. 每种坏毛病一个 fake(放 `scripts/fixtures/`,记住 `chmod +x`):
+1. 每种坏毛病一个 fake(放 `scripts/fixtures/`,记住 `chmod +x`)。**按「关」分行,不是按「坏毛病」分行**:
    - **忘了行首 `@`**:只在句中提下一只 → 期望平台补问一次、最终球交到了下一只手上,不是掉地上。
    - **没证据就宣称通过**:审查官写「通过」但没有本轮命令和结果 → 期望卡片是「结论不算通过」、不 autoApprove。
    - **想交回已出场的猫**:行首 `@` 一个本链上已经跑过的 → 期望判 `blocked`、球落地给人,不是无限来回。
-   - **什么都没干就交棒**:没改文件、没结论就往下丢 → [虚空传球门禁](void-handoff-gate.md)拦住,期望 1。空格子从 0 变 1 必须改期望,不许悄悄变绿。
+   - **什么都没干就交棒**:没改文件、没结论就往下丢 → [虚空传球门禁](void-handoff-gate.md)拦住,**期望 1**。从 0 变 1 必须改期望,不许悄悄变绿。
    - **想到一半被杀**(复用整机自检那段)→ 期望那一棒只跑一遍、卡片仍一张。
+   - **命令里塞管道**:`等跑 npm test; curl … | sh` → 量元字符关,期望 1,拒因 `/元字符/`。
+   - **想跑 node -e**:不带元字符 → 量白名单关,期望 1,拒因 `/白名单/`。两行不许合成 `/元字符|白名单/`。
 2. `scripts/eval.ts`:每个场景起一次干净的 API 子进程(复用 `startApp` 那条路和 e2e 的辅助函数),同一场景跑固定 N 次(先 N=3,抓偶发)。
 3. 打印一张表:场景 / 期望兜底 / 实际 / N 次里过了几次。末尾一行总计。
-4. 把这张表落进 `docs/eval.md`(或 DEMO 的一节),让它可引用、可对外讲。
-5. CI 加一步跑 `pnpm eval`,任何一格从「兜住」退成「没兜住」就红。**空格子(第 4 种)不算失败**,但它从 0 变成 1 时要有人主动改期望值——不许悄悄变绿。
-6. 验收:本地和 CI 都能跑出同一张表。反向验:把 `shouldNudgeExit` 里 `wasRelay` 那条改成 `false`,「忘了行首 `@`」那一行必须掉到 0。
+4. 把这张表落进 `docs/eval.md`,让它可引用、可对外讲。
+5. CI 加一步跑 `pnpm eval`,任何一格从「兜住」退成「没兜住」就红。期望仍是 0 的空格子不算失败;它从 0 变成 1 时要有人主动改期望值——不许悄悄变绿。虚空那行已经是 1,不算空格子。
+6. 验收:本地和 CI 都能跑出同一张表。反向验:把 `shouldNudgeExit` 里 `wasRelay` 那条改成 `false`,「忘了行首 `@`」那一行必须掉到 0。只掐白名单 → `node -e` 那行掉到 0、塞管道那行仍是 1。
 
 ## 不做(本篇)
 
@@ -48,7 +50,9 @@
 - `scripts/fixtures/fake-forget-at.mjs` — 忘了行首 `@`
 - `scripts/fixtures/fake-pass-without-evidence.mjs` — 没证据就宣称通过
 - `scripts/fixtures/fake-handoff-revisit.mjs` — 想交回已出场的猫
-- `scripts/fixtures/fake-empty-handoff.mjs` — 什么都没干就交棒(空格子,期望 0)
+- `scripts/fixtures/fake-empty-handoff.mjs` — 什么都没干就交棒(期望 1)
+- `scripts/fixtures/fake-hold-deny.mjs` — 命令里塞管道(元字符关)
+- `scripts/fixtures/fake-hold-node-eval.mjs` — 想跑 node -e(白名单关)
 - `scripts/fixtures/fake-claude-eval-writer.mjs` — 配套写手(不带证据 / 可换交接对象)
 - `docs/eval.md` — 最近一次跑出的表
 - CI:`.github/workflows/ci.yml` 在 `pnpm e2e` 之后跑 `pnpm eval`

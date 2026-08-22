@@ -17,7 +17,9 @@
 
 ## 为什么
 
-WS 现在只推 `increment` / `activity` / `start` / `thinking`（`packages/api/src/http/server.ts` 468–477）。**没有一种事件表示「有系统消息或审批卡产生了」**。而 `followPendingChain` 是 POST 返回之后才在后台跑的,所以它产出的接力条、球权提示、审批卡全落在 HTTP 响应之外;前端只在 `send()` 返回那一刻拉过一次消息,之后没人告诉它该再拉。侧栏角标同理 —— `refreshThreads()` 在卡片存在之前就跑完了。
+**改造前的动机**（不是现状）:当时 WS 只推 `increment` / `activity` / `start` / `thinking`（`emitSync` 还没加）。**没有一种事件表示「有系统消息或审批卡产生了」**。而 `followPendingChain` 是 POST 返回之后才在后台跑的,所以它产出的接力条、球权提示、审批卡全落在 HTTP 响应之外;前端只在 `send()` 返回那一刻拉过一次消息,之后没人告诉它该再拉。侧栏角标同理 —— `refreshThreads()` 在卡片存在之前就跑完了。
+
+**落地后**:已有 `{ type: 'sync' }`（`emitSync` + `/api/ws` 转发）。下面「怎么做」是当时的步骤。
 
 真机实测（真实模型,绑真实仓库）:闪闪写完「结论:通过」、卡片已在 Redis,界面仍停在「球在闪闪手上 / 思考中…」,重新点一下线程才刷出卡片和「球在人手里」。而 `docs/DEMO.md` 写「不必再发继续」,`AGENTS.md` 写「审查官写出通过 → 顶栏球回人手里;不必等审批卡刷出来」。两句在服务端都是真的,在人眼前都是假的。
 

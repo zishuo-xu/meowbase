@@ -4,11 +4,12 @@
 
 | 读什么 | 给谁 | 文件 |
 |---|---|---|
-| 接手必读 | 人或 agent | [AGENTS.md](../AGENTS.md) |
+| 接手必读 + **协议表(唯一写全)** | 人或 agent | [AGENTS.md](../AGENTS.md) |
+| **是什么 / 难在哪 / 凭什么说它没坏** | 面试 / 简历 | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 人怎么用 | 演示 / 简历 | [README.md](../README.md)、[DEMO.md](DEMO.md) |
 | 猫怎么协作（现行怎么跑） | 人 / 面试深挖 | [A2A.md](A2A.md) |
 | **功能设计（一篇一刀）** | 写完就做 | [features/](features/) |
-| 总设计（开工时批准） | 历史 + 仍有效的总图 | [superpowers/specs/2026-08-16-meowbase-design.md](superpowers/specs/2026-08-16-meowbase-design.md) |
+| 总设计（开工时批准） | **历史稿**,别当现行能力表 | [superpowers/specs/2026-08-16-meowbase-design.md](superpowers/specs/2026-08-16-meowbase-design.md) |
 | 旧里程碑计划 | 不改写 | `superpowers/plans/`（历史稿） |
 
-一次只写一篇功能稿、只做这一篇。协议一变，同一轮改 `AGENTS.md` / `README.md` / `DEMO.md` / 那一篇。
+一次只写一篇功能稿、只做这一篇。协议只改 `AGENTS.md` 协议表；演示只改现象；功能稿只改为什么。不要再抄一份完整规则。

@@ -51,4 +51,4 @@
 - `scripts/fixtures/fake-gemini-reviewer.mjs` — 审查官 fake(gemini stream-json,命令+结果 + 单独一行「通过」)
 - `tsconfig.scripts.json` + `pnpm typecheck:scripts` — 把 `scripts/` 纳入类型检查
 - `scripts/smoke.ts` — 真实 CLI 冒烟(不进 CI);调 `startApp`(仓库根 `configPath` + 临时 `workdirBase`)
-- CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts`、`pnpm e2e`；记分板见 [failure-mode-eval.md](failure-mode-eval.md)
+- CI:`.github/workflows/ci.yml` 在 `pnpm -r build` 之后跑 `typecheck:scripts`、`pnpm test`、`pnpm e2e`、`pnpm eval`；记分板见 [failure-mode-eval.md](failure-mode-eval.md)

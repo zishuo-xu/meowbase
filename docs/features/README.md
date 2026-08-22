@@ -7,7 +7,7 @@
 3. 做完、状态改成 `已落地`，协议入口同一轮改掉。
 4. 再开下一篇。不要一次写齐「以后可能做的」。
 
-`设计中` 同时最多一篇。上一刀 [command-allowlist.md](command-allowlist.md) 已落地。
+`设计中` 同时最多一篇。表里没有「设计中」时，最后一篇已落地的就是上一刀。
 
 设计尽量靠拢他们公开的图和语义。落地先薄后厚，不抄源码。
 
@@ -27,9 +27,9 @@
 | [auto-follow-pending.md](auto-follow-pending.md) | 已落地 | 交棒后平台自己续跑 |
 | [exit-nudge.md](exit-nudge.md) | 已落地 | 无出口时再问同一只一次 |
 | [review-ball-to-human.md](review-ball-to-human.md) | 已落地 | 审查通过后顶栏球回人 |
-| [revise-ball-to-writer.md](revise-ball-to-writer.md) | 已落地 | 需修改后顶栏球在写手 |
+| [revise-ball-to-writer.md](revise-ball-to-writer.md) | 已落地 | 需修改后先球在写手,卡出后回人 |
 | [hold-wait.md](hold-wait.md) | 已落地 | 行首「等」持球 |
-| [verification-gate.md](verification-gate.md) | 已落地 | 没证据不能当通过 |
+| [verification-gate.md](verification-gate.md) | 已落地 | 没证据:卡上不算通过,不自动落地 |
 | [hub-capability.md](hub-capability.md) | 已落地 | Hub 能力表 |
 | [hold-command-wake.md](hold-command-wake.md) | 已落地 | 行首「等跑」平台托管命令再叫醒 |
 | [thread-repo-worktree.md](thread-repo-worktree.md) | 已落地 | 线程绑真实仓库,worktree 隔离 |
