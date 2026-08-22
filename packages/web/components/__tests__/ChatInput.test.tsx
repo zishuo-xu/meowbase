@@ -17,6 +17,16 @@ describe('ChatInput', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it('Shift+Enter 不提交', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+    fireEvent.change(input, { target: { value: '第一行' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((input as HTMLTextAreaElement).value).toBe('第一行');
+  });
+
   it('输入法组合中(IME)的回车不提交', () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} />);
@@ -26,6 +36,22 @@ describe('ChatInput', () => {
     fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
     expect(onSend).not.toHaveBeenCalled();
     expect((input as HTMLTextAreaElement).value).toBe('写个函数');
+  });
+
+  it('nativeEvent.isComposing 时回车不提交', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+    fireEvent.change(input, { target: { value: '写个函数' } });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    expect(onSend).not.toHaveBeenCalled();
+    expect((input as HTMLTextAreaElement).value).toBe('写个函数');
+  });
+
+  it('输入区提示 Enter 发送与 Shift+Enter 换行', () => {
+    render(<ChatInput onSend={vi.fn()} />);
+    expect(screen.getByPlaceholderText(/⇧↵换行/)).toBeTruthy();
+    expect(screen.getByText('Enter 发送 · Shift+Enter 换行')).toBeTruthy();
   });
 
   it('sending 且有 onAbort 时显示中止', () => {

@@ -111,7 +111,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))。store 已经负责的 kind(`STORE_OWNED_SYSTEM_KINDS`,现为 `approval-applied`)消息侧不再重复派生,回执从 `GET /messages` 能拿到;`approval-failed` 只有消息没有 store 动作,仍从消息落。没有 `pendingHop` 不落租约行。
-- 测试:`pnpm test`(shared 164 + api 267 + web 165 = 596);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
+- 测试:`pnpm test`(shared 164 + api 267 + web 170 = 601);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -128,7 +128,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线)。空沙箱 diff 仍是 `git diff HEAD`;绑仓线程用 `lastApprovedSha`(没有则 `merge-base <baseBranch> HEAD`),这样猫自己提交后审批卡还建得出来。绑仓线程不调 gitInit(会覆盖目标仓的 `.gitignore`)。
 10. **IME 输入法**:前端回车处理必须检查组合状态(composingRef + isComposing + keyCode 229),否则中文选词回车会误发送。
 11. **Redis 测试数据污染**:测试线程/证据会留在 Redis,断言前用唯一 id(如 `t-${Date.now()}`)。
-12. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——改 shared 后需重启 api 或手动 `pnpm --filter @meowbase/shared build`。
+12. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——必须手动 `pnpm --filter @meowbase/shared build`。不 build 就不生效。`tsx watch` 盯着 `packages/shared/dist/index.js`,build 完 API 会自己重启(日志 `[tsx] change in ./../shared/dist/index.js Restarting...`),不必再手动重启。
 13. **未跟踪源码会被沙箱清扫误搬走**:新文件若还没 `git add`,旧版 `sweepStrayFiles` 会把它 `rename` 进 `work/<threadId>/`,tsx 记成 `unlink`,API 重启后模块找不到、3200 掉线。规避:新适配器/测试立刻提交(或至少 `git add`);改清扫规则后只允许浅层散落文件;API 日志出现 `sweepStrayFiles: 移回沙箱` 时去对应线程目录找回。
 14. **手改仓库根 `meowbase.config.json` 不会热重载**:`tsx watch` 只盯 `src/`。改完 `GET /api/config` 还是旧值,必须重启 API 才生效。名册里改 `handoffTo` / 模型也一样。常见操作「改 agent / 模型」写了重启,就是这条路。**另一条路**:Hub 点保存走 `PATCH /api/config`,改内存再落盘,立即生效,不必重启。
 15. **`kill -9` 掉 3200 上的进程后,`tsx watch` 不会自动重生**:它只在文件变化时重启,进程崩了不管。第 1 条说了必须按端口杀、重启后平台会捡棒;杀完还得自己再起一次(`pnpm --filter @meowbase/api dev`),别以为它会自愈。

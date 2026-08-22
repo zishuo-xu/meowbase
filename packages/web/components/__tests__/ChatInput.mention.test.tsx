@@ -36,5 +36,25 @@ describe('ChatInput 提及补全', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' }); // 高亮移到闪闪
     fireEvent.keyDown(input, { key: 'Enter' });
     expect((input as HTMLTextAreaElement).value).toBe('@闪闪 ');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('Tab 选择当前高亮项且不提交', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+
+    fireEvent.change(input, { target: { value: '@', selectionStart: 1 } });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Tab' });
+    expect((input as HTMLTextAreaElement).value).toBe('@闪闪 ');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('补全菜单写明 Enter / Tab / 方向键 / Esc', () => {
+    render(<ChatInput onSend={vi.fn()} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+    fireEvent.change(input, { target: { value: '@', selectionStart: 1 } });
+    expect(screen.getByText('Enter / Tab 选中 · ↑↓ 移动 · Esc 关闭')).toBeTruthy();
   });
 });
