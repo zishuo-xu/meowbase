@@ -1,6 +1,8 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export const root = resolve(import.meta.dirname, '../..');
 export const defaultWriterBin = resolve(root, 'scripts/fixtures/fake-claude-writer.mjs');
@@ -37,6 +39,19 @@ export interface ApprovalRow {
   id: string;
   status: string;
   reviewComment?: string;
+  diffText?: string;
+}
+
+export interface ThreadRow {
+  id: string;
+  workdir: string;
+  pendingHop?: { to?: string } | null;
+}
+
+export interface ScratchRepo {
+  repoPath: string;
+  baseBranch: string;
+  cleanup: () => void;
 }
 
 export interface AuditRow {
@@ -157,15 +172,58 @@ export async function json<T>(res: Response, label: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function createThread(baseUrl: string, title: string): Promise<string> {
+/** 临时真仓当绑仓目标。配本地 git 身份(CI 没有全局身份),分支名从仓库读,不写死 main/master。 */
+export function makeScratchRepo(): ScratchRepo {
+  const repoPath = mkdtempSync(join(tmpdir(), 'meowbase-eval-repo-'));
+  const git = (args: string[]): string =>
+    execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' });
+  try {
+    git(['init', '-q']);
+    git(['config', 'user.name', 'meowbase-eval']);
+    git(['config', 'user.email', 'meowbase-eval@local']);
+    git(['config', 'commit.gpgsign', 'false']);
+    writeFileSync(join(repoPath, 'README.md'), 'eval scratch\n');
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'init']);
+    const baseBranch = git(['branch', '--show-current']).trim();
+    if (!baseBranch) throw new Error('临时仓没有默认分支');
+    return {
+      repoPath,
+      baseBranch,
+      cleanup: () => rmSync(repoPath, { recursive: true, force: true }),
+    };
+  } catch (err) {
+    rmSync(repoPath, { recursive: true, force: true });
+    throw err;
+  }
+}
+
+export async function createThread(
+  baseUrl: string,
+  title: string,
+  opts?: { repoPath?: string; baseBranch?: string },
+): Promise<string> {
   const res = await fetch(`${baseUrl}/api/threads`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ title, primaryAgentId: 'claude' }),
+    body: JSON.stringify({
+      title,
+      primaryAgentId: 'claude',
+      ...(opts?.repoPath ? { repoPath: opts.repoPath } : {}),
+      ...(opts?.baseBranch ? { baseBranch: opts.baseBranch } : {}),
+    }),
   });
   const thread = await json<{ id: string }>(res, 'POST /api/threads');
   if (!thread.id) throw new Error('建线程未返回 id');
   return thread.id;
+}
+
+export async function getThread(baseUrl: string, threadId: string): Promise<ThreadRow> {
+  const res = await fetch(`${baseUrl}/api/threads`);
+  const threads = await json<ThreadRow[]>(res, 'GET /api/threads');
+  const thread = threads.find((item) => item.id === threadId);
+  if (!thread) throw new Error(`线程不存在: ${threadId}`);
+  return thread;
 }
 
 export async function postMessage(baseUrl: string, threadId: string, content: string): Promise<void> {

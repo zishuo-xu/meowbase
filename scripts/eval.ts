@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { createRedisClient, assertStorageReady } from '../packages/api/src/redis.js';
 import {
   EVAL_REDIS_URL,
@@ -10,7 +12,9 @@ import {
   deleteThread,
   getApprovals,
   getMessages,
+  getThread,
   killHard,
+  makeScratchRepo,
   patchAutoApprove,
   postMessage,
   root,
@@ -23,6 +27,8 @@ import {
   type MessageRow,
 } from './lib/harness.js';
 
+const exec = promisify(execFile);
+
 const REDIS_URL = EVAL_REDIS_URL;
 const N = 3;
 const DOCS_EVAL = resolve(root, 'docs/eval.md');
@@ -34,6 +40,7 @@ const emptyHandoffBin = resolve(root, 'scripts/fixtures/fake-empty-handoff.mjs')
 const holdDenyBin = resolve(root, 'scripts/fixtures/fake-hold-deny.mjs');
 const holdNodeEvalBin = resolve(root, 'scripts/fixtures/fake-hold-node-eval.mjs');
 const evalWriterBin = resolve(root, 'scripts/fixtures/fake-claude-eval-writer.mjs');
+const selfCommitBin = resolve(root, 'scripts/fixtures/fake-self-commit.mjs');
 
 interface Scenario {
   id: string;
@@ -62,6 +69,29 @@ async function withApi<T>(
   } finally {
     killHard(api.proc);
     await sleep(200);
+  }
+}
+
+async function withBoundApi<T>(
+  opts: Omit<HarnessStartOpts, 'redisUrl'> & { redisUrl?: string },
+  fn: (api: ApiHandle, bound: { threadId: string; workdir: string }) => Promise<T>,
+): Promise<T> {
+  const scratch = makeScratchRepo();
+  try {
+    return await withApi(opts, async (api) => {
+      const threadId = await createThread(api.baseUrl, `eval-bound-${Date.now()}`, {
+        repoPath: scratch.repoPath,
+        baseBranch: scratch.baseBranch,
+      });
+      try {
+        const thread = await getThread(api.baseUrl, threadId);
+        return await fn(api, { threadId, workdir: thread.workdir });
+      } finally {
+        await deleteThread(api.baseUrl, threadId);
+      }
+    });
+  } finally {
+    scratch.cleanup();
   }
 }
 
@@ -277,6 +307,55 @@ async function runCrash(workdirBase: string): Promise<boolean> {
   return true;
 }
 
+/** true = 猫自己提交后审批卡仍建得出来,且 diff 里有那个文件。量的是 diff 基准,不是批准诚实性。 */
+async function runSelfCommit(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    { workdirBase, writerBin: selfCommitBin, reviewerBin: defaultReviewerBin },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写个文件并自己提交');
+      const rows = await waitFor('猫自己提交:卡已建或链已落定', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const card = hasKind(messages, 'approval-pending') || hasKind(messages, 'approval-applied');
+        const dropped = hasKind(messages, 'dropped');
+        const reviewerDone = assistantOf(messages, 'gemini').some((m) => m.status === 'completed');
+        const pending = (await getThread(api.baseUrl, bound.threadId)).pendingHop;
+        return card || dropped || (reviewerDone && !pending) ? messages : undefined;
+      });
+      if (hasKind(rows, 'dropped') && !hasKind(rows, 'approval-pending') && !hasKind(rows, 'approval-applied')) {
+        return false;
+      }
+      const approvals = await getApprovals(api.baseUrl, bound.threadId);
+      const card = approvals[0];
+      if (!card) return false;
+      if (!card.diffText?.includes('committed.txt')) return false;
+      return true;
+    },
+  );
+}
+
+/** true = 暂存区没了再批准,卡不是 applied,回执不宣称已落地。量的是批准诚实性,不是 diff 基准。 */
+async function runApproveLie(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    { workdirBase, writerBin: evalWriterBin, reviewerBin: defaultReviewerBin },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 创建一个 hello.txt 文件');
+      const card = await waitFor('批准撒谎:审批卡已建', async () => {
+        const cards = await getApprovals(api.baseUrl, bound.threadId);
+        return cards[0];
+      });
+      await exec('git', ['reset', '-q', 'HEAD'], { cwd: bound.workdir });
+      await postMessage(api.baseUrl, bound.threadId, `#approve ${card.id}`);
+      const after = await getApprovals(api.baseUrl, bound.threadId);
+      if (after.some((c) => c.status === 'applied')) return false;
+      const rows = await getMessages(api.baseUrl, bound.threadId);
+      if (hasKind(rows, 'approval-applied')) return false;
+      if (rows.some((m) => m.role === 'system' && m.content.includes('已落地'))) return false;
+      if (!hasKind(rows, 'approval-failed')) return false;
+      return true;
+    },
+  );
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -338,6 +417,20 @@ const scenarios: Scenario[] = [
         commandFragment: 'node -e',
         reasonRe: /白名单/,
       }),
+  },
+  {
+    id: 'self-commit',
+    name: '猫自己提交，平台就瞎了',
+    expectedCatch: 1,
+    expectNote: '审批卡仍建得出,diff 里有 committed.txt',
+    run: runSelfCommit,
+  },
+  {
+    id: 'approve-lie',
+    name: '提交失败还说已落地',
+    expectedCatch: 1,
+    expectNote: '卡不是 applied,回执是 approval-failed,不写已落地',
+    run: runApproveLie,
   },
 ];
 
@@ -401,13 +494,22 @@ ${notes}
 
 const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-eval-'));
 const redis = createRedisClient(REDIS_URL);
+const onlyIds = (process.env.EVAL_ONLY ?? '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
+const selected = onlyIds.length > 0 ? scenarios.filter((s) => onlyIds.includes(s.id)) : scenarios;
+if (onlyIds.length > 0 && selected.length !== onlyIds.length) {
+  const missing = onlyIds.filter((id) => !scenarios.some((s) => s.id === id));
+  throw new Error(`EVAL_ONLY 找不到: ${missing.join(', ')}`);
+}
 
 try {
   await assertStorageReady(redis);
   await redis.flushdb();
 
   const results: RowResult[] = [];
-  for (const scenario of scenarios) {
+  for (const scenario of selected) {
     await redis.flushdb();
     const details: string[] = [];
     let passed = 0;
@@ -438,7 +540,7 @@ try {
   }
 
   const table = formatTable(results);
-  writeEvalDoc(results, table);
+  if (onlyIds.length === 0) writeEvalDoc(results, table);
 
   console.log('\n失败模式记分板\n');
   console.log(table);
