@@ -45,3 +45,4 @@
 | [void-handoff-gate.md](void-handoff-gate.md) | 已落地 | 空手不许交棒 |
 | [command-allowlist.md](command-allowlist.md) | 已落地 | 平台只跑认得的命令 |
 | [git-state-tracking.md](git-state-tracking.md) | 已落地 | 猫对 git 做了什么,平台看得见 |
+| [repo-root-allowlist.md](repo-root-allowlist.md) | 已落地 | 只在允许的目录干活,只听本机说话 |

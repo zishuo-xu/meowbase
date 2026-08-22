@@ -111,7 +111,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))。store 已经负责的 kind(`STORE_OWNED_SYSTEM_KINDS`,现为 `approval-applied`)消息侧不再重复派生,回执从 `GET /messages` 能拿到;`approval-failed` 只有消息没有 store 动作,仍从消息落。没有 `pendingHop` 不落租约行。
-- 测试:`pnpm test`(shared 164 + api 267 + web 170 = 601);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
+- 测试:`pnpm test`(shared 183 + api 273 + web 172 = 628);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -148,10 +148,11 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 29. **绑仓线程猫自己提交后会补问**:`shouldNudgeExit` 看 `hasDiff`,diff 基准改成 marker 后,已经提交的改动仍算有 diff。测试 stub 若每跳都 `git commit`,补问那次会 nothing to commit 炸掉——只提交一次,或第二次只回正文。批准时**不要**补 `gitAddAll`,那会把人没在卡上看过的改动一起提交。
 30. **记分板绑仓行要自带 git 身份,默认分支从仓库读**:CI 没有全局 `user.email` / `user.name`,临时仓不配 `commit` 会失败;不同 git 版本默认分支是 `master` 或 `main`,写死会 400。`makeScratchRepo` 里配身份、`git branch --show-current` 读出来再当 `baseBranch`。新 fake 记得 `chmod +x`(第 16 条)。
 31. **审计别把回执和空抢租约当第二份真相**:`approval-applied` 既是 `markApplied` 的 store 动作,也是回执 `systemKind`。消息装饰器再按 kind 落一行,同一秒两条,读的人以为落地了两遍。store 已经负责的 kind 写进 `STORE_OWNED_SYSTEM_KINDS`,消息侧跳过;`approval-failed` 只有消息没有 store 动作,必须留。另一边:`POST /messages` 结尾无条件 `runner.run()`,`#approve` / `#confirm` / 星星罐子没有棒也会先抢租约再读 hop,落一对空 hopId 的 `lease-claim` + `lease-release`,DEMO 里「claim 和 hop-done 同一 hopId」那条不变量就破了。没有棒就释放租约、一行都不写;提前返回必须释放,否则线程被锁 TTL。subject 取第一个非空行:模型正文常以 `\n\n` 开头,取字面第一行会落成空白。
+32. **默认绑仓根必须取 realpath**:macOS 上 `os.tmpdir()` 是 `/var/folders/...`,realpath 到 `/private/var/folders/...`。默认根如果用字面 tmpdir,`pnpm eval` 里 `makeScratchRepo` 建的临时仓会对不上,两行绑仓当场 403。`defaultAllowedRepoRoots` 已经 realpath。配了 `ALLOWED_REPO_ROOTS` 是覆盖不是追加。另一面:CORS / WS 用同一张来源表,`localhost` 和 `127.0.0.1` 是两个 origin,都要放;`Origin` 不带(curl / e2e)放行,带了但不对才拒——不带的一律拒会把 e2e 和人自己 curl 全弄挂。
 
 ## 常见操作
 
-- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱
+- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱。路径必须在允许的根下面(默认家目录 + 临时目录);`ALLOWED_REPO_ROOTS` 覆盖。API 默认只听 `127.0.0.1`,开 LAN 设 `API_SERVER_HOST=0.0.0.0`
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:Hub 里改名册/模型并保存(`PATCH /api/config`)立即生效;或手改仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`)后重启 API。`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore

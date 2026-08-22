@@ -127,3 +127,18 @@ export {
   parseHoldCommandArgv,
   pickHoldCommandEnv,
 } from './hold-command.js';
+export type { RepoPathDecision } from './repo-path.js';
+export {
+  canonicalizePath,
+  defaultAllowedRepoRoots,
+  isRepoPathAllowed,
+  parseAllowedRepoRoots,
+  resolveAllowedRepoRoots,
+} from './repo-path.js';
+export {
+  DEFAULT_LISTEN_HOST,
+  DEFAULT_WEB_PORT,
+  isAllowedRequestOrigin,
+  resolveAllowedOrigins,
+  resolveListenHost,
+} from './listen-origin.js';

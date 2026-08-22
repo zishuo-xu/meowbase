@@ -2,7 +2,7 @@
 
 > **愿景**(还不是现状):让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
 >
-> **现状**:猫按名册交棒;忘了行首 `@`、有文件改动、或要拍板时,平台和人还在场(补问、建卡、批卡、`#confirm`)。完整协议见 [AGENTS.md](AGENTS.md) 协议表。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，已落地 29 篇，见 [docs/features/](docs/features/)。
+> **现状**:猫按名册交棒;忘了行首 `@`、有文件改动、或要拍板时,平台和人还在场(补问、建卡、批卡、`#confirm`)。完整协议见 [AGENTS.md](AGENTS.md) 协议表。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，已落地 30 篇，见 [docs/features/](docs/features/)。
 
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。
@@ -14,8 +14,10 @@ pnpm install
 pnpm dev   # 起 Redis + API(3200)+ Web(3300)
 ```
 
-浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 看能力表、配模型和密钥、侧栏「账本」按猫看 token 和花费。建会话时可填真实仓库路径,改动只落在线程分支 `meow/<id>`,不碰基准分支、不 push。
+浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 看能力表、配模型和密钥、侧栏「账本」按猫看 token 和花费。建会话时可填真实仓库路径,改动只落在线程分支 `meow/<id>`,不碰基准分支、不 push。路径必须落在允许的根下面(默认家目录 + 临时目录,都已 realpath);不在范围内会 403,并告诉你现在允许哪些根。
 (API 需要本机 Redis;冒烟/演示可设 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 指向 fake CLI)
+
+API 默认只听 `127.0.0.1`。要从手机或同网段看 Hub,显式设 `API_SERVER_HOST=0.0.0.0` 再起。CORS / WebSocket 只放行本机 web(`http://localhost:3300` 和 `http://127.0.0.1:3300`;`NEXT_PUBLIC_API_URL` 指到别处时会带上那个主机的 web 端口)。想收紧或换绑仓根:环境变量 `ALLOWED_REPO_ROOTS` 按 `,` 或 `:` 分隔,配了就是覆盖不是追加。
 
 ```bash
 # 仅 API:

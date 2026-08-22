@@ -5,6 +5,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket, { type WebSocket } from '@fastify/websocket';
 import type { AgentId, AuditAction, AuditActor, HoldCommandRule } from '@meowbase/shared';
+import {
+  defaultAllowedRepoRoots,
+  isAllowedRequestOrigin,
+  isRepoPathAllowed,
+  resolveAllowedOrigins,
+} from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
 import type { AppStores } from '../stores/ports.js';
 import { AUDIT_LIST_MAX } from '../stores/ports.js';
@@ -76,6 +82,10 @@ export interface ApiDeps {
   hopSweepIntervalMs?: number;
   holdCommands?: readonly HoldCommandRule[];
   holdCommandEnv?: readonly string[];
+  /** 绑仓允许的根;不传则用默认(家目录 + 临时目录,都已 realpath) */
+  allowedRepoRoots?: readonly string[];
+  /** 浏览器来源表;不传则按 web 端口 + NEXT_PUBLIC_API_URL 推 */
+  allowedOrigins?: readonly string[];
 }
 
 interface LiveConfig {
@@ -110,6 +120,10 @@ function adapterRuntimeChanged(prev: AgentSpec, next: AgentSpec): boolean {
 }
 
 export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
+  const allowedRepoRoots = deps.allowedRepoRoots?.length
+    ? [...deps.allowedRepoRoots]
+    : defaultAllowedRepoRoots();
+  const allowedOrigins = deps.allowedOrigins ?? resolveAllowedOrigins(process.env);
   const app = Fastify({ logger: false });
   const emitter = new EventEmitter();
   const emitSync = (threadId: string) => {
@@ -172,8 +186,20 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     };
   }
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      cb(null, isAllowedRequestOrigin(origin, allowedOrigins));
+    },
+  });
   await app.register(websocket);
+
+  app.addHook('onRequest', async (request, reply) => {
+    const raw = request.headers.origin;
+    const origin = Array.isArray(raw) ? raw[0] : raw;
+    if (!isAllowedRequestOrigin(origin, allowedOrigins)) {
+      return reply.code(403).send({ error: '来源不被允许' });
+    }
+  });
 
   app.post('/api/threads', async (request, reply) => {
     const body = request.body as {
@@ -184,6 +210,14 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     } | null;
     const repoPathRaw = body?.repoPath?.trim();
     if (repoPathRaw) {
+      const decision = isRepoPathAllowed(repoPathRaw, allowedRepoRoots);
+      if (!decision.ok) {
+        return reply.code(403).send({
+          error: '仓库路径不在允许的根下面',
+          selectedPath: repoPathRaw,
+          allowedRoots: decision.allowedRoots,
+        });
+      }
       const repoPath = resolve(repoPathRaw);
       if (!existsSync(repoPath)) {
         return reply.code(400).send({ error: '仓库路径不存在' });

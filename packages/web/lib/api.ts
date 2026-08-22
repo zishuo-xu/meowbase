@@ -12,8 +12,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let message = `API ${res.status}: ${path}`;
     try {
       if (typeof res.json === 'function') {
-        const body = (await res.json()) as { error?: string };
-        if (typeof body?.error === 'string' && body.error.trim()) message = body.error;
+        const body = (await res.json()) as { error?: string; allowedRoots?: unknown };
+        if (typeof body?.error === 'string' && body.error.trim()) {
+          message = body.error;
+          if (Array.isArray(body.allowedRoots) && body.allowedRoots.length > 0) {
+            const roots = body.allowedRoots.filter((item): item is string => typeof item === 'string');
+            if (roots.length > 0) message = `${body.error}。允许的根: ${roots.join('、')}`;
+          }
+        }
       }
     } catch {
       // 没有 JSON 体时沿用状态码文案

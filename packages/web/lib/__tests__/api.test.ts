@@ -122,6 +122,24 @@ describe('api', () => {
     await expect(api.createThread('x', 'claude')).rejects.toThrow();
   });
 
+  it('403 绑仓拒因把允许的根拼进文案', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          error: '仓库路径不在允许的根下面',
+          selectedPath: '/etc/secret',
+          allowedRoots: ['/Users/me', '/private/var/folders/xx'],
+        }),
+      }),
+    );
+    await expect(api.createThread('x', 'claude', { repoPath: '/etc/secret' })).rejects.toThrow(
+      /允许的根: \/Users\/me、\/private\/var\/folders\/xx/,
+    );
+  });
+
   it('400 时抛出服务端 error 文案', async () => {
     vi.stubGlobal(
       'fetch',

@@ -72,6 +72,19 @@ describe('Home 建会话', () => {
     vi.clearAllMocks();
   });
 
+  it('建会话 403 时展示允许的根', async () => {
+    vi.mocked(api.createThread).mockRejectedValue(
+      new Error('仓库路径不在允许的根下面。允许的根: /Users/me、/tmp'),
+    );
+    render(<Home />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '+ 新会话' })).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText('仓库路径（可选）'), {
+      target: { value: '/etc/secret' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(await screen.findByText(/允许的根: \/Users\/me、\/tmp/)).toBeTruthy();
+  });
+
   it('建会话 400 时展示服务端中文错误', async () => {
     vi.mocked(api.createThread).mockRejectedValue(new Error('仓库路径不存在'));
     render(<Home />);

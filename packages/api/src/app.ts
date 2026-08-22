@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { parseAllowedRepoRoots, resolveAllowedOrigins, resolveAllowedRepoRoots } from '@meowbase/shared';
 import { buildServer } from './http/server.js';
 import { loadConfig, type Config } from './config.js';
 import { assertStorageReady, createRedisClient } from './redis.js';
@@ -65,6 +66,8 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     models: config.models,
     holdCommands: config.holdCommands,
     holdCommandEnv: config.holdCommandEnv,
+    allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
+    allowedOrigins: resolveAllowedOrigins(process.env),
     ...(opts.configPath ? { configPath: opts.configPath } : {}),
     ...(opts.rebuildAdapter
       ? { rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)) }
