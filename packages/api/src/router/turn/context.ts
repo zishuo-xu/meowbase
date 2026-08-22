@@ -3,9 +3,9 @@ import {
   DEFAULT_ROSTER,
   isHumanEscalateToken,
 } from '@meowbase/shared';
-import type { AgentProfile, MentionCatalog, TeamMember } from '@meowbase/shared';
+import type { AgentProfile, MentionCatalog, TeamMember, ThreadRepo } from '@meowbase/shared';
 import type { AgentSpec } from '../../config.js';
-import { gitChangedPaths } from '../../services/git.js';
+import { gitChangedPaths, resolveDiffMarker } from '../../services/git.js';
 import { MAX_A2A_DEPTH, type TurnContext } from './types.js';
 
 export function overlayProfile(
@@ -57,9 +57,10 @@ export function isReviewerRole(role?: string): boolean {
   return Boolean(role && role.includes('审查'));
 }
 
-export async function listHandoffFiles(workdir: string): Promise<string[]> {
+export async function listHandoffFiles(workdir: string, repo?: ThreadRepo): Promise<string[]> {
   try {
-    return await gitChangedPaths(workdir);
+    const from = await resolveDiffMarker(workdir, repo);
+    return await gitChangedPaths(workdir, from);
   } catch {
     return [];
   }

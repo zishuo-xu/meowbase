@@ -38,6 +38,8 @@ export interface ThreadRepo {
   path: string;
   baseBranch: string;
   branch: string;
+  /** 人上次批准落地时的 HEAD；没有则审批 diff 回退到与基准分支的分叉点 */
+  lastApprovedSha?: string;
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -58,6 +60,8 @@ export type SystemKind =
   | 'exit-nudge'
   | 'approval-pending'
   | 'approval-applied'
+  | 'approval-failed'
+  | 'git-move'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';

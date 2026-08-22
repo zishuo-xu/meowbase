@@ -99,6 +99,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 验证闸 | 只管卡上 `verdict` 和不许 `autoApprove`。不管顶栏文案(顶栏读审查正文关键词) |
 | 命令白名单 | 只跑猫 `等跑` 里白名单形状;元字符拒、不在表里拒。命令字符串来自猫的回复 |
 | 重启后捡棒 | 开机扫 pending,见踩坑第 1 条 |
+| 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);HEAD 前进 / 本支远端跟踪引用前进 / 基准分支远端跟踪引用变了则落 `git-move`(不参与球权)。空沙箱跳过 |
 
 ## 开发约定
 
@@ -110,7 +111,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))
-- 测试:`pnpm test`(shared 159 + api 252 + web 159 = 570);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
+- 测试:`pnpm test`(shared 159 + api 262 + web 165 = 586);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -124,7 +125,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 6. **opencode 项目根会上溯**:模型可能把文件写到仓库根(而非线程沙箱)。防御:适配器传 `--dir` 绝对沙箱路径 + 线程工作目录有 package.json + 系统提示写明沙箱绝对路径 + 每轮 `sweepStrayFiles` 自动移回。**清扫只收仓库根/包根浅文件**(如 `mul.js`),不会碰 `src/`、`test/`。审批/交接 diff 忽略 `node_modules`。绑仓线程跳过清扫,以免把真仓库根文件搬进 worktree。
 7. **并行组并发写 Redis 会 lost-update**:executeTurn 内有写队列串行化 append/patch,别绕开它。
 8. **审批状态机**:`markApplied` 只接受 `approved` 状态,自动批准路径必须先 `approve()`。
-9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线),diff 检测靠 `git diff HEAD`。绑仓线程不调 gitInit(会覆盖目标仓的 `.gitignore`)。
+9. **线程工作目录是 git 仓库**:创建时 gitInit(含 package.json 基线)。空沙箱 diff 仍是 `git diff HEAD`;绑仓线程用 `lastApprovedSha`(没有则 `merge-base <baseBranch> HEAD`),这样猫自己提交后审批卡还建得出来。绑仓线程不调 gitInit(会覆盖目标仓的 `.gitignore`)。
 10. **IME 输入法**:前端回车处理必须检查组合状态(composingRef + isComposing + keyCode 229),否则中文选词回车会误发送。
 11. **Redis 测试数据污染**:测试线程/证据会留在 Redis,断言前用唯一 id(如 `t-${Date.now()}`)。
 12. **服务重启后 shared dist 过期**:改了 `packages/shared` 后,api 启动脚本会先 rebuild,但热更新中途不会——改 shared 后需重启 api 或手动 `pnpm --filter @meowbase/shared build`。
@@ -144,6 +145,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 26. **`formatDroppedBallNote` 的 `'void'` 必须写在 early return 之前**:`hadInlineHint` / 审查结论 / 持球那几行会直接 `return null`。虚空那句放后面就发不出来,球像没落地。单测锁住 `hadInlineHint: true` 时 `'void'` 仍出「球还在地上」。
 27. **记分板要按「关」分行,不是按「坏毛病」分行**:命令闸是两道关(元字符、白名单)。最初只有一行 `等跑 npm test; curl … | sh`,它先被元字符拒,**白名单那道关根本走不到**——整个白名单坏掉(比如 `node` 被放进表)记分板照样绿。现在拆成两行:「命令里塞管道」量元字符关,「想跑 node -e」不带元字符、专量白名单关,两行各自断言自己的拒因(`/元字符/` vs `/白名单/`),不许写成 `/元字符|白名单/`。所以反向验也能分开做:只掐白名单 → `node -e` 那行掉到 0、塞管道那行仍是 1。**以后加新的关,同一轮加上能单独量它的那一行。**`'denied-command'` 同样必须写在 `formatDroppedBallNote` 持球 early return 之前(同第 26 条)。
 28. **`tsc` 报错时照样会写出 dist**:`pnpm --filter @meowbase/shared build` 退出码非 0 **不代表** `dist` 没变。反向验时若看见 build 失败就以为「这次改动没生效」,结论会正好反过来——`dist` 已经是改后的,eval 跑的就是被掐的行为。所以掐门禁做反向验后,复原必须 `rg` 确认 `src` 和 `dist` 两边都干净,不能只看 build 有没有过。
+29. **绑仓线程猫自己提交后会补问**:`shouldNudgeExit` 看 `hasDiff`,diff 基准改成 marker 后,已经提交的改动仍算有 diff。测试 stub 若每跳都 `git commit`,补问那次会 nothing to commit 炸掉——只提交一次,或第二次只回正文。批准时**不要**补 `gitAddAll`,那会把人没在卡上看过的改动一起提交。
 
 ## 常见操作
 

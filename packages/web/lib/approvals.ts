@@ -1,5 +1,10 @@
 export function isPendingApprovalStatus(status: string | undefined): boolean {
-  return status === 'draft' || status === 'reviewing' || status === 'pending';
+  return (
+    status === 'draft' ||
+    status === 'reviewing' ||
+    status === 'pending' ||
+    status === 'approved'
+  );
 }
 
 /** 侧栏要标「待确认」的会话。 */

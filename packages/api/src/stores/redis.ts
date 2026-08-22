@@ -66,7 +66,8 @@ export class RedisThreadStore implements ThreadStore {
     title: string;
     primaryAgentId: AgentId;
     workdirBase?: string;
-    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> &
+      Partial<Pick<ThreadRepo, 'branch' | 'lastApprovedSha'>>;
   }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
@@ -82,6 +83,9 @@ export class RedisThreadStore implements ThreadStore {
               path: input.repo.path,
               baseBranch: input.repo.baseBranch,
               branch: input.repo.branch ?? `meow/${id}`,
+              ...(input.repo.lastApprovedSha
+                ? { lastApprovedSha: input.repo.lastApprovedSha }
+                : {}),
             },
           }
         : {}),
@@ -147,6 +151,13 @@ export class RedisThreadStore implements ThreadStore {
       if (thread) threads.push(thread);
     }
     return threads;
+  }
+
+  async setLastApprovedSha(threadId: string, sha: string): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread?.repo) return;
+    thread.repo = { ...thread.repo, lastApprovedSha: sha };
+    await this.redis.hset(threadKey(threadId), 'repo', JSON.stringify(thread.repo));
   }
 
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {

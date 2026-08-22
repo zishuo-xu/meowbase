@@ -27,6 +27,7 @@ export interface ThreadRepoDto {
   path: string;
   baseBranch: string;
   branch: string;
+  lastApprovedSha?: string;
 }
 
 export interface ThreadDto {

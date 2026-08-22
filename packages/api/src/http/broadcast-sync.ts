@@ -65,6 +65,10 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
     create: (input) => store.create(input),
     get: (id) => store.get(id),
     list: () => store.list(),
+    setLastApprovedSha: async (threadId, sha) => {
+      await store.setLastApprovedSha(threadId, sha);
+      emit(threadId);
+    },
     setSession: (threadId, agentId, sessionId) => store.setSession(threadId, agentId, sessionId),
     setPendingHop: async (threadId, hop) => {
       await store.setPendingHop(threadId, hop);

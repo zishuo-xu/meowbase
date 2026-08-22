@@ -152,6 +152,8 @@ describe.skipIf(!redis)('Redis 存储', () => {
       baseBranch: 'develop',
       branch: `meow/${thread.id}`,
     });
+    await threads.setLastApprovedSha(thread.id, 'abc123def456');
+    expect((await threads.get(thread.id))?.repo?.lastApprovedSha).toBe('abc123def456');
     await threads.delete(thread.id);
   });
 

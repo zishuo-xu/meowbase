@@ -35,8 +35,56 @@ import type {
 import type { AgentTurnOutput } from '../../providers/types.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runAgentTurn } from './agent-hop.js';
+import {
+  countCommitsBetween,
+  describeGitMoves,
+  snapshotGitState,
+  type GitStateSnapshot,
+} from '../../services/git.js';
 import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
+
+async function recordGitMove(input: {
+  thread: ThreadRuntime;
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  before: GitStateSnapshot | null;
+  agentName: string;
+}): Promise<void> {
+  if (!input.thread.repo || !input.before) return;
+  try {
+    const after = await snapshotGitState(input.thread.workdir, {
+      baseBranch: input.thread.repo.baseBranch,
+    });
+    const commitsSinceBefore = await countCommitsBetween(
+      input.thread.workdir,
+      input.before.headSha,
+      after.headSha,
+    );
+    const notes = describeGitMoves({
+      before: input.before,
+      after,
+      commitsSinceBefore,
+      agentName: input.agentName,
+      baseBranch: input.thread.repo.baseBranch,
+    });
+    if (notes.length === 0) return;
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: notes.join('\n'),
+        status: 'completed',
+        systemKind: 'git-move',
+      }),
+    );
+  } catch (err) {
+    turnLog('git-move fail', {
+      thread: input.thread.id,
+      error: clip(String(err), 120),
+    });
+  }
+}
 
 async function rememberHoldCommand(input: {
   thread: { id: string };
@@ -128,7 +176,7 @@ export async function runSegment(
           currentTask,
           {
             goal: segment.text,
-            files: await listHandoffFiles(thread.workdir),
+            files: await listHandoffFiles(thread.workdir, thread.repo),
             closeout: isReviewerRole(team.find((m) => m.agentId === currentAgent)?.role)
               ? 'reviewer'
               : 'default',
@@ -137,6 +185,15 @@ export async function runSegment(
         )
       : currentTask;
 
+    let before: GitStateSnapshot | null = null;
+    if (thread.repo) {
+      try {
+        before = await snapshotGitState(thread.workdir, { baseBranch: thread.repo.baseBranch });
+      } catch (err) {
+        turnLog('git-move fail', { thread: thread.id, error: clip(String(err), 120) });
+      }
+    }
+    try {
     const hopResult = await runAgentTurn(
       context,
       thread,
@@ -206,7 +263,7 @@ export async function runSegment(
           hadInlineHint: labels.length > 0,
           isReviewer,
           hasExplicitVerdict: hasExplicitReviewVerdict(prevContent),
-          hasDiff: (await listHandoffFiles(thread.workdir)).length > 0,
+          hasDiff: (await listHandoffFiles(thread.workdir, thread.repo)).length > 0,
           hasHold: Boolean(holdReason),
         })
       ) {
@@ -295,7 +352,7 @@ export async function runSegment(
       );
       break;
     }
-    const relayFiles = await listHandoffFiles(thread.workdir);
+    const relayFiles = await listHandoffFiles(thread.workdir, thread.repo);
     const relayTarget: AgentId = handoff.target;
     if (isVoidHandoff({ changedFiles: relayFiles, reply: prevContent })) {
       stop = { kind: 'void', blockedTarget: relayTarget, handoffTask: handoff.task };
@@ -337,6 +394,15 @@ export async function runSegment(
       task: clip(handoff.task, 60),
     });
     break;
+    } finally {
+      await recordGitMove({
+        thread,
+        context,
+        writeQueue,
+        before,
+        agentName: displayName(currentAgent, catalog),
+      });
+    }
   }
 
   if (!lastAssistant || !lastOutput) throw new Error('执行失败:未产生任何输出');

@@ -53,6 +53,23 @@ describe('parseMessage', () => {
     expect(parseMessage({ role: 'system', content: '普通系统消息' }).kind).toBe('text');
   });
 
+  it('git-move 不崩,提交句当普通系统正文,越界句当回执', () => {
+    expect(
+      parseMessage({
+        role: 'system',
+        systemKind: 'git-move',
+        content: '墨墨 在 `meow/xxx` 上提交了 1 个 commit',
+      }),
+    ).toEqual({ kind: 'text', text: '墨墨 在 `meow/xxx` 上提交了 1 个 commit' });
+    expect(
+      parseMessage({
+        role: 'system',
+        systemKind: 'git-move',
+        content: '⚠️ 基准分支 `main` 的远端引用变了',
+      }).kind,
+    ).toBe('receipt');
+  });
+
   it('user/assistant 消息 → text', () => {
     expect(parseMessage({ role: 'user', content: 'hi' }).kind).toBe('text');
     expect(parseMessage({ role: 'assistant', content: 'hello' }).kind).toBe('text');

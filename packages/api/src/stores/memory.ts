@@ -43,7 +43,8 @@ export class InMemoryThreadStore implements ThreadStore {
     title: string;
     primaryAgentId: AgentId;
     workdirBase?: string;
-    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> &
+      Partial<Pick<ThreadRepo, 'branch' | 'lastApprovedSha'>>;
   }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
@@ -59,6 +60,9 @@ export class InMemoryThreadStore implements ThreadStore {
               path: input.repo.path,
               baseBranch: input.repo.baseBranch,
               branch: input.repo.branch ?? `meow/${id}`,
+              ...(input.repo.lastApprovedSha
+                ? { lastApprovedSha: input.repo.lastApprovedSha }
+                : {}),
             },
           }
         : {}),
@@ -81,6 +85,12 @@ export class InMemoryThreadStore implements ThreadStore {
 
   async list(): Promise<Thread[]> {
     return [...this.threads.values()].map((t) => this.ensureHopId(t));
+  }
+
+  async setLastApprovedSha(threadId: string, sha: string): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread?.repo) return;
+    thread.repo = { ...thread.repo, lastApprovedSha: sha };
   }
 
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {

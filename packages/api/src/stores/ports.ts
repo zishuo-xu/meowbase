@@ -23,8 +23,11 @@ export interface ThreadStore {
     /** 线程工作目录的基准路径;不传时默认相对路径 'work'(与历史行为一致) */
     workdirBase?: string;
     /** 绑真实仓库时只传 path + baseBranch;store 补全 branch 为 meow/<id> */
-    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> & Partial<Pick<ThreadRepo, 'branch'>>;
+    repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> &
+      Partial<Pick<ThreadRepo, 'branch' | 'lastApprovedSha'>>;
   }): Promise<Thread>;
+  /** 批准落地成功后记下 HEAD,下一张卡从这里开始 diff */
+  setLastApprovedSha(threadId: string, sha: string): Promise<void>;
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;

@@ -15,7 +15,8 @@ import type {
   Skill,
   TeamMember,
 } from '@meowbase/shared';
-import { gitAddAll, gitCommit, gitDiffHead } from '../../services/git.js';
+import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
+import { landApprovedCard } from './land-approval.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runAgentTurn } from './agent-hop.js';
 import { overlayProfile } from './context.js';
@@ -144,7 +145,8 @@ export async function runReviewFixThenCard(input: {
         writeQueue,
       );
       await gitAddAll(thread.workdir);
-      latestDiff = (await gitDiffHead(thread.workdir)) ?? latestDiff;
+      const from = await resolveDiffMarker(thread.workdir, thread.repo);
+      latestDiff = (await gitDiffHead(thread.workdir, from)) ?? latestDiff;
       reviewComment = await runReview();
     }
   }
@@ -163,15 +165,20 @@ export async function runReviewFixThenCard(input: {
     .map((m) => m.content);
   const gated = gateReviewVerdict(reviewComment, writerTexts);
   const writerProfile = await context.stores.profiles.get(writerAgentId);
-  const autoApplied = allowsAutoApprove(reviewComment, writerProfile?.autoApprove, writerTexts);
-  if (autoApplied) {
+  const wantAuto = allowsAutoApprove(reviewComment, writerProfile?.autoApprove, writerTexts);
+  let autoApplied = false;
+  let landFail: string | undefined;
+  if (wantAuto) {
     await context.stores.approvals.approve(card.id);
-    try {
-      await gitCommit(thread.workdir, `approve ${card.id}`);
-    } catch {
-      // 提交失败不阻塞,批准决策生效
-    }
-    await context.stores.approvals.markApplied(card.id);
+    const land = await landApprovedCard({
+      context,
+      threadId,
+      workdir: thread.workdir,
+      cardId: card.id,
+      repo: thread.repo,
+    });
+    if (land.ok) autoApplied = true;
+    else landFail = land.reason;
   }
 
   const revise = gated === 'revise';
@@ -197,4 +204,13 @@ export async function runReviewFixThenCard(input: {
     systemKind: autoApplied ? 'approval-applied' : 'approval-pending',
     systemMeta: { verdict: gated },
   });
+  if (landFail) {
+    await context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: `⚠️ 批准记下了，但提交失败：${landFail}`,
+      status: 'completed',
+      systemKind: 'approval-failed',
+    });
+  }
 }

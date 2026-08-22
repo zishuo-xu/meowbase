@@ -8,7 +8,11 @@ import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gitInit } from '../src/services/git.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { gitAddAll, gitInit } from '../src/services/git.js';
+
+const exec = promisify(execFile);
 
 /** 够长、没文件也会照传,避免虚空门禁误拦测交棒的用例 */
 const KEPT_HANDOFF_BODY =
@@ -1032,16 +1036,23 @@ describe('executeTurn 审批流', () => {
     const thread = await makeGitThread(stores);
     // 造一个真实改动,让落地提交真正发生
     writeFileSync(join(thread.workdir, 'applied.txt'), 'v1');
+    await gitAddAll(thread.workdir);
     const card = await stores.approvals.create({
       threadId: thread.id, writerAgentId: 'claude', reviewerAgentId: 'opencode',
       diffText: 'd', diffStat: 's',
     });
+    const logBefore = (await exec('git', ['-C', thread.workdir, 'log', '--oneline'])).stdout;
     const final = await executeTurn({
       threadId: thread.id, content: `#approve ${card.id}`, context: { stores, registry },
     });
     expect(final.role).toBe('system');
     expect(final.content).toContain('✅ 已批准并落地');
     expect((await stores.approvals.get(card.id))?.status).toBe('applied');
+    const logAfter = (await exec('git', ['-C', thread.workdir, 'log', '--oneline'])).stdout;
+    expect(logAfter).toContain(`approve ${card.id}`);
+    expect(logAfter.split('\n').filter(Boolean).length).toBe(
+      logBefore.split('\n').filter(Boolean).length + 1,
+    );
   });
 
   it('#reject 打回卡片带理由', async () => {

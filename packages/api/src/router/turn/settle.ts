@@ -1,6 +1,6 @@
 import { parseHoldExit, parseLearnCommand } from '@meowbase/shared';
 import type { EvidenceEntry, MentionCatalog, Message, TeamMember } from '@meowbase/shared';
-import { gitAddAll, gitDiffHead } from '../../services/git.js';
+import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runReviewFixThenCard } from './review.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
@@ -42,7 +42,8 @@ export async function settleTurn(input: {
   if (lastOutput.status === 'completed' && !waiting && !holding) {
     try {
       await gitAddAll(thread.workdir);
-      const diff = await gitDiffHead(thread.workdir);
+      const from = await resolveDiffMarker(thread.workdir, thread.repo);
+      const diff = await gitDiffHead(thread.workdir, from);
       if (diff) {
         turnLog('diff', { thread: threadId, stat: clip(diff.stat, 80) });
         const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;

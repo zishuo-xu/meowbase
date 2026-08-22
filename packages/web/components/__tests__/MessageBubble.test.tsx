@@ -94,6 +94,24 @@ describe('MessageBubble', () => {
     expect(onSpeak).toHaveBeenCalled();
   });
 
+  it('git-move 系统句渲染成中间胶囊,不当接力包', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-git-move',
+          threadId: 't',
+          role: 'system',
+          content: '墨墨 在 `meow/xxx` 上提交了 1 个 commit',
+          status: 'completed',
+          createdAt: '',
+          systemKind: 'git-move',
+        }}
+      />,
+    );
+    expect(screen.getByText(/墨墨 在 `meow\/xxx` 上提交了 1 个 commit/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /交接包/ })).toBeNull();
+  });
+
   it('气泡里的 #ev_ 可点引用', () => {
     const onCite = vi.fn();
     render(

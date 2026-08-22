@@ -13,6 +13,15 @@ describe('parseRelayNote', () => {
     });
   });
 
+  it('git-move 不当交接包', () => {
+    expect(
+      parseRelayNote({
+        content: '墨墨 在 `meow/xxx` 上提交了 1 个 commit',
+        systemKind: 'git-move',
+      }),
+    ).toBeNull();
+  });
+
   it('有 relay kind 时改掉第一行仍当交接包', () => {
     expect(
       parseRelayNote({

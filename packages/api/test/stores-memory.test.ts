@@ -27,6 +27,18 @@ describe('内存存储', () => {
     expect((await threads.get(thread.id))?.repo).toEqual(thread.repo);
   });
 
+  it('lastApprovedSha 写入后 get 能 round-trip', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({
+      title: '绑仓',
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'main' },
+    });
+    expect(thread.repo?.lastApprovedSha).toBeUndefined();
+    await threads.setLastApprovedSha(thread.id, 'abc123def456');
+    expect((await threads.get(thread.id))?.repo?.lastApprovedSha).toBe('abc123def456');
+  });
+
   it('rename 改标题', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: '8/17 19:28', primaryAgentId: 'claude' });

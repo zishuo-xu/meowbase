@@ -44,3 +44,4 @@
 | [failure-mode-eval.md](failure-mode-eval.md) | 已落地 | 坏毛病记分板:平台兜住率 |
 | [void-handoff-gate.md](void-handoff-gate.md) | 已落地 | 空手不许交棒 |
 | [command-allowlist.md](command-allowlist.md) | 已落地 | 平台只跑认得的命令 |
+| [git-state-tracking.md](git-state-tracking.md) | 已落地 | 猫对 git 做了什么,平台看得见 |

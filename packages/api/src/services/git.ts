@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import type { ThreadRepo } from '@meowbase/shared';
 
 const exec = promisify(execFile);
 
@@ -34,6 +35,100 @@ export function isApprovalNoisePath(path: string): boolean {
 async function run(dir: string, args: string[]): Promise<string> {
   const { stdout } = await exec('git', args, { cwd: dir });
   return stdout;
+}
+
+async function tryRun(dir: string, args: string[]): Promise<string | undefined> {
+  try {
+    const out = (await run(dir, args)).trim();
+    return out || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface GitStateSnapshot {
+  branch: string;
+  headSha: string;
+  remoteName?: string;
+  remoteTrackingSha?: string;
+  baseRemoteTrackingSha?: string;
+  aheadCount: number;
+}
+
+async function firstRemoteName(dir: string): Promise<string | undefined> {
+  const raw = await tryRun(dir, ['remote']);
+  if (!raw) return undefined;
+  const remotes = raw.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (remotes.includes('origin')) return 'origin';
+  return remotes[0];
+}
+
+/** 线程 workdir 的只读 git 快照。不 fetch、不联网。某条 ref 不存在则对应字段为空。 */
+export async function snapshotGitState(
+  dir: string,
+  opts?: { baseBranch?: string },
+): Promise<GitStateSnapshot> {
+  const branch = (await tryRun(dir, ['branch', '--show-current'])) ?? '';
+  const headSha = (await tryRun(dir, ['rev-parse', 'HEAD'])) ?? '';
+  const remoteName = await firstRemoteName(dir);
+  const remoteTrackingSha =
+    remoteName && branch
+      ? await tryRun(dir, ['rev-parse', `refs/remotes/${remoteName}/${branch}`])
+      : undefined;
+  const baseRemoteTrackingSha =
+    remoteName && opts?.baseBranch
+      ? await tryRun(dir, ['rev-parse', `refs/remotes/${remoteName}/${opts.baseBranch}`])
+      : undefined;
+  let aheadCount = 0;
+  if (opts?.baseBranch && headSha) {
+    const counted = await tryRun(dir, ['rev-list', '--count', `${opts.baseBranch}..HEAD`]);
+    if (counted) aheadCount = Number.parseInt(counted, 10) || 0;
+  }
+  return {
+    branch,
+    headSha,
+    ...(remoteName ? { remoteName } : {}),
+    ...(remoteTrackingSha ? { remoteTrackingSha } : {}),
+    ...(baseRemoteTrackingSha ? { baseRemoteTrackingSha } : {}),
+    aheadCount,
+  };
+}
+
+export async function countCommitsBetween(
+  dir: string,
+  fromSha: string,
+  toSha: string,
+): Promise<number> {
+  if (!fromSha || !toSha || fromSha === toSha) return 0;
+  const counted = await tryRun(dir, ['rev-list', '--count', `${fromSha}..${toSha}`]);
+  return counted ? Number.parseInt(counted, 10) || 0 : 0;
+}
+
+export function describeGitMoves(input: {
+  before: GitStateSnapshot;
+  after: GitStateSnapshot;
+  commitsSinceBefore: number;
+  agentName: string;
+  baseBranch?: string;
+}): string[] {
+  const notes: string[] = [];
+  const branch = input.after.branch || input.before.branch;
+  if (input.commitsSinceBefore > 0) {
+    notes.push(
+      `${input.agentName} 在 \`${branch}\` 上提交了 ${input.commitsSinceBefore} 个 commit`,
+    );
+  }
+  if (
+    input.after.remoteTrackingSha &&
+    input.after.remoteTrackingSha !== input.before.remoteTrackingSha
+  ) {
+    const remote = input.after.remoteName ?? input.before.remoteName ?? 'origin';
+    notes.push(`${input.agentName} 把 \`${branch}\` 推到了 ${remote}`);
+  }
+  if (input.after.baseRemoteTrackingSha !== input.before.baseRemoteTrackingSha) {
+    notes.push(`⚠️ 基准分支 \`${input.baseBranch ?? 'main'}\` 的远端引用变了`);
+  }
+  return notes;
 }
 
 export async function gitIsRepo(dir: string): Promise<boolean> {
@@ -102,30 +197,99 @@ export async function gitAddAll(dir: string): Promise<void> {
   }
 }
 
-export async function gitChangedPaths(dir: string): Promise<string[]> {
+export async function gitHeadSha(dir: string): Promise<string | undefined> {
+  return tryRun(dir, ['rev-parse', 'HEAD']);
+}
+
+/** 绑仓线程的审批/交接 diff 基准:上次批准的 HEAD,否则与基准分支的分叉点。空沙箱用 HEAD。 */
+export async function resolveDiffMarker(dir: string, repo?: ThreadRepo): Promise<string> {
+  if (!repo) return 'HEAD';
+  if (repo.lastApprovedSha) return repo.lastApprovedSha;
+  return (await tryRun(dir, ['merge-base', repo.baseBranch, 'HEAD'])) ?? 'HEAD';
+}
+
+export async function gitChangedPaths(dir: string, fromRef = 'HEAD'): Promise<string[]> {
   await gitAddAll(dir);
-  return (await run(dir, ['diff', 'HEAD', '--name-only', '--', '.']))
+  return (await run(dir, ['diff', fromRef, '--name-only', '--', '.']))
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .filter((path) => !isApprovalNoisePath(path));
 }
 
-export async function gitDiffHead(dir: string): Promise<{ stat: string; text: string } | null> {
-  const names = (await run(dir, ['diff', 'HEAD', '--name-only', '--', '.']))
+export async function gitDiffHead(
+  dir: string,
+  fromRef = 'HEAD',
+): Promise<{ stat: string; text: string } | null> {
+  const names = (await run(dir, ['diff', fromRef, '--name-only', '--', '.']))
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .filter((path) => !isApprovalNoisePath(path));
   if (names.length === 0) return null;
-  const text = await run(dir, ['diff', 'HEAD', '--', ...names]);
+  const text = await run(dir, ['diff', fromRef, '--', ...names]);
   if (!text.trim()) return null;
-  const stat = await run(dir, ['diff', 'HEAD', '--stat', '--', ...names]);
+  const stat = await run(dir, ['diff', fromRef, '--stat', '--', ...names]);
   return { stat: stat.trim(), text: text.slice(0, 20_000) };
 }
 
 export async function gitCommit(dir: string, message: string): Promise<void> {
   await run(dir, ['commit', '-q', '-m', message]);
+}
+
+function gitErrorReason(err: unknown): string {
+  if (err && typeof err === 'object') {
+    const stderr = 'stderr' in err && typeof err.stderr === 'string' ? err.stderr.trim() : '';
+    if (stderr) {
+      const line = stderr
+        .split('\n')
+        .map((item) => item.trim())
+        .find(
+          (item) =>
+            item &&
+            !item.startsWith('On branch') &&
+            !item.startsWith('Your branch'),
+        );
+      if (line) return line;
+    }
+    if (err instanceof Error && err.message) return err.message;
+  }
+  return String(err);
+}
+
+function isNothingToCommit(reason: string): boolean {
+  return /nothing to commit|no changes added to commit/i.test(reason);
+}
+
+export type LandApprovalResult =
+  | { ok: true; headSha: string }
+  | { ok: false; reason: string };
+
+/**
+ * 尝试把批准落成一次 commit。失败(含 nothing to commit)默认不落地。
+ * 绑仓且工作区干净、HEAD 已越过 marker 时,改动已经在历史上,算落地(前进 marker 即可)。
+ */
+export async function tryLandApproval(input: {
+  dir: string;
+  message: string;
+  repo?: ThreadRepo;
+}): Promise<LandApprovalResult> {
+  try {
+    await gitCommit(input.dir, input.message);
+    const headSha = (await gitHeadSha(input.dir)) ?? '';
+    return { ok: true, headSha };
+  } catch (err) {
+    const reason = gitErrorReason(err);
+    if (input.repo && isNothingToCommit(reason)) {
+      const dirty = (await gitStatusPorcelain(input.dir)).trim();
+      const headSha = await gitHeadSha(input.dir);
+      const marker = await resolveDiffMarker(input.dir, input.repo);
+      if (!dirty && headSha && headSha !== marker) {
+        return { ok: true, headSha };
+      }
+    }
+    return { ok: false, reason };
+  }
 }
 
 export async function gitStatusPorcelain(dir: string): Promise<string> {

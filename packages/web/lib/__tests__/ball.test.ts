@@ -410,6 +410,75 @@ describe('describeBall', () => {
     ).not.toBe('球在墨墨手上');
   });
 
+  it('git-move 在最后时顶栏仍显示它之前那条', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写好了', status: 'completed' },
+          {
+            role: 'system',
+            content: '墨墨 在 `meow/xxx` 上提交了 1 个 commit',
+            systemKind: 'git-move',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在墨墨手上', tone: 'cat', agentId: 'claude' });
+    expect(
+      describeBall(
+        [
+          {
+            role: 'system',
+            content: '📋 审批卡片 ap_deadbeef\n改动:x.txt\n审查意见:通过\n回复 #approve',
+            systemKind: 'approval-pending',
+          },
+          {
+            role: 'system',
+            content: '⚠️ 基准分支 `main` 的远端引用变了',
+            systemKind: 'git-move',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('approval-failed 顶栏球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写好了', status: 'completed' },
+          {
+            role: 'system',
+            content: '⚠️ 批准记下了，但提交失败：nothing to commit',
+            systemKind: 'approval-failed',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('git-move 不进接力时间线', () => {
+    expect(
+      describeRelayTimeline(
+        [
+          { role: 'assistant', agentId: 'claude', content: '写好了', status: 'completed' },
+          {
+            role: 'system',
+            content: '墨墨 在 `meow/xxx` 上提交了 1 个 commit',
+            systemKind: 'git-move',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual([{ name: '墨墨', agentId: 'claude', status: 'done' }]);
+  });
+
   it('接力带 systemMeta.to 时时间线拿到 agentId', () => {
     expect(
       describeRelayTimeline(

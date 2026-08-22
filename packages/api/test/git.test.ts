@@ -13,6 +13,7 @@ import {
   gitDiffHead,
   gitInit,
   gitIsRepo,
+  snapshotGitState,
   gitWorktreeAdd,
   gitWorktreeList,
   gitWorktreePrune,
@@ -183,6 +184,41 @@ describe('git 辅助函数', () => {
     expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe(USER_GITIGNORE);
 
     await gitWorktreePrune(repo);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('只读快照:推之前远端跟踪引用为空,推到裸仓后能读到 sha', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-git-snap-'));
+    const bare = mkdtempSync(join(tmpdir(), 'meowbase-git-bare-'));
+    await initScratchRepo(repo);
+    await exec('git', ['init', '--bare', '-q'], { cwd: bare });
+    await exec('git', ['remote', 'add', 'origin', bare], { cwd: repo });
+
+    const before = await snapshotGitState(repo, { baseBranch: 'main' });
+    expect(before.branch).toBe('main');
+    expect(before.headSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(before.remoteName).toBe('origin');
+    expect(before.remoteTrackingSha).toBeUndefined();
+    expect(before.baseRemoteTrackingSha).toBeUndefined();
+
+    await exec('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: repo });
+    const after = await snapshotGitState(repo, { baseBranch: 'main' });
+    expect(after.remoteTrackingSha).toBe(after.headSha);
+    expect(after.baseRemoteTrackingSha).toBe(after.headSha);
+    expect(after.aheadCount).toBe(0);
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(bare, { recursive: true, force: true });
+  });
+
+  it('没有配 remote 的仓探测不炸,远端字段为空', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-git-noremote-'));
+    await initScratchRepo(repo);
+    const snap = await snapshotGitState(repo, { baseBranch: 'main' });
+    expect(snap.branch).toBe('main');
+    expect(snap.headSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(snap.remoteName).toBeUndefined();
+    expect(snap.remoteTrackingSha).toBeUndefined();
+    expect(snap.baseRemoteTrackingSha).toBeUndefined();
     rmSync(repo, { recursive: true, force: true });
   });
 });

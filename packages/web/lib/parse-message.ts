@@ -80,7 +80,8 @@ export function isHiddenChatMessage(message: {
 
 export function approvalStatusFromDto(status: string | undefined): ApprovalUiStatus | undefined {
   if (!status) return undefined;
-  if (status === 'applied' || status === 'approved') return 'applied';
+  if (status === 'applied') return 'applied';
+  if (status === 'approved') return 'pending';
   if (status === 'rejected') return 'rejected';
   if (status === 'draft' || status === 'reviewing') return 'pending';
   return undefined;

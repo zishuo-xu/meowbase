@@ -42,6 +42,7 @@ export function describeBall(
   for (const last of [...messages].reverse()) {
     if (!last.content?.trim()) continue;
     if (last.role === 'system' && isRoutingHintMessage(last)) continue;
+    if (last.role === 'system' && last.systemKind === 'git-move') continue;
     if (last.role === 'user' && last.content.trim().startsWith('#')) continue;
 
     if (last.role === 'system' && isDroppedBallNote(last)) {
@@ -54,6 +55,9 @@ export function describeBall(
     }
     if (last.role === 'system' && isAppliedApprovalMessage(last)) {
       return { text: '已落地，等人开口', tone: 'human' };
+    }
+    if (last.role === 'system' && isApprovalFailedMessage(last)) {
+      return { text: '球在人手里', tone: 'human' };
     }
     if (last.role === 'system' && isPendingApprovalMessage(last)) {
       return { text: '球在人手里', tone: 'human' };
@@ -143,6 +147,11 @@ function isAppliedApprovalMessage(message: Kinded): boolean {
 
 function isPendingApprovalMessage(message: Kinded): boolean {
   return message.systemKind === 'approval-pending' || isPendingApprovalNote(message.content);
+}
+
+function isApprovalFailedMessage(message: Kinded): boolean {
+  if (message.systemKind === 'approval-failed') return true;
+  return message.content.includes('批准记下了') && message.content.includes('提交失败');
 }
 
 function isFreezeBallMessage(message: Kinded): boolean {

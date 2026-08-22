@@ -6,9 +6,9 @@ import {
   parseRejectCommand,
 } from '@meowbase/shared';
 import type { Message } from '@meowbase/shared';
-import { gitCommit } from '../../services/git.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { killHoldCommand } from '../../services/hold-command.js';
+import { landApprovedCard } from './land-approval.js';
 import type { TurnContext } from './types.js';
 
 export async function handleSystemCommand(input: {
@@ -38,24 +38,52 @@ export async function handleSystemCommand(input: {
   const approve = parseApproveCommand(content);
   if (approve) {
     turnLog('approve', { thread: threadId, id: approve.id });
-    const card = await context.stores.approvals.approve(approve.id);
-    if (card) {
-      try {
-        await gitCommit(workdir, `approve ${card.id}`);
-      } catch {
-        // git 提交失败不阻塞;批准决策本身已生效
-      }
-      await context.stores.approvals.markApplied(card.id);
+    const existing = await context.stores.approvals.get(approve.id);
+    let card = existing;
+    if (card && (card.status === 'draft' || card.status === 'reviewing')) {
+      card = (await context.stores.approvals.approve(approve.id)) ?? card;
     }
-    const reply = card
-      ? `✅ 已批准并落地:${card.id}`
-      : `⚠️ 找不到可批准的卡片:${approve.id}`;
+    if (!card || (card.status !== 'approved' && card.status !== 'applied')) {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: `⚠️ 找不到可批准的卡片:${approve.id}`,
+        status: 'completed',
+        systemKind: 'notice',
+      });
+    }
+    if (card.status === 'applied') {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: `✅ 已批准并落地:${card.id}`,
+        status: 'completed',
+        systemKind: 'approval-applied',
+      });
+    }
+    const thread = await context.stores.threads.get(threadId);
+    const land = await landApprovedCard({
+      context,
+      threadId,
+      workdir,
+      cardId: card.id,
+      repo: thread?.repo,
+    });
+    if (land.ok) {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: `✅ 已批准并落地:${card.id}`,
+        status: 'completed',
+        systemKind: 'approval-applied',
+      });
+    }
     return context.stores.messages.append({
       threadId,
       role: 'system',
-      content: reply,
+      content: `⚠️ 批准记下了，但提交失败：${land.reason}`,
       status: 'completed',
-      systemKind: card ? 'approval-applied' : 'notice',
+      systemKind: 'approval-failed',
     });
   }
 

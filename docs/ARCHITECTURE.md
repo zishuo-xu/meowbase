@@ -64,13 +64,13 @@ Fastify 的 `onReady` 在 `listen()` 失败后照样会跑完。撞 `EADDRINUSE`
 
 | 层 | 命令 | 验什么 |
 |---|---|---|
-| 单测 | `pnpm test`（570：shared 159 / api 252 / web 159） | 纯函数和适配器 |
+| 单测 | `pnpm test`（586：shared 159 / api 262 / web 165） | 纯函数和适配器 |
 | 整机 | `pnpm e2e`（3 段：happy-path / crash-resume / bind-conflict） | 真进程 + fake CLI |
 | 记分板 | `pnpm eval`（7 行） | 已知坏毛病平台兜住几次 |
 
 全部在 CI 上每次 push 跑（`.github/workflows/ci.yml` 还有 `pnpm -r build` 和 `typecheck:scripts`）。用 fake CLI 而不是真模型：确定性、不花钱、能进 CI。真模型冒烟是 `pnpm smoke`，花钱，不进 CI。
 
-CI 里挂了 Redis service，所以 570 是满数。本机连不上 Redis 时，那几个 Redis 套件用 `describe.skipIf` 真跳过，输出是 skipped 而不是 passed——早先写成 `if (!redis) return` 时 vitest 会把它算成 passed，那是假绿。
+CI 里挂了 Redis service，所以 586 是满数。本机连不上 Redis 时，那几个 Redis 套件用 `describe.skipIf` 真跳过，输出是 skipped 而不是 passed——早先写成 `if (!redis) return` 时 vitest 会把它算成 passed，那是假绿。
 
 审计大部分由 store 装饰器派生（`audit-log.ts` 的 `auditMessages` / `auditApprovals`）。租约事件（`pending-runner.ts` 的 `lease-claim` / `lease-steal`）和半截重跑（`resumePendingTurn` 的 `hop-rerun`）是显式补的。
 
@@ -84,4 +84,4 @@ CI 里挂了 Redis service，所以 570 是满数。本机连不上 Redis 时，
 
 **有意不做。** 不做邮箱、SOP 手册、MCP 规格——那是参考项目的形态，喵窝是一场接力。平台不推理。
 
-**现在还薄。** 线程能绑真实仓库，改动落在 `meow/<threadId>` worktree，但**不 push、不开 PR**，到本地分支为止。账本能按猫看 token 和花费（`GET /api/usage`），但只能看、**不能按预算拦**。Hub 是只读能力表加名册配置，不是完整产品外壳。
+**现在还薄。** 线程能绑真实仓库，改动落在 `meow/<threadId>` worktree，但**不 push、不开 PR**，到本地分支为止。猫自己提交或推送，平台每跳后比一次只读 git 快照，时间线出 `git-move`、审计留一行——只是**看得见**，不是拦得住：worktree 和父仓共享 `.git`，凭据也在里面，「不许 push」目前仍是提示词里的一句嘱咐，不是技术闸。账本能按猫看 token 和花费（`GET /api/usage`），但只能看、**不能按预算拦**。Hub 是只读能力表加名册配置，不是完整产品外壳。

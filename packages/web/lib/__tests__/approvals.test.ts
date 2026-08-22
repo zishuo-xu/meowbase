@@ -9,7 +9,8 @@ describe('pendingThreadIds', () => {
         { threadId: 'b', status: 'applied' },
         { threadId: 'c', status: 'draft' },
         { threadId: 'b', status: 'rejected' },
+        { threadId: 'd', status: 'approved' },
       ]),
-    ).toEqual(['a', 'c']);
+    ).toEqual(['a', 'c', 'd']);
   });
 });
