@@ -118,7 +118,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 ## 踩坑记录(血泪清单,改代码前先看)
 
 1. **重启 API 必须按端口杀进程**:`pkill -f "tsx watch"` 经常杀不掉(命令行里没这字样),旧进程继续占 3200 服务旧代码 → 你以为在验证新代码,其实在旧代码上(EADDRINUSE 静默失败)。正确姿势:`lsof -ti :3200 | xargs kill -9` 再起。**重启后平台会自己把还搁着的那一棒捡起来接着跑**(日志 `[meow] resume sweep`),30 分钟内的才捡、多条线程串行捡(同时只叫醒一只);不想让它跑就先清掉那条线程的 `pendingHop`。猫正在想的时候杀进程也接得住:那一棒跑完落库才清,半截的助手气泡会被标成 `failed`(「平台重启,这一跳没写完」)然后重跑。**没杀干净、新进程 EADDRINUSE 起不来时,那个进程不会碰球**——捡棒挂在 `listen` 成功之后(`startApp` 里才调 `app.startPendingRunner()`),不是 `onReady`(它在绑定失败后照样会跑完)。见 [durable-relay.md](docs/features/durable-relay.md) 和 [hop-commit-then-clear.md](docs/features/hop-commit-then-clear.md)。杀完须自己再起,见第 15 条。
-2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。
+2. **web 服务崩溃会损坏 `.next` 缓存**:出现"页面能开但没交互/资源 404"时,`rm -rf packages/web/.next` 重启。**另一种长相**:白屏 + `Runtime TypeError: __webpack_modules__[moduleId] is not a function`(热更新改多了文件后容易出),此时**硬刷新没用**,必须清缓存重启——别以为是刚改的前端代码写坏了。顺带:开发服务器**在沙箱里起不来**(Next 枚举网卡 `uv_interface_addresses` 报 Unknown system error 1、tsx 建 unix socket 报 `listen EPERM`),必须在沙箱外跑。Redis 是独立的 brew 服务,重启 `pnpm dev` 不会丢线程数据。
 3. **opencode 适配器**:必须带 `--auto`(headless 写文件权限);systemPrompt 无参数,需前置拼进 prompt;解析器要容忍中间 `tool-calls` step(不算失败,最终 stop 才算)。
 4. **claude 适配器**:`--permission-mode acceptEdits` 只放行改文件,headless 跑 `node`/`tsx` 会卡在审批、自检只能写「跑不了」。必须 `bypassPermissions`(对齐 opencode `--auto` / gemini `yolo`)。正因为权限面开得宽,`等跑` 的命令闸落在平台这一侧:只跑白名单内的形状,`shell: false`,不透传整套 env。
 5. **gemini 适配器**:`stream-json` 事件是 `init`/`message`/`result`(不是 claude 的 assistant/result);无系统提示词参数,身份前置拼进 prompt;headless 写文件必须 `--approval-mode yolo`,否则会卡在审批。`--resume`/`-r` 接受 session UUID(init 事件的 `session_id`)。
