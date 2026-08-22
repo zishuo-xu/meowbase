@@ -386,7 +386,7 @@ function writeEvalDoc(rows: RowResult[], table: string): void {
     .join('\n');
   const body = `# 失败模式记分板
 
-CI 每次 \`pnpm eval\` 复验。全用 fake CLI,不花钱。空格子(期望 0)不算失败,但从 0 变成 1 必须有人改期望值,不许悄悄变绿。
+CI 每次 \`pnpm eval\` 复验。全用 fake CLI,不花钱。还没人拦的格子期望写 0,记的是现状不是愿望;哪一格从 0 变成 1,必须有人回来改期望值,不许放宽断言悄悄变绿。
 
 生成于 ${when}。每种毛病跑 N=${N} 次。
 
