@@ -23,7 +23,7 @@
 
 ## 怎么做
 
-1. `Thread.repo?: { path, baseBranch, branch }`（shared 类型）。`POST /api/threads` 多收可选 `repoPath` + `baseBranch`（缺省取该仓库当前分支）。校验:路径存在、是 git 仓库、`baseBranch` 存在、目标 worktree 路径未被占用;不过则 400,不建线程。
+1. `Thread.repo?: { path, baseBranch, branch }`（shared 类型）。`POST /api/threads` 多收可选 `repoPath` + `baseBranch`（缺省取该仓库当前分支）。校验:路径存在、是 git 仓库、`baseBranch` 存在、目标 worktree 路径未被占用;不过则 400,不建线程。（这一刀落地时只有这几道校验;后来在它们**之前**又加了一道根白名单,不在允许的根下面先回 403,见 [repo-root-allowlist.md](repo-root-allowlist.md)。）
 2. 绑了仓库:`git -C <repoPath> worktree add <workdirBase>/<threadId> -b meow/<threadId> <baseBranch>`。**不调 `gitInit`** —— 它会往目录里写一份沙箱 `.gitignore`,在真仓库里就是覆盖人家的 `.gitignore`。没绑仓库:完全走现在的 `mkdir` + `package.json` + `gitInit`,旧行为和旧测试一个字不改。
 3. 删线程:先 `git -C <repoPath> worktree remove --force <workdir>`,再删目录。`meow/<threadId>` 分支**留着**,人可能还要看;删分支要人自己动手。
 4. `buildSystemPrompt` 里写明:这是真实仓库 `<repoPath>` 的 worktree,绝对路径 `<workdir>`,当前分支 `meow/<threadId>`;不许 `push`、不许切分支、不许动 `.git`、不许碰 `baseBranch`。
