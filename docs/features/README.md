@@ -48,3 +48,4 @@
 | [repo-root-allowlist.md](repo-root-allowlist.md) | 已落地 | 只在允许的目录干活,只听本机说话 |
 | [push-boundary.md](push-boundary.md) | 已落地 | 放开推送,越界就停 |
 | [platform-spend.md](platform-spend.md) | 已落地 | 空模型名不许探测,探测用量当场显示不进账本 |
+| [pr-open.md](pr-open.md) | 已落地 | 猫自己开 PR,合了就停 |

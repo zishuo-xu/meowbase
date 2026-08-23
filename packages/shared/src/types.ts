@@ -63,6 +63,8 @@ export type SystemKind =
   | 'approval-failed'
   | 'git-move'
   | 'git-overstep'
+  | 'pr-opened'
+  | 'pr-merged'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';
@@ -77,6 +79,10 @@ export interface SystemMeta {
   baseBranch?: string;
   beforeSha?: string;
   afterSha?: string;
+  /** PR 那条:number + 当时的 head sha,不用 FETCH_HEAD */
+  prNumber?: number;
+  prUrl?: string;
+  headRefOid?: string;
 }
 
 export interface TokenUsage {

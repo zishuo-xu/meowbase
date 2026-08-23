@@ -186,7 +186,10 @@ describe('buildSystemPrompt', () => {
     expect(bound).toContain('/tmp/meowbase-work/t1');
     expect(bound).toContain('meow/t1');
     expect(bound).toContain('可以 push 你自己这根 meow/t1');
+    expect(bound).toContain('也可以对自己这根开 PR');
+    expect(bound).toContain('gh pr create --base main');
     expect(bound).not.toContain('不许 push');
+    expect(bound).toContain('不许自己把 PR 合进去');
     expect(bound).toContain('不许切分支');
     expect(bound).toContain('不许动 .git');
     expect(bound).toContain('不许碰 main');

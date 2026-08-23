@@ -68,6 +68,23 @@ describe('parseMessage', () => {
         content: '⚠️ 基准分支 `main` 的远端引用变了',
       }).kind,
     ).toBe('receipt');
+    expect(
+      parseMessage({
+        role: 'system',
+        systemKind: 'pr-opened',
+        content: '墨墨 对自己这根 `meow/t1` 开了 PR #12：https://example.com/pull/12',
+      }),
+    ).toEqual({
+      kind: 'text',
+      text: '墨墨 对自己这根 `meow/t1` 开了 PR #12：https://example.com/pull/12',
+    });
+    expect(
+      parseMessage({
+        role: 'system',
+        systemKind: 'pr-merged',
+        content: '⚠️ PR #12 已被合并：https://example.com/pull/12',
+      }).kind,
+    ).toBe('receipt');
   });
 
   it('user/assistant 消息 → text', () => {

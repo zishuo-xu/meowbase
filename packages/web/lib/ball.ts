@@ -43,7 +43,11 @@ export function describeBall(
     if (!last.content?.trim()) continue;
     if (last.role === 'system' && isRoutingHintMessage(last)) continue;
     if (last.role === 'system' && last.systemKind === 'git-move') continue;
+    if (last.role === 'system' && last.systemKind === 'pr-opened') continue;
     if (last.role === 'system' && last.systemKind === 'git-overstep') {
+      return { text: '球在人手里', tone: 'human' };
+    }
+    if (last.role === 'system' && last.systemKind === 'pr-merged') {
       return { text: '球在人手里', tone: 'human' };
     }
     if (last.role === 'user' && last.content.trim().startsWith('#')) continue;

@@ -6,6 +6,7 @@ import type {
   ToolActivity,
 } from '@meowbase/shared';
 import type { GitOverstep } from '../../services/git.js';
+import type { PrLookup, PrMergeStop } from '../../services/pr.js';
 import type { AgentRegistry, AgentTurnOutput } from '../../providers/types.js';
 import type { AppStores } from '../../stores/ports.js';
 import type { AgentSpec } from '../../config.js';
@@ -52,6 +53,8 @@ export interface TurnContext {
   holdCommandEnv?: readonly string[];
   /** 测试注入 spawn,证明被拒时没真跑 */
   holdCommandSpawn?: HoldCommandSpawn;
+  /** PR 只读查询;不传则用默认 gh。记分板换成假源。 */
+  lookupPr?: PrLookup;
 }
 
 export interface SegmentRunResult {
@@ -60,6 +63,7 @@ export interface SegmentRunResult {
   visited: Set<AgentId>;
   firstAgent: AgentId;
   oversteps?: GitOverstep[];
+  mergedPr?: PrMergeStop;
 }
 
 /** 串行化存储写操作:并行组并发 append/patch 时避免 Redis lost-update */

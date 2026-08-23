@@ -103,6 +103,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 重启后捡棒 | 开机扫 pending,见踩坑第 1 条 |
 | 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);自己那根 HEAD 前进 / 自己那根远端跟踪引用变了(含 force)则落 `git-move`(不参与球权)。空沙箱跳过 |
 | 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。自己那根的提交/推送只落 `git-move`,接力继续 |
+| PR 合了就停 | 绑仓线程每跳后自己查这个分支的 PR(不读猫正文)。状态变成 MERGED 则落参与球权的 `pr-merged`、清掉 pending、不建审批卡。查不到落「查不到 PR 状态(原因)」、不停接力,不许落成「没有 PR」。第一次看见 OPEN 只落 `pr-opened`(不参与球权) |
 
 ## 开发约定
 

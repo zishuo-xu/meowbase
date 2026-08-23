@@ -10,6 +10,7 @@ import { createRedisStores } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
 import { createAdapter } from './providers/factory.js';
 import { createAgentRegistry } from './providers/registry.js';
+import { resolvePrLookup } from './services/pr.js';
 
 export interface StartAppOptions {
   /** skillsDir / workdirBase 相对它解析;传入的绝对路径原样用 */
@@ -68,6 +69,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     holdCommandEnv: config.holdCommandEnv,
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
     allowedOrigins: resolveAllowedOrigins(process.env),
+    lookupPr: resolvePrLookup(process.env),
     ...(opts.configPath ? { configPath: opts.configPath } : {}),
     ...(opts.rebuildAdapter
       ? { rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)) }

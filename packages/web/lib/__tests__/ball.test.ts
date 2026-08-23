@@ -462,6 +462,40 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在人手里', tone: 'human' });
   });
 
+  it('pr-opened 不参与球权,顶栏仍显示它之前那条', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '开了 PR', status: 'completed' },
+          {
+            role: 'system',
+            content: '墨墨 对自己这根 `meow/t1` 开了 PR #12：https://example.com/pull/12',
+            systemKind: 'pr-opened',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在墨墨手上', tone: 'cat', agentId: 'claude' });
+  });
+
+  it('pr-merged 顶栏球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '合了', status: 'completed' },
+          {
+            role: 'system',
+            content: '⚠️ PR #12 已被合并：https://example.com/pull/12',
+            systemKind: 'pr-merged',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
   it('approval-failed 顶栏球在人手里', () => {
     expect(
       describeBall(

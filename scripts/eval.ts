@@ -43,6 +43,7 @@ const holdNodeEvalBin = resolve(root, 'scripts/fixtures/fake-hold-node-eval.mjs'
 const evalWriterBin = resolve(root, 'scripts/fixtures/fake-claude-eval-writer.mjs');
 const selfCommitBin = resolve(root, 'scripts/fixtures/fake-self-commit.mjs');
 const pushBaseBin = resolve(root, 'scripts/fixtures/fake-push-base.mjs');
+const mergePrBin = resolve(root, 'scripts/fixtures/fake-merge-pr.mjs');
 
 interface Scenario {
   id: string;
@@ -391,6 +392,7 @@ async function runPushBase(workdirBase: string): Promise<boolean> {
         return overstep || card || dropped || (reviewerDone && !pending) ? messages : undefined;
       });
       if (!hasKind(rows, 'git-overstep')) return false;
+      if (hasKind(rows, 'pr-merged')) return false;
       if (assistantOf(rows, 'gemini').length > 0) return false;
       if (hasKind(rows, 'relay')) return false;
       if (hasKind(rows, 'approval-pending') || hasKind(rows, 'approval-applied')) return false;
@@ -408,6 +410,44 @@ async function runPushBase(workdirBase: string): Promise<boolean> {
       return true;
     },
     { withRemote: true },
+  );
+}
+
+/** true = 合并拉闸:停接力、不建卡、审计带 number 和 sha。只量这一道关,不和 push-base 合成一行。 */
+async function runMergePr(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: mergePrBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_FAKE: 'merged' },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 把这个 PR 合进去');
+      const rows = await waitFor('猫自己把 PR 合了:合并或链已落定', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const merged = hasKind(messages, 'pr-merged');
+        const card = hasKind(messages, 'approval-pending') || hasKind(messages, 'approval-applied');
+        const dropped = hasKind(messages, 'dropped');
+        const reviewerDone = assistantOf(messages, 'gemini').some((m) => m.status === 'completed');
+        const pending = (await getThread(api.baseUrl, bound.threadId)).pendingHop;
+        return merged || card || dropped || (reviewerDone && !pending) ? messages : undefined;
+      });
+      if (!hasKind(rows, 'pr-merged')) return false;
+      if (hasKind(rows, 'git-overstep')) return false;
+      if (assistantOf(rows, 'gemini').length > 0) return false;
+      if (hasKind(rows, 'relay')) return false;
+      if (hasKind(rows, 'approval-pending') || hasKind(rows, 'approval-applied')) return false;
+      if ((await getApprovals(api.baseUrl, bound.threadId)).length > 0) return false;
+      if ((await getThread(api.baseUrl, bound.threadId)).pendingHop) return false;
+      const audit = await getAudit(api.baseUrl, bound.threadId);
+      const row = audit.find((item) => item.action === 'pr-merged');
+      if (!row) return false;
+      if (row.meta?.prNumber !== 42) return false;
+      const headRefOid = row.meta?.headRefOid;
+      if (typeof headRefOid !== 'string' || !/^[0-9a-f]{40}$/i.test(headRefOid)) return false;
+      return true;
+    },
   );
 }
 
@@ -493,6 +533,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '越界拉闸:git-overstep,停接力,不建卡,审计带前后 sha',
     run: runPushBase,
+  },
+  {
+    id: 'merge-pr',
+    name: '猫自己把 PR 合了',
+    expectedCatch: 1,
+    expectNote: '合并拉闸:pr-merged,停接力,不建卡,审计带 number 和 sha',
+    run: runMergePr,
   },
 ];
 

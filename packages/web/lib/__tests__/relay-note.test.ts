@@ -31,6 +31,21 @@ describe('parseRelayNote', () => {
     ).toBeNull();
   });
 
+  it('pr-opened / pr-merged 不当交接包', () => {
+    expect(
+      parseRelayNote({
+        content: '墨墨 对自己这根 `meow/t1` 开了 PR #12：https://example.com/pull/12',
+        systemKind: 'pr-opened',
+      }),
+    ).toBeNull();
+    expect(
+      parseRelayNote({
+        content: '⚠️ PR #12 已被合并：https://example.com/pull/12',
+        systemKind: 'pr-merged',
+      }),
+    ).toBeNull();
+  });
+
   it('有 relay kind 时改掉第一行仍当交接包', () => {
     expect(
       parseRelayNote({

@@ -36,29 +36,53 @@ export async function settleTurn(input: {
   }
 
   const oversteps = lastResult.oversteps ?? [];
-  if (oversteps.length > 0) {
-    const primary = oversteps[0]!;
-    await writeQueue(() =>
-      context.stores.messages.append({
-        threadId,
-        role: 'system',
-        content: oversteps.map((item) => item.note).join('\n'),
-        status: 'completed',
-        systemKind: 'git-overstep',
-        systemMeta: {
-          baseBranch: primary.baseBranch,
-          ...(primary.beforeSha ? { beforeSha: primary.beforeSha } : {}),
-          ...(primary.afterSha ? { afterSha: primary.afterSha } : {}),
-        },
-      }),
-    );
+  const mergedPr = lastResult.mergedPr;
+  if (oversteps.length > 0 || mergedPr) {
+    if (oversteps.length > 0) {
+      const primary = oversteps[0]!;
+      await writeQueue(() =>
+        context.stores.messages.append({
+          threadId,
+          role: 'system',
+          content: oversteps.map((item) => item.note).join('\n'),
+          status: 'completed',
+          systemKind: 'git-overstep',
+          systemMeta: {
+            baseBranch: primary.baseBranch,
+            ...(primary.beforeSha ? { beforeSha: primary.beforeSha } : {}),
+            ...(primary.afterSha ? { afterSha: primary.afterSha } : {}),
+          },
+        }),
+      );
+      turnLog('git-overstep', {
+        thread: threadId,
+        baseBranch: primary.baseBranch,
+        before: clip(primary.beforeSha ?? '', 12),
+        after: clip(primary.afterSha ?? '', 12),
+      });
+    }
+    if (mergedPr) {
+      await writeQueue(() =>
+        context.stores.messages.append({
+          threadId,
+          role: 'system',
+          content: mergedPr.note,
+          status: 'completed',
+          systemKind: 'pr-merged',
+          systemMeta: {
+            prNumber: mergedPr.number,
+            prUrl: mergedPr.url,
+            headRefOid: mergedPr.headRefOid,
+          },
+        }),
+      );
+      turnLog('pr-merged', {
+        thread: threadId,
+        number: mergedPr.number,
+        sha: clip(mergedPr.headRefOid, 12),
+      });
+    }
     await context.stores.threads.setPendingHop(threadId, null);
-    turnLog('git-overstep', {
-      thread: threadId,
-      baseBranch: primary.baseBranch,
-      before: clip(primary.beforeSha ?? '', 12),
-      after: clip(primary.afterSha ?? '', 12),
-    });
     return lastAssistant;
   }
 

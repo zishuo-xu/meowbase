@@ -42,6 +42,15 @@ import {
   type GitOverstep,
   type GitStateSnapshot,
 } from '../../services/git.js';
+import {
+  formatPrLookupFailedNote,
+  formatPrMergedNote,
+  formatPrOpenedNote,
+  isPrMerged,
+  lookupPr,
+  type PrMergeStop,
+  type PrSnapshot,
+} from '../../services/pr.js';
 import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
 
@@ -88,6 +97,85 @@ async function recordGitMove(input: {
     });
     return [];
   }
+}
+
+async function recordPrState(input: {
+  thread: ThreadRuntime;
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  agentName: string;
+}): Promise<PrMergeStop | undefined> {
+  if (!input.thread.repo) return undefined;
+  const branch = input.thread.repo.branch;
+  const lookup = input.context.lookupPr ?? lookupPr;
+  let result;
+  try {
+    result = await lookup({
+      workdir: input.thread.workdir,
+      head: branch,
+    });
+  } catch (err) {
+    turnLog('pr lookup fail', {
+      thread: input.thread.id,
+      error: clip(String(err), 120),
+    });
+    result = { ok: false as const, reason: clip(String(err), 80) };
+  }
+  if (!result.ok) {
+    const reason = result.reason;
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrLookupFailedNote(reason),
+        status: 'completed',
+        systemKind: 'notice',
+      }),
+    );
+    return undefined;
+  }
+  const pr = result.pr;
+  if (!pr) return undefined;
+
+  const prior = await input.context.stores.messages.list(input.thread.id);
+  const samePr = (kind: 'pr-opened' | 'pr-merged', seen: PrSnapshot) =>
+    prior.some(
+      (m) =>
+        m.role === 'system' &&
+        m.systemKind === kind &&
+        m.systemMeta?.prNumber === seen.number,
+    );
+
+  if (isPrMerged(pr)) {
+    if (samePr('pr-merged', pr)) return undefined;
+    return {
+      number: pr.number,
+      url: pr.url,
+      headRefOid: pr.headRefOid,
+      note: formatPrMergedNote({ number: pr.number, url: pr.url }),
+    };
+  }
+  if (samePr('pr-opened', pr)) return undefined;
+  await input.writeQueue(() =>
+    input.context.stores.messages.append({
+      threadId: input.thread.id,
+      role: 'system',
+      content: formatPrOpenedNote({
+        agentName: input.agentName,
+        branch,
+        number: pr.number,
+        url: pr.url,
+      }),
+      status: 'completed',
+      systemKind: 'pr-opened',
+      systemMeta: {
+        prNumber: pr.number,
+        prUrl: pr.url,
+        headRefOid: pr.headRefOid,
+      },
+    }),
+  );
+  return undefined;
 }
 
 async function rememberHoldCommand(input: {
@@ -151,6 +239,7 @@ export async function runSegment(
     denyReason?: HoldCommandDenyReason;
   } | undefined;
   const oversteps: GitOverstep[] = [];
+  let mergedPr: PrMergeStop | undefined;
   if (resume) {
     for (const id of resume.visited) visited.add(id);
   }
@@ -199,18 +288,26 @@ export async function runSegment(
       }
     }
     let recordedHop = false;
-    const captureGit = async (): Promise<GitOverstep[]> => {
-      if (recordedHop) return [];
+    const captureAfterHop = async (): Promise<boolean> => {
+      if (recordedHop) return oversteps.length > 0 || Boolean(mergedPr);
       recordedHop = true;
+      const agentName = displayName(currentAgent, catalog);
       const found = await recordGitMove({
         thread,
         context,
         writeQueue,
         before,
-        agentName: displayName(currentAgent, catalog),
+        agentName,
       });
       oversteps.push(...found);
-      return found;
+      const foundMerge = await recordPrState({
+        thread,
+        context,
+        writeQueue,
+        agentName,
+      });
+      if (foundMerge) mergedPr = foundMerge;
+      return found.length > 0 || Boolean(foundMerge);
     };
     try {
     const hopResult = await runAgentTurn(
@@ -377,7 +474,7 @@ export async function runSegment(
       stop = { kind: 'void', blockedTarget: relayTarget, handoffTask: handoff.task };
       break;
     }
-    if ((await captureGit()).length > 0) break;
+    if (await captureAfterHop()) break;
     const pendingHop: PendingHop = {
       id: randomUUID(),
       to: relayTarget,
@@ -415,7 +512,7 @@ export async function runSegment(
     });
     break;
     } finally {
-      await captureGit();
+      await captureAfterHop();
     }
   }
 
@@ -479,5 +576,5 @@ export async function runSegment(
       );
     }
   }
-  return { lastAssistant, lastOutput, visited, firstAgent, oversteps };
+  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr };
 }
