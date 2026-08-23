@@ -2,7 +2,7 @@
 
 > **愿景**(还不是现状):让 AI 不再是被调用的工具,而是一支有身份、有记忆、有纪律的团队。人可以只表达"要什么",分工、协调、互审、决策,都交给团队自己完成。
 >
-> **现状**:猫按名册交棒;忘了行首 `@`、有文件改动、或要拍板时,平台和人还在场(补问、建卡、批卡、`#confirm`)。完整协议见 [AGENTS.md](AGENTS.md) 协议表。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别:我们是**一场接力**,不是猫窝操作系统(不做邮箱/SOP/MCP)。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，已落地 31 篇，见 [docs/features/](docs/features/)。
+> **现状**:猫按名册交棒;忘了行首 `@`、有文件改动、或要拍板时,平台和人还在场(补问、建卡、批卡、`#confirm`)。完整协议见 [AGENTS.md](AGENTS.md) 协议表。API 重启或猫想到一半被杀,那一棒会被自己捡起来重跑;平台的每个决定落一行审计流水,花掉的 token 和钱在侧栏「账本」按猫看。架构参考 clowder-ai,代码独立实现。和他们的差别在形态和进度:我们先做成**一场接力**,邮箱/SOP/MCP 那套还没有,按迭代节奏再说。演示与口播见 [docs/DEMO.md](docs/DEMO.md)。猫怎么交棒、传什么、各自记什么、公共记什么，见 [docs/A2A.md](docs/A2A.md)。功能一篇一刀，已落地 31 篇，见 [docs/features/](docs/features/)。
 
 多 Agent 协作平台:让 Claude Code / Gemini CLI / opencode 三支 agent CLI 像一支团队一样协作。
 架构参考 [clowder-ai](https://github.com/zts212653/clowder-ai)(MIT),代码为独立实现。

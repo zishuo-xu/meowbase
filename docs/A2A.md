@@ -1,6 +1,6 @@
 # A2A：猫怎么协作
 
-对照 clowder 公开能力：他们是异步邮箱 + 结构化 packet + 线程隔离 + 共享证据。我们只拿语义：交棒后本轮先结束，平台自己续跑。不建 mailbox，不 MCP 派球，不把另一只猫的 CLI 会话读过来。
+对照 clowder 公开能力：他们是异步邮箱 + 结构化 packet + 线程隔离 + 共享证据。这一版只拿接力语义：交棒后本轮先结束，平台自己续跑。mailbox、MCP 派球、读另一只猫的 CLI 会话都还没做——按迭代节奏来，不是判它们不该做。
 
 设计理由见 [features/a2a.md](features/a2a.md)。现行补问见 [features/exit-nudge.md](features/exit-nudge.md)。空手不传见 [features/void-handoff-gate.md](features/void-handoff-gate.md)。
 
@@ -89,7 +89,7 @@
 
 他们公开写：A2A 是异步消息、线程隔离、结构化 handoff、共享记忆。后来还加了邮箱、MCP 派球、session 压缩交接。
 
-我们：交棒后本轮先结束，下一跳进 pending，平台自己续跑。交接包仍是 prompt 字符串。不要邮箱。补问 / 空手不传见协议表。
+我们：交棒后本轮先结束，下一跳进 pending，平台自己续跑。交接包仍是 prompt 字符串，还没有邮箱。补问 / 空手不传见协议表。
 
 ## 代码入口
 
