@@ -52,7 +52,8 @@
 
 ## 接手要知道的几条规矩
 
-- **推送和花钱归人拍板。** agent 可以在 `main` 上提交，**不要 push**；`pnpm smoke` 和真模型演示花钱，跑之前问人。哪些命令花钱见 `AGENTS.md` 快速上手。
+- **一刀一次提交，五道闸全绿后推 `main`。不开特性分支、不另开 worktree 干活。** 理由在 `AGENTS.md` 开发约定里（同一目录只有一个 HEAD；两个实例同扫 pending 会抢棒）。**花钱的事仍归人拍板**：`pnpm smoke` 和真模型演示要花钱，跑之前问人，哪些命令花钱见 `AGENTS.md` 快速上手。
+- **增量标题和 commit 标题要对得上。** 这是下一个人唯一的锚点——拿标题 `git log --grep` 定位那一刀，再 diff 到底。git 能告诉他改了什么，但**看不见「只有人手验过」和「故意没做」**：一份有测试的提交和一份测试只盖了纯函数那层的提交，diff 长得一模一样；缺席也不会出现在 diff 里。所以增量那两栏别省。
 - **接手别人半截的活，第一件事是 `git diff`。** 别假设「没提交 = 没改」。已经发生过：反向验时把门禁掐掉的改动剩在工作区，在 `git status` 里只是一个普通 modified，混在别的改动里毫不显眼（踩坑第 28 条）。掐点写成带 `RV` 之类的记号，好让 `rg` 一次扫出来。
 - **一刀算做完** = 五道闸全绿（`pnpm test` / `pnpm -r build` / `pnpm typecheck:scripts` / `pnpm e2e` / `pnpm eval`）+ 同一轮改文档（协议只改协议表、演示只改现象、功能稿改状态和入口）+ 在下面记一条增量。TDD：先写失败测试。
 - **改了 `packages/shared` 要 `pnpm --filter @meowbase/shared build`**，否则 e2e / eval 跑的还是旧 dist。build 完 API 会自己重启。

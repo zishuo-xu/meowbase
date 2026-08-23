@@ -109,7 +109,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 业务逻辑只依赖 `stores/ports.ts` 接口,禁止直接 import ioredis
 - **计划先对照 clowder**:每次设计先想同一问题他们公开怎么做、这一刀能靠多近;只拿语义和踩坑,不抄源码。能靠就靠,本刀没更近要写清为什么。
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
-- **一刀做完在 [docs/PROGRESS.md](docs/PROGRESS.md) 记一条增量**:动了什么、与设计稿的偏离及原因、只有人手验过的部分、留了什么没做。推送和花钱(`pnpm smoke`、真模型演示)归人拍板,agent 可以在 `main` 上提交但不 push
+- **一刀做完在 [docs/PROGRESS.md](docs/PROGRESS.md) 记一条增量**:动了什么、与设计稿的偏离及原因、只有人手验过的部分、留了什么没做。增量标题和 commit 标题要对得上,后来的人才能 `git log --grep` 找回那一刀
+- **一刀一次提交,五道闸全绿后推 `main`**。不开特性分支:交接是顺序的,同一个目录只有一个 HEAD,切分支会坏 `.next` 缓存和 `shared/dist`(踩坑 2、12),还容易把提交落到别人分支上。也别用 `git worktree` 开第二个目录干活——两个实例同扫 Redis db 0 的 pending 会抢棒、端口还撞(踩坑 17、22)。**花钱的事仍归人拍板**(`pnpm smoke`、真模型演示)
 - **文档同轮更新**:协议只改本文件协议表;演示只改现象;功能稿只改为什么。不要再抄一份完整规则。其余入口改成引用,见 [docs/README.md](docs/README.md)
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
