@@ -60,6 +60,24 @@ export interface VerifyModelResult {
   latencyMs: number;
   error?: string;
   preview?: string;
+  usage?: TokenUsageDto;
+}
+
+function formatVerifyUsage(usage?: TokenUsageDto): string | null {
+  if (!usage) return null;
+  const cost =
+    usage.costUsd == null
+      ? '无成本数据'
+      : `${formatCostUsd(usage.costUsd)}${usage.costEstimated ? ' 估算' : ''}`;
+  return `输入 ${formatTokenCount(usage.inputTokens)} · 输出 ${formatTokenCount(usage.outputTokens)} · ${cost}`;
+}
+
+function formatVerifyNote(result: VerifyModelResult): string {
+  const head = result.ok
+    ? `已连通 (${result.latencyMs}ms)${result.preview ? ` · ${result.preview}` : ''}`
+    : `失败: ${result.error ?? result.stage}`;
+  const usageLine = formatVerifyUsage(result.usage);
+  return usageLine ? `${head}\n${usageLine}` : head;
 }
 
 function splitList(raw: string): string[] {
@@ -184,6 +202,7 @@ export function TeamHub({
   const [editApiKey, setEditApiKey] = useState('');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
+  const [draftErrors, setDraftErrors] = useState<{ model?: string; bins?: string }>({});
   const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
   const [usage, setUsage] = useState<UsageDto | null>(null);
 
@@ -246,9 +265,7 @@ export function TeamHub({
       const result = await onVerifyModel(payload);
       setVerifyNotes((notes) => ({
         ...notes,
-        [key]: result.ok
-          ? `已连通 (${result.latencyMs}ms)${result.preview ? ` · ${result.preview}` : ''}`
-          : `失败: ${result.error ?? result.stage}`,
+        [key]: formatVerifyNote(result),
       }));
     } catch (err) {
       setVerifyNotes((notes) => ({
@@ -356,7 +373,7 @@ export function TeamHub({
               <div>
                 <div className="text-xs font-bold text-[var(--ink-soft)]">账本</div>
                 <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                  按猫看已经跑完的用量。没报成本的格子写「无成本数据」，不估。
+                  只算猫已经跑完的用量。模型探测的花费在探测结果里当场显示，不计入。没报成本的格子写「无成本数据」，不估。
                 </p>
               </div>
               <div className="flex gap-2">
@@ -483,7 +500,7 @@ export function TeamHub({
                       )}
                       {verifyNotes[preset.id] && (
                         <div
-                          className={`mt-1 text-[11px] ${
+                          className={`mt-1 whitespace-pre-line text-[11px] ${
                             verifyNotes[preset.id]?.startsWith('已连通')
                               ? 'text-[var(--accent-strong)]'
                               : verifyNotes[preset.id] === '探测中…'
@@ -693,10 +710,19 @@ export function TeamHub({
                 <input
                   className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1.5 font-mono text-sm text-[var(--ink)]"
                   value={newModel}
-                  onChange={(e) => setNewModel(e.target.value)}
+                  onChange={(e) => {
+                    setNewModel(e.target.value);
+                    if (draftErrors.model) setDraftErrors((err) => ({ ...err, model: undefined }));
+                  }}
                   placeholder="例如 provider/model-id"
+                  aria-invalid={Boolean(draftErrors.model)}
                 />
               </label>
+              {draftErrors.model ? (
+                <p className="text-[11px] text-red-700" role="alert">
+                  {draftErrors.model}
+                </p>
+              ) : null}
               <label className="block text-xs text-[var(--ink-soft)]">
                 网关 URL
                 <input
@@ -736,9 +762,15 @@ export function TeamHub({
                           disabled={!compatible}
                           onChange={() => {
                             if (!compatible) return;
-                            setNewBins((list) =>
-                              list.includes(bin) ? list.filter((item) => item !== bin) : [...list, bin],
-                            );
+                            setNewBins((list) => {
+                              const next = list.includes(bin)
+                                ? list.filter((item) => item !== bin)
+                                : [...list, bin];
+                              if (next.length > 0 && draftErrors.bins) {
+                                setDraftErrors((err) => ({ ...err, bins: undefined }));
+                              }
+                              return next;
+                            });
                           }}
                         />
                         {bin}
@@ -747,9 +779,14 @@ export function TeamHub({
                   })}
                 </div>
               </fieldset>
+              {draftErrors.bins ? (
+                <p className="text-[11px] text-red-700" role="alert">
+                  {draftErrors.bins}
+                </p>
+              ) : null}
               {verifyNotes.draft && (
                 <div
-                  className={`text-[11px] ${
+                  className={`whitespace-pre-line text-[11px] ${
                     verifyNotes.draft.startsWith('已连通')
                       ? 'text-[var(--accent-strong)]'
                       : verifyNotes.draft === '探测中…'
@@ -764,16 +801,25 @@ export function TeamHub({
                 <button
                   type="button"
                   disabled={verifyingId === 'draft'}
-                  onClick={() =>
+                  onClick={() => {
+                    const model = newModel.trim();
+                    const errors: { model?: string; bins?: string } = {};
+                    if (!model) errors.model = '请填写模型 ID';
+                    if (newBins.length === 0) errors.bins = '请至少勾选一个 CLI';
+                    if (errors.model || errors.bins) {
+                      setDraftErrors(errors);
+                      return;
+                    }
+                    setDraftErrors({});
                     void runVerify('draft', {
                       bin: newBins[0] ?? '',
-                      model: newModel.trim(),
+                      model,
                       protocol: newProtocol,
                       ...(newBaseUrl.trim() ? { baseUrl: newBaseUrl.trim() } : {}),
                       ...(newApiKey.trim() ? { apiKey: newApiKey.trim() } : {}),
-                      label: newLabel.trim() || newModel.trim(),
-                    })
-                  }
+                      label: newLabel.trim() || model,
+                    });
+                  }}
                   className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold ring-1 ring-[var(--border)] disabled:opacity-60"
                 >
                   验证新模型
@@ -782,7 +828,14 @@ export function TeamHub({
                   type="button"
                   onClick={() => {
                     const model = newModel.trim();
-                    if (!model || newBins.length === 0) return;
+                    const errors: { model?: string; bins?: string } = {};
+                    if (!model) errors.model = '请填写模型 ID';
+                    if (newBins.length === 0) errors.bins = '请至少勾选一个 CLI';
+                    if (errors.model || errors.bins) {
+                      setDraftErrors(errors);
+                      return;
+                    }
+                    setDraftErrors({});
                     const label = newLabel.trim() || model;
                     const baseUrl = newBaseUrl.trim();
                     const apiKey = newApiKey.trim();

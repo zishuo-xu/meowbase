@@ -17,7 +17,7 @@ pnpm dev   # 起 Redis + API(3200)+ Web(3300)
 浏览器打开 http://localhost:3300:线程管理、猫耳气泡聊天、审批卡片(点卡片批准/打回)、证据确认、团队 Hub 看能力表、配模型和密钥、侧栏「账本」按猫看 token 和花费。建会话时可填真实仓库路径,改动落在线程分支 `meow/<id>`；猫可以 push 自己这根,碰基准分支则停接力、球回人。路径必须落在允许的根下面(默认家目录 + 临时目录,都已 realpath);不在范围内会 403,并告诉你现在允许哪些根。规则见 [AGENTS.md](AGENTS.md) 协议表。
 (API 需要本机 Redis;冒烟/演示可设 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 指向 fake CLI)
 
-API 默认只听 `127.0.0.1`。要从手机或同网段看 Hub,显式设 `API_SERVER_HOST=0.0.0.0` 再起（平台没有鉴权,开了等于同网段谁都能让猫干活）。CORS / WebSocket 只放行本机 web(`http://localhost:3300` 和 `http://127.0.0.1:3300`;`NEXT_PUBLIC_API_URL` 指到别处时会带上那个主机的 web 端口)。想收紧或换绑仓根:环境变量 `ALLOWED_REPO_ROOTS` 按 `,` 或 `:` 分隔,配了就是覆盖不是追加。
+API 默认只听 `127.0.0.1`,**本机自用是唯一推荐的用法**。`API_SERVER_HOST=0.0.0.0` 能开 LAN,但**不建议**:平台没有鉴权,开了等于同网段谁都能让猫在你的仓库里干活。手机上界面也没适配(侧栏固定宽度,窄屏会挤掉聊天区)。CORS / WebSocket 只放行本机 web(`http://localhost:3300` 和 `http://127.0.0.1:3300`;`NEXT_PUBLIC_API_URL` 指到别处时会带上那个主机的 web 端口)。想收紧或换绑仓根:环境变量 `ALLOWED_REPO_ROOTS` 按 `,` 或 `:` 分隔,配了就是覆盖不是追加。
 
 ```bash
 # 仅 API:

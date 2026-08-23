@@ -341,6 +341,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       apiKey = apiKey ?? preset.apiKey;
     }
     if (!bin) return reply.code(400).send({ error: 'bin 不能为空' });
+    if (!model) return reply.code(400).send({ error: 'model 不能为空', field: 'model' });
     return verifyModelConnection({ bin, model, protocol, baseUrl, apiKey, timeoutMs: 45_000 });
   });
 

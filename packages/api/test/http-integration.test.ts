@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import * as factory from '../src/providers/factory.js';
 import { createMemoryStores } from '../src/stores/factories.js';
 import { ensureSeededProfiles } from '../src/stores/seeds.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
@@ -359,9 +360,25 @@ describe('HTTP 集成', () => {
       body: JSON.stringify({ bin: FAKE_CLAUDE, model: 'sonnet' }),
     });
     expect(okRes.status).toBe(200);
-    const good = (await okRes.json()) as { ok: boolean; preview?: string };
+    const good = (await okRes.json()) as { ok: boolean; preview?: string; usage?: { costUsd?: number } };
     expect(good.ok).toBe(true);
     expect(good.preview).toContain('claude');
+    expect(good.usage?.costUsd).toBe(0.0012);
+  });
+
+  it('POST /api/config/models/verify 模型名为空则 400 且适配器零调用', async () => {
+    const spy = vi.spyOn(factory, 'createAdapter');
+    const empty = await fetch(`${baseUrl}/api/config/models/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bin: 'opencode', model: '' }),
+    });
+    expect(empty.status).toBe(400);
+    const body = (await empty.json()) as { error: string; field?: string };
+    expect(body.field).toBe('model');
+    expect(body.error).toMatch(/model/);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('GET /api/profiles 与 /api/evidence', async () => {

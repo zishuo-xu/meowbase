@@ -3,8 +3,9 @@ import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { isAbsolute } from 'node:path';
 import { promisify } from 'node:util';
+import type { TokenUsage } from '@meowbase/shared';
 import type { AgentSpec, ModelProtocol } from '../config.js';
-import { cliKindFromBin, createAdapter } from './factory.js';
+import * as factory from './factory.js';
 
 const execFileAsync = promisify(execFile);
 const PROBE_PROMPT = '只回复 pong,不要改任何文件';
@@ -26,6 +27,7 @@ export interface VerifyModelResult {
   latencyMs: number;
   error?: string;
   preview?: string;
+  usage?: TokenUsage;
 }
 
 export async function resolveExecutable(bin: string): Promise<string | null> {
@@ -48,8 +50,8 @@ export async function resolveExecutable(bin: string): Promise<string | null> {
   }
 }
 
-function probeSpec(input: VerifyModelInput, resolvedBin: string): AgentSpec {
-  const id = cliKindFromBin(resolvedBin, 'opencode');
+function probeSpec(input: VerifyModelInput, resolvedBin: string, model: string): AgentSpec {
+  const id = factory.cliKindFromBin(resolvedBin, 'opencode');
   return {
     id,
     name: id,
@@ -58,7 +60,7 @@ function probeSpec(input: VerifyModelInput, resolvedBin: string): AgentSpec {
     personality: '',
     expertise: [],
     bin: resolvedBin,
-    ...(input.model?.trim() ? { model: input.model.trim() } : {}),
+    model,
     ...(input.protocol ? { protocol: input.protocol } : {}),
     ...(input.baseUrl?.trim() ? { baseUrl: input.baseUrl.trim() } : {}),
     ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
@@ -71,6 +73,10 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
   if (!bin) {
     return { ok: false, stage: 'bin', latencyMs: 0, error: 'CLI 不能为空' };
   }
+  const model = input.model?.trim() ?? '';
+  if (!model) {
+    return { ok: false, stage: 'model', latencyMs: 0, error: 'model 不能为空' };
+  }
   const resolved = await resolveExecutable(bin);
   if (!resolved) {
     return {
@@ -82,7 +88,7 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
   }
 
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const adapter = createAdapter(probeSpec(input, resolved), timeoutMs);
+  const adapter = factory.createAdapter(probeSpec(input, resolved, model), timeoutMs);
   const output = await adapter.runTurn({
     prompt: PROBE_PROMPT,
     workdir: input.workdir ?? tmpdir(),
@@ -90,6 +96,7 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
   });
   const latencyMs = Date.now() - started;
   const preview = output.content.trim().slice(0, 240);
+  const usage = output.usage;
   if (output.status !== 'completed') {
     return {
       ok: false,
@@ -97,6 +104,7 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
       latencyMs,
       error: output.error ?? `探测失败(${output.status})`,
       preview: preview || undefined,
+      ...(usage ? { usage } : {}),
     };
   }
   if (!preview) {
@@ -105,7 +113,8 @@ export async function verifyModelConnection(input: VerifyModelInput): Promise<Ve
       stage: 'model',
       latencyMs,
       error: 'CLI 在,但模型没有返回内容(请检查模型 ID 与登录)',
+      ...(usage ? { usage } : {}),
     };
   }
-  return { ok: true, stage: 'model', latencyMs, preview };
+  return { ok: true, stage: 'model', latencyMs, preview, ...(usage ? { usage } : {}) };
 }

@@ -328,6 +328,115 @@ describe('TeamHub', () => {
     });
   });
 
+  it('加入目录空模型名显示字段提示且不加入', () => {
+    const onSaveModels = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveModels={onSaveModels}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
+    expect(screen.getByText(/请填写模型/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '保存模型目录' }));
+    expect(onSaveModels).toHaveBeenCalledWith([expect.objectContaining({ id: 'flash' })]);
+    expect(onSaveModels.mock.calls[0]?.[0]).toHaveLength(1);
+  });
+
+  it('加入目录没勾 CLI 显示字段提示', () => {
+    const onSaveModels = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveModels={onSaveModels}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('模型 ID'), { target: { value: 'kimi-k2' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'opencode' }));
+    fireEvent.click(screen.getByRole('button', { name: '加入目录' }));
+    expect(screen.getByText(/请至少勾选/)).toBeTruthy();
+    expect(screen.queryByText('kimi-k2')).toBeNull();
+  });
+
+  it('验证新模型空模型名显示字段提示且不探测', () => {
+    const onVerifyModel = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onVerifyModel={onVerifyModel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '验证新模型' }));
+    expect(onVerifyModel).not.toHaveBeenCalled();
+    expect(screen.getByText(/请填写模型/)).toBeTruthy();
+  });
+
+  it('探测成功把 token 和花费写进结果', async () => {
+    const onVerifyModel = vi.fn().mockResolvedValue({
+      ok: true,
+      stage: 'model',
+      latencyMs: 12,
+      preview: 'pong',
+      usage: { inputTokens: 10, outputTokens: 4, costUsd: 0.01 },
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onVerifyModel={onVerifyModel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '验证 Flash' }));
+    await waitFor(() => {
+      expect(screen.getByText(/已连通/)).toBeTruthy();
+    });
+    expect(screen.getByText(/输入 10/)).toBeTruthy();
+    expect(screen.getByText(/输出 4/)).toBeTruthy();
+    expect(screen.getByText(/\$0.01/)).toBeTruthy();
+  });
+
+  it('探测失败也显示用量,没成本写无成本数据不是 $0', async () => {
+    const onVerifyModel = vi.fn().mockResolvedValue({
+      ok: false,
+      stage: 'model',
+      latencyMs: 9,
+      error: '解析失败',
+      usage: { inputTokens: 8, outputTokens: 2 },
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onVerifyModel={onVerifyModel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '验证 Flash' }));
+    await waitFor(() => {
+      expect(screen.getByText(/失败: 解析失败/)).toBeTruthy();
+    });
+    expect(screen.getByText(/输入 8/)).toBeTruthy();
+    expect(screen.getByText(/无成本数据/)).toBeTruthy();
+    expect(screen.queryByText('$0')).toBeNull();
+  });
+
   it('验证新模型带上网关 URL', async () => {
     const onVerifyModel = vi.fn().mockResolvedValue({
       ok: true,
@@ -471,6 +580,8 @@ describe('TeamHub', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '账本' }));
     const ledger = await screen.findByRole('region', { name: '账本' });
+    expect(within(ledger).getByText(/只算猫/)).toBeTruthy();
+    expect(within(ledger).getByText(/不计入/)).toBeTruthy();
     expect(within(ledger).getByText(/1,234/)).toBeTruthy();
     expect(within(ledger).getByText('墨墨')).toBeTruthy();
     expect(within(ledger).getByText('闪闪')).toBeTruthy();

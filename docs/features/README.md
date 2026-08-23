@@ -47,3 +47,4 @@
 | [git-state-tracking.md](git-state-tracking.md) | 已落地 | 猫对 git 做了什么,平台看得见 |
 | [repo-root-allowlist.md](repo-root-allowlist.md) | 已落地 | 只在允许的目录干活,只听本机说话 |
 | [push-boundary.md](push-boundary.md) | 已落地 | 放开推送,越界就停 |
+| [platform-spend.md](platform-spend.md) | 已落地 | 空模型名不许探测,探测用量当场显示不进账本 |

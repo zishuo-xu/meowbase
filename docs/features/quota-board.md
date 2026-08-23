@@ -42,6 +42,7 @@
 - **没选线程时的「当前线程」直接给空态**，不偷偷退化成「全部」——否则人以为在看这条线程的账。
 - **跨线程是两层循环**（`threads.list()` + 每条线程一次 `messages.list()`），有测试盯着「一次 `get` 都不许调」，防的是以后有人改成按消息逐条取。
 - 复核时我把 `sumUsage` 收了两处：`isBillable` 改成类型谓词（原先检查完还要在循环里重查一遍才能过窄化）、去掉多余的 `hasTotal` 开关（`mergeTokenUsage({}, x)` 和 `mergeTokenUsage(undefined, x)` 等价）。
+- **账本只算猫的。** 模型探测的花费当场显示在探测结果里,不进 `GET /api/usage`、不改 `loadUsage`。为什么不撑大口径见 [platform-spend.md](platform-spend.md)。
 
 ## 总计是派生的（真实数据暴露的口径）
 

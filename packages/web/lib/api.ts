@@ -183,6 +183,7 @@ export const api = {
       latencyMs: number;
       error?: string;
       preview?: string;
+      usage?: TokenUsageDto;
     }>('/api/config/models/verify', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
