@@ -123,7 +123,7 @@ export async function countCommitsBetween(
   return counted ? Number.parseInt(counted, 10) || 0 : 0;
 }
 
-/** 基准分支的远端跟踪引用或本地 ref 动了。反向验掐这里(RV)。 */
+/** 基准分支的远端跟踪引用或本地 ref 动了。自己那根前进(含被 force 改写)不算越界。 */
 export function isGitOverstep(before: GitStateSnapshot, after: GitStateSnapshot): boolean {
   return (
     after.baseRemoteTrackingSha !== before.baseRemoteTrackingSha ||
