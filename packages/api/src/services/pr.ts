@@ -171,8 +171,3 @@ export function createMergedPrLookup(): PrLookup {
     };
   };
 }
-
-export function resolvePrLookup(env: NodeJS.ProcessEnv = process.env): PrLookup {
-  if (env.MEOW_PR_FAKE === 'merged') return createMergedPrLookup();
-  return (input) => lookupPr(input);
-}

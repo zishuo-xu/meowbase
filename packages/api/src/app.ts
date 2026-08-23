@@ -10,7 +10,7 @@ import { createRedisStores } from './stores/factories.js';
 import { ensureSeededProfiles } from './stores/seeds.js';
 import { createAdapter } from './providers/factory.js';
 import { createAgentRegistry } from './providers/registry.js';
-import { resolvePrLookup } from './services/pr.js';
+import { type PrLookup, lookupPr } from './services/pr.js';
 
 export interface StartAppOptions {
   /** skillsDir / workdirBase 相对它解析;传入的绝对路径原样用 */
@@ -22,6 +22,8 @@ export interface StartAppOptions {
   port?: number;
   /** 生产入口给 PATCH 名册后重建适配器;e2e 不需要 */
   rebuildAdapter?: boolean;
+  /** 记分板换成假 PR 状态源;不传就真查 gh。生产不传,所以生产没有「假装已合并」这个开关 */
+  lookupPr?: PrLookup;
   /**
    * 有则用它当沙箱根,不读、不改 config 里的 workdirBase。
    * 不传才按 repoRoot + config.workdirBase 解析(e2e 走这条,WORKDIR_BASE 已是绝对路径)。
@@ -69,7 +71,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     holdCommandEnv: config.holdCommandEnv,
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
     allowedOrigins: resolveAllowedOrigins(process.env),
-    lookupPr: resolvePrLookup(process.env),
+    lookupPr: opts.lookupPr ?? ((input) => lookupPr(input)),
     ...(opts.configPath ? { configPath: opts.configPath } : {}),
     ...(opts.rebuildAdapter
       ? { rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)) }

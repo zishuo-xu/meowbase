@@ -68,7 +68,7 @@
 
 `pr-open.md`。提示词改口：可以对自己这根开 PR，不许自己合。每跳后查一次 PR（可注入），第一次看见 OPEN 落 `pr-opened`，MERGED 走 `settleTurn` 停接力。记分板加一行「猫自己把 PR 合了」。
 
-- **偏离**：查之前先看 `git remote -v` 像不像 GitHub——设计稿只写了 `gh pr list`，但「远端不是 GitHub」那道关若完全交给 `gh` 的报错原文，本地 bare remote 的现有绑仓测试会去真 spawn `gh`，结果随本机有没有装/登入而漂。第一次看见 MERGED 只落 `pr-merged`、不补 `pr-opened`（没看见 OPEN 就写「开了」是谎）。记分板假源用环境变量 `MEOW_PR_FAKE=merged` 挂在 `startApp`，没有另做文件协议。
+- **偏离**：查之前先看 `git remote -v` 像不像 GitHub——设计稿只写了 `gh pr list`，但「远端不是 GitHub」那道关若完全交给 `gh` 的报错原文，本地 bare remote 的现有绑仓测试会去真 spawn `gh`，结果随本机有没有装/登入而漂。第一次看见 MERGED 只落 `pr-merged`、不补 `pr-opened`（没看见 OPEN 就写「开了」是谎）。记分板假源用环境变量 `MEOW_PR_FAKE=merged`，没有另做文件协议;**验收时挪了一次位置**——原来 `startApp` 无条件读这个 env，等于生产进程也带着「假装 PR 已合并」的开关（而且一个测试都没盖），改成 `startApp` 的 `lookupPr` 参数、env 只有 `scripts/e2e-server.ts` 认，跟 `rebuildAdapter` 同一个缝。
 - **还没验过（等人手跑）**：真机绑仓、真 `gh pr create` / `gh pr merge` 看时间线链接和合了之后顶栏——**不许真调 GitHub，落地时没跑**。浏览器顶栏认 `pr-merged` 只有单测。`gh` 没装 / 没登录 / 断网三条分类有单测，没对着真机四态看过。
 - **留了没做**：不做 webhook / 补偿扫描 / review 回流 / CI 追踪 / Hub PR 看板 / 平台代开代合 / 自动 rebase。不裁 `gh` 的 env。查不到每跳都落一句，没有去重。崩溃卡在 hop 已完成、`settleTurn` 还没跑的窗口里，重跑会丢 `pr-merged` 信号——和上一刀越界闸同一个窗口。
 

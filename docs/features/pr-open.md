@@ -61,7 +61,7 @@
 ## 入口
 
 - 提示词改口:`packages/shared/src/system-prompt.ts`（`buildSystemPrompt` 绑仓那段）
-- PR 只读查询（可注入）:`packages/api/src/services/pr.ts`（`lookupPr` / `resolvePrLookup`；记分板 `MEOW_PR_FAKE=merged`）
+- PR 只读查询（可注入）:`packages/api/src/services/pr.ts`（`lookupPr` / `createMergedPrLookup`）。注入缝是 `startApp` 的 `lookupPr` 参数,和 `rebuildAdapter` 同一个模式;`MEOW_PR_FAKE=merged` **只有 `scripts/e2e-server.ts` 认**,生产进程没有「假装已合并」这个开关
 - 每跳后查、落 `pr-opened`:`packages/api/src/router/turn/segment.ts`（`recordPrState`，和 `captureGit` 同一拍）
 - 合了就停:`packages/api/src/router/turn/settle.ts`（`settleTurn` 里和 `git-overstep` 共用清 pending / 不建卡那支，kind 分开）
 - 球权认 `pr-merged`、跳过 `pr-opened`:`packages/web/lib/ball.ts`
