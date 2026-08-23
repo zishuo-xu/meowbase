@@ -152,7 +152,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 ## 常见操作
 
-- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱。路径必须在允许的根下面(默认家目录 + 临时目录);`ALLOWED_REPO_ROOTS` 覆盖。API 默认只听 `127.0.0.1`,开 LAN 设 `API_SERVER_HOST=0.0.0.0`
+- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱。路径必须在允许的根下面,否则 403,返回体带 `selectedPath` 和 `allowedRoots`;怎么改根看 [README.md](README.md)。API 默认只听 `127.0.0.1`,开 LAN 设 `API_SERVER_HOST=0.0.0.0`（没有鉴权,开了同网段谁都能让猫干活）
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:Hub 里改名册/模型并保存(`PATCH /api/config`)立即生效;或手改仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`)后重启 API。`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
