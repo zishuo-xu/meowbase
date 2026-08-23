@@ -14,6 +14,8 @@ import {
   gitInit,
   gitIsRepo,
   snapshotGitState,
+  describeGitMoves,
+  isGitOverstep,
   gitWorktreeAdd,
   gitWorktreeList,
   gitWorktreePrune,
@@ -200,6 +202,7 @@ describe('git 辅助函数', () => {
     expect(before.remoteName).toBe('origin');
     expect(before.remoteTrackingSha).toBeUndefined();
     expect(before.baseRemoteTrackingSha).toBeUndefined();
+    expect(before.baseLocalSha).toBe(before.headSha);
 
     await exec('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: repo });
     const after = await snapshotGitState(repo, { baseBranch: 'main' });
@@ -219,6 +222,86 @@ describe('git 辅助函数', () => {
     expect(snap.remoteName).toBeUndefined();
     expect(snap.remoteTrackingSha).toBeUndefined();
     expect(snap.baseRemoteTrackingSha).toBeUndefined();
+    expect(snap.baseLocalSha).toBe(snap.headSha);
     rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('worktree 能看见父仓本地基准分支 sha', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-git-baselocal-'));
+    const work = mkdtempSync(join(tmpdir(), 'meowbase-git-baselocal-wt-'));
+    await initScratchRepo(repo);
+    const parent = await snapshotGitState(repo, { baseBranch: 'main' });
+    expect(parent.baseLocalSha).toBe(parent.headSha);
+    await gitWorktreeAdd(repo, work, 'meow/t-baselocal', 'main');
+    const wt = await snapshotGitState(work, { baseBranch: 'main' });
+    expect(wt.branch).toBe('meow/t-baselocal');
+    expect(wt.headSha).toBe(parent.headSha);
+    expect(wt.baseLocalSha).toBe(parent.headSha);
+    rmSync(work, { recursive: true, force: true });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('自己那根前进不越界,基准远端或本地动了才越界', () => {
+    const before = {
+      branch: 'meow/t',
+      headSha: 'aaa',
+      remoteName: 'origin',
+      remoteTrackingSha: 'aaa',
+      baseRemoteTrackingSha: 'mmm',
+      baseLocalSha: 'mmm',
+      aheadCount: 1,
+    };
+    const afterOwn = { ...before, headSha: 'bbb', remoteTrackingSha: 'bbb', aheadCount: 2 };
+    const own = describeGitMoves({
+      before,
+      after: afterOwn,
+      commitsSinceBefore: 1,
+      agentName: '墨墨',
+      baseBranch: 'main',
+    });
+    expect(isGitOverstep(before, afterOwn)).toBe(false);
+    expect(own.oversteps).toEqual([]);
+    expect(own.notes.some((n) => n.includes('提交了') && n.includes('commit'))).toBe(true);
+    expect(own.notes.some((n) => n.includes('推到了 origin'))).toBe(true);
+
+    const afterRemote = { ...before, baseRemoteTrackingSha: 'nnn' };
+    const remote = describeGitMoves({
+      before,
+      after: afterRemote,
+      commitsSinceBefore: 0,
+      agentName: '墨墨',
+      baseBranch: 'main',
+    });
+    expect(isGitOverstep(before, afterRemote)).toBe(true);
+    expect(remote.notes).toEqual([]);
+    expect(remote.oversteps).toEqual([
+      {
+        side: 'remote',
+        baseBranch: 'main',
+        beforeSha: 'mmm',
+        afterSha: 'nnn',
+        note: '⚠️ 基准分支 `main` 的远端引用变了',
+      },
+    ]);
+
+    const afterLocal = { ...before, baseLocalSha: 'nnn' };
+    const local = describeGitMoves({
+      before,
+      after: afterLocal,
+      commitsSinceBefore: 0,
+      agentName: '墨墨',
+      baseBranch: 'main',
+    });
+    expect(isGitOverstep(before, afterLocal)).toBe(true);
+    expect(local.notes).toEqual([]);
+    expect(local.oversteps).toEqual([
+      {
+        side: 'local',
+        baseBranch: 'main',
+        beforeSha: 'mmm',
+        afterSha: 'nnn',
+        note: '⚠️ 基准分支 `main` 的本地引用变了',
+      },
+    ]);
   });
 });

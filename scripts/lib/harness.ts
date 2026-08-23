@@ -51,11 +51,13 @@ export interface ThreadRow {
 export interface ScratchRepo {
   repoPath: string;
   baseBranch: string;
+  remotePath?: string;
   cleanup: () => void;
 }
 
 export interface AuditRow {
   action: string;
+  meta?: Record<string, unknown>;
 }
 
 export interface UsageSummary {
@@ -173,10 +175,15 @@ export async function json<T>(res: Response, label: string): Promise<T> {
 }
 
 /** 临时真仓当绑仓目标。配本地 git 身份(CI 没有全局身份),分支名从仓库读,不写死 main/master。 */
-export function makeScratchRepo(): ScratchRepo {
+export function makeScratchRepo(opts?: { withRemote?: boolean }): ScratchRepo {
   const repoPath = mkdtempSync(join(tmpdir(), 'meowbase-eval-repo-'));
+  let remotePath: string | undefined;
   const git = (args: string[]): string =>
     execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' });
+  const cleanup = (): void => {
+    rmSync(repoPath, { recursive: true, force: true });
+    if (remotePath) rmSync(remotePath, { recursive: true, force: true });
+  };
   try {
     git(['init', '-q']);
     git(['config', 'user.name', 'meowbase-eval']);
@@ -187,13 +194,20 @@ export function makeScratchRepo(): ScratchRepo {
     git(['commit', '-q', '-m', 'init']);
     const baseBranch = git(['branch', '--show-current']).trim();
     if (!baseBranch) throw new Error('临时仓没有默认分支');
+    if (opts?.withRemote) {
+      remotePath = mkdtempSync(join(tmpdir(), 'meowbase-eval-bare-'));
+      execFileSync('git', ['init', '--bare', '-q'], { cwd: remotePath });
+      git(['remote', 'add', 'origin', remotePath]);
+      git(['push', '-q', '-u', 'origin', baseBranch]);
+    }
     return {
       repoPath,
       baseBranch,
-      cleanup: () => rmSync(repoPath, { recursive: true, force: true }),
+      ...(remotePath ? { remotePath } : {}),
+      cleanup,
     };
   } catch (err) {
-    rmSync(repoPath, { recursive: true, force: true });
+    cleanup();
     throw err;
   }
 }

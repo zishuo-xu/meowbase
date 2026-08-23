@@ -6,9 +6,10 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryStores } from '../src/stores/factories.js';
 import { createAgentRegistry } from '../src/providers/registry.js';
-import { executeTurn } from '../src/router/execute-turn.js';
+import { executeTurn, followPendingChain } from '../src/router/execute-turn.js';
 import { gitAddAll, gitInit, gitWorktreeAdd } from '../src/services/git.js';
 import { DEFAULT_AGENTS } from '../src/config.js';
+import { auditApprovals, auditMessages } from '../src/stores/audit-log.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 
@@ -175,9 +176,9 @@ describe('绑仓线程 git 状态追踪', () => {
     expect(moves.some((m) => m.content.includes('推到了 origin'))).toBe(true);
   });
 
-  it('基准分支远端引用变了出越界句', async () => {
+  it('推自己那根只落 git-move,接力继续', async () => {
     const { repo, stores, thread } = await bindThread();
-    const bare = mkdtempSync(join(tmpdir(), 'meowbase-gst-base-'));
+    const bare = mkdtempSync(join(tmpdir(), 'meowbase-gst-own-'));
     cleanups.push(bare);
     await exec('git', ['init', '--bare', '-q'], { cwd: bare });
     await exec('git', ['remote', 'add', 'origin', bare], { cwd: repo });
@@ -187,25 +188,142 @@ describe('绑仓线程 git 状态追踪', () => {
       {
         agentId: 'claude',
         async runTurn(input) {
-          const fake = (
-            await exec('git', ['commit-tree', 'HEAD^{tree}', '-m', 'moved-base'], { cwd: input.workdir })
-          ).stdout.trim();
-          await exec('git', ['update-ref', 'refs/remotes/origin/main', fake], { cwd: input.workdir });
-          return { sessionId: 's-w', content: '没改文件', status: 'completed' };
+          writeFileSync(join(input.workdir, 'own.txt'), 'ok\n');
+          await exec('git', ['add', 'own.txt'], { cwd: input.workdir });
+          await commitAsCat(input.workdir, 'own commit');
+          await exec('git', ['push', '-q', '-u', 'origin', thread.repo!.branch], { cwd: input.workdir });
+          return {
+            sessionId: 's-w',
+            content: '推了自己这根。\n@闪闪 请审查 own.txt',
+            status: 'completed',
+          };
         },
       },
+      stub('gemini', '审查意见:通过'),
     ]);
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 推自己这根',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
 
+    const rows = await stores.messages.list(thread.id);
+    expect(rows.some((m) => m.role === 'system' && m.systemKind === 'git-overstep')).toBe(false);
+    expect(
+      rows.some(
+        (m) =>
+          m.role === 'system' &&
+          m.systemKind === 'git-move' &&
+          m.content.includes('推到了 origin'),
+      ),
+    ).toBe(true);
+    expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(true);
+    expect((await stores.approvals.list(thread.id)).length).toBe(1);
+  });
+
+  it('推基准分支:停接力、不建卡、球给人、审计带 sha', async () => {
+    const { repo, stores: raw, thread } = await bindThread();
+    const stores = {
+      ...raw,
+      messages: auditMessages(raw.messages, raw.audit),
+      approvals: auditApprovals(raw.approvals, raw.audit),
+    };
+    const bare = mkdtempSync(join(tmpdir(), 'meowbase-gst-over-'));
+    cleanups.push(bare);
+    await exec('git', ['init', '--bare', '-q'], { cwd: bare });
+    await exec('git', ['remote', 'add', 'origin', bare], { cwd: repo });
+    await exec('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: repo });
+    const beforeSha = (
+      await exec('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: repo })
+    ).stdout.trim();
+
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          writeFileSync(join(input.workdir, 'overstep.txt'), 'x\n');
+          const fake = (
+            await exec('git', ['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'moved-base'], {
+              cwd: input.workdir,
+            })
+          ).stdout.trim();
+          await exec('git', ['push', '-q', 'origin', `${fake}:refs/heads/main`], { cwd: input.workdir });
+          return {
+            sessionId: 's-w',
+            content: '推了基准分支。\n@闪闪 请审查 overstep.txt',
+            status: 'completed',
+          };
+        },
+      },
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS };
     await executeTurn({
       threadId: thread.id,
       content: '@墨墨 看一眼',
-      context: { stores, registry, agents: DEFAULT_AGENTS },
+      context: ctx,
     });
+    await followPendingChain({ threadId: thread.id, context: ctx });
 
-    const moves = (await stores.messages.list(thread.id)).filter(
-      (m) => m.role === 'system' && m.systemKind === 'git-move',
+    const rows = await stores.messages.list(thread.id);
+    const over = rows.filter((m) => m.role === 'system' && m.systemKind === 'git-overstep');
+    expect(over.length).toBe(1);
+    expect(over[0]?.content).toContain('⚠️');
+    expect(over[0]?.content).toContain('基准分支');
+    expect(over[0]?.systemMeta?.baseBranch).toBe('main');
+    expect(over[0]?.systemMeta?.beforeSha).toBe(beforeSha);
+    expect(over[0]?.systemMeta?.afterSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(over[0]?.systemMeta?.afterSha).not.toBe(beforeSha);
+    expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(false);
+    expect(rows.some((m) => m.role === 'system' && m.systemKind === 'relay')).toBe(false);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
+    expect(rows.some((m) => m.role === 'system' && m.systemKind === 'git-move')).toBe(false);
+
+    const audit = (await raw.audit.list({ threadId: thread.id })).filter(
+      (r) => r.action === 'git-overstep',
     );
-    expect(moves.some((m) => m.content.includes('⚠️') && m.content.includes('基准分支'))).toBe(true);
+    expect(audit.length).toBe(1);
+    expect(audit[0]?.meta?.baseBranch).toBe('main');
+    expect(audit[0]?.meta?.beforeSha).toBe(beforeSha);
+    expect(audit[0]?.meta?.afterSha).toBe(over[0]?.systemMeta?.afterSha);
+  });
+
+  it('本地基准分支 ref 动了也越界停接力', async () => {
+    const { stores, thread } = await bindThread();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          writeFileSync(join(input.workdir, 'local.txt'), 'x\n');
+          const fake = (
+            await exec('git', ['commit-tree', 'HEAD^{tree}', '-m', 'force-main'], { cwd: input.workdir })
+          ).stdout.trim();
+          await exec('git', ['update-ref', 'refs/heads/main', fake], { cwd: input.workdir });
+          return {
+            sessionId: 's-w',
+            content: '动了本地 main。\n@闪闪 请审查 local.txt',
+            status: 'completed',
+          };
+        },
+      },
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 看一眼',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
+
+    const rows = await stores.messages.list(thread.id);
+    expect(rows.some((m) => m.role === 'system' && m.systemKind === 'git-overstep')).toBe(true);
+    expect(rows.some((m) => m.content.includes('本地引用'))).toBe(true);
+    expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(false);
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
   });
 
   it('空沙箱线程一句 git-move 都不出', async () => {

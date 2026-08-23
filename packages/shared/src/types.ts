@@ -62,6 +62,7 @@ export type SystemKind =
   | 'approval-applied'
   | 'approval-failed'
   | 'git-move'
+  | 'git-overstep'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';
@@ -72,6 +73,10 @@ export interface SystemMeta {
   to?: AgentId;
   /** 验证门已经算好的审查结论；老消息没有，前端退回正文判断 */
   verdict?: 'pass' | 'revise' | 'incomplete';
+  /** 越界那条:动的是哪根基准分支、前后 sha */
+  baseBranch?: string;
+  beforeSha?: string;
+  afterSha?: string;
 }
 
 export interface TokenUsage {

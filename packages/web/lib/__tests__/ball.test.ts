@@ -436,7 +436,24 @@ describe('describeBall', () => {
           {
             role: 'system',
             content: '⚠️ 基准分支 `main` 的远端引用变了',
-            systemKind: 'git-move',
+            systemKind: 'git-overstep',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在人手里', tone: 'human' });
+  });
+
+  it('git-overstep 顶栏球在人手里', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '推了', status: 'completed' },
+          {
+            role: 'system',
+            content: '⚠️ 基准分支 `main` 的远端引用变了',
+            systemKind: 'git-overstep',
           },
         ],
         false,

@@ -185,7 +185,8 @@ describe('buildSystemPrompt', () => {
     expect(bound).toContain('/src/myapp');
     expect(bound).toContain('/tmp/meowbase-work/t1');
     expect(bound).toContain('meow/t1');
-    expect(bound).toContain('不许 push');
+    expect(bound).toContain('可以 push 你自己这根 meow/t1');
+    expect(bound).not.toContain('不许 push');
     expect(bound).toContain('不许切分支');
     expect(bound).toContain('不许动 .git');
     expect(bound).toContain('不许碰 main');

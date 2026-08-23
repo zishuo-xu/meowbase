@@ -52,7 +52,22 @@ export interface GitStateSnapshot {
   remoteName?: string;
   remoteTrackingSha?: string;
   baseRemoteTrackingSha?: string;
+  /** worktree 和父仓共享 refs,所以这里看见的是人主仓那根基准分支 */
+  baseLocalSha?: string;
   aheadCount: number;
+}
+
+export interface GitOverstep {
+  side: 'remote' | 'local';
+  baseBranch: string;
+  beforeSha?: string;
+  afterSha?: string;
+  note: string;
+}
+
+export interface GitMoveClassification {
+  notes: string[];
+  oversteps: GitOverstep[];
 }
 
 async function firstRemoteName(dir: string): Promise<string | undefined> {
@@ -79,6 +94,9 @@ export async function snapshotGitState(
     remoteName && opts?.baseBranch
       ? await tryRun(dir, ['rev-parse', `refs/remotes/${remoteName}/${opts.baseBranch}`])
       : undefined;
+  const baseLocalSha = opts?.baseBranch
+    ? await tryRun(dir, ['rev-parse', `refs/heads/${opts.baseBranch}`])
+    : undefined;
   let aheadCount = 0;
   if (opts?.baseBranch && headSha) {
     const counted = await tryRun(dir, ['rev-list', '--count', `${opts.baseBranch}..HEAD`]);
@@ -90,6 +108,7 @@ export async function snapshotGitState(
     ...(remoteName ? { remoteName } : {}),
     ...(remoteTrackingSha ? { remoteTrackingSha } : {}),
     ...(baseRemoteTrackingSha ? { baseRemoteTrackingSha } : {}),
+    ...(baseLocalSha ? { baseLocalSha } : {}),
     aheadCount,
   };
 }
@@ -104,14 +123,23 @@ export async function countCommitsBetween(
   return counted ? Number.parseInt(counted, 10) || 0 : 0;
 }
 
+/** 基准分支的远端跟踪引用或本地 ref 动了。反向验掐这里(RV)。 */
+export function isGitOverstep(before: GitStateSnapshot, after: GitStateSnapshot): boolean {
+  return (
+    after.baseRemoteTrackingSha !== before.baseRemoteTrackingSha ||
+    after.baseLocalSha !== before.baseLocalSha
+  );
+}
+
 export function describeGitMoves(input: {
   before: GitStateSnapshot;
   after: GitStateSnapshot;
   commitsSinceBefore: number;
   agentName: string;
   baseBranch?: string;
-}): string[] {
+}): GitMoveClassification {
   const notes: string[] = [];
+  const oversteps: GitOverstep[] = [];
   const branch = input.after.branch || input.before.branch;
   if (input.commitsSinceBefore > 0) {
     notes.push(
@@ -125,10 +153,32 @@ export function describeGitMoves(input: {
     const remote = input.after.remoteName ?? input.before.remoteName ?? 'origin';
     notes.push(`${input.agentName} 把 \`${branch}\` 推到了 ${remote}`);
   }
-  if (input.after.baseRemoteTrackingSha !== input.before.baseRemoteTrackingSha) {
-    notes.push(`⚠️ 基准分支 \`${input.baseBranch ?? 'main'}\` 的远端引用变了`);
+  const baseBranch = input.baseBranch ?? 'main';
+  if (isGitOverstep(input.before, input.after)) {
+    if (input.after.baseRemoteTrackingSha !== input.before.baseRemoteTrackingSha) {
+      oversteps.push({
+        side: 'remote',
+        baseBranch,
+        ...(input.before.baseRemoteTrackingSha
+          ? { beforeSha: input.before.baseRemoteTrackingSha }
+          : {}),
+        ...(input.after.baseRemoteTrackingSha
+          ? { afterSha: input.after.baseRemoteTrackingSha }
+          : {}),
+        note: `⚠️ 基准分支 \`${baseBranch}\` 的远端引用变了`,
+      });
+    }
+    if (input.after.baseLocalSha !== input.before.baseLocalSha) {
+      oversteps.push({
+        side: 'local',
+        baseBranch,
+        ...(input.before.baseLocalSha ? { beforeSha: input.before.baseLocalSha } : {}),
+        ...(input.after.baseLocalSha ? { afterSha: input.after.baseLocalSha } : {}),
+        note: `⚠️ 基准分支 \`${baseBranch}\` 的本地引用变了`,
+      });
+    }
   }
-  return notes;
+  return { notes, oversteps };
 }
 
 export async function gitIsRepo(dir: string): Promise<boolean> {

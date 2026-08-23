@@ -64,7 +64,7 @@ describe('parseMessage', () => {
     expect(
       parseMessage({
         role: 'system',
-        systemKind: 'git-move',
+        systemKind: 'git-overstep',
         content: '⚠️ 基准分支 `main` 的远端引用变了',
       }).kind,
     ).toBe('receipt');

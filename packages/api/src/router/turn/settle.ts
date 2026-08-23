@@ -35,6 +35,33 @@ export async function settleTurn(input: {
     });
   }
 
+  const oversteps = lastResult.oversteps ?? [];
+  if (oversteps.length > 0) {
+    const primary = oversteps[0]!;
+    await writeQueue(() =>
+      context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: oversteps.map((item) => item.note).join('\n'),
+        status: 'completed',
+        systemKind: 'git-overstep',
+        systemMeta: {
+          baseBranch: primary.baseBranch,
+          ...(primary.beforeSha ? { beforeSha: primary.beforeSha } : {}),
+          ...(primary.afterSha ? { afterSha: primary.afterSha } : {}),
+        },
+      }),
+    );
+    await context.stores.threads.setPendingHop(threadId, null);
+    turnLog('git-overstep', {
+      thread: threadId,
+      baseBranch: primary.baseBranch,
+      before: clip(primary.beforeSha ?? '', 12),
+      after: clip(primary.afterSha ?? '', 12),
+    });
+    return lastAssistant;
+  }
+
   const pending = (await context.stores.threads.get(threadId))?.pendingHop;
   // 槽里还是刚跑完的那一棒 ≠ 下一棒已写下;要等下一棒才跳过审查
   const waiting = Boolean(pending && pending.id !== lastAssistant.hopId);

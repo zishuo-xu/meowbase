@@ -39,6 +39,7 @@ import {
   countCommitsBetween,
   describeGitMoves,
   snapshotGitState,
+  type GitOverstep,
   type GitStateSnapshot,
 } from '../../services/git.js';
 import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
@@ -50,8 +51,8 @@ async function recordGitMove(input: {
   writeQueue: WriteQueue;
   before: GitStateSnapshot | null;
   agentName: string;
-}): Promise<void> {
-  if (!input.thread.repo || !input.before) return;
+}): Promise<GitOverstep[]> {
+  if (!input.thread.repo || !input.before) return [];
   try {
     const after = await snapshotGitState(input.thread.workdir, {
       baseBranch: input.thread.repo.baseBranch,
@@ -61,28 +62,31 @@ async function recordGitMove(input: {
       input.before.headSha,
       after.headSha,
     );
-    const notes = describeGitMoves({
+    const classified = describeGitMoves({
       before: input.before,
       after,
       commitsSinceBefore,
       agentName: input.agentName,
       baseBranch: input.thread.repo.baseBranch,
     });
-    if (notes.length === 0) return;
-    await input.writeQueue(() =>
-      input.context.stores.messages.append({
-        threadId: input.thread.id,
-        role: 'system',
-        content: notes.join('\n'),
-        status: 'completed',
-        systemKind: 'git-move',
-      }),
-    );
+    if (classified.notes.length > 0) {
+      await input.writeQueue(() =>
+        input.context.stores.messages.append({
+          threadId: input.thread.id,
+          role: 'system',
+          content: classified.notes.join('\n'),
+          status: 'completed',
+          systemKind: 'git-move',
+        }),
+      );
+    }
+    return classified.oversteps;
   } catch (err) {
     turnLog('git-move fail', {
       thread: input.thread.id,
       error: clip(String(err), 120),
     });
+    return [];
   }
 }
 
@@ -146,6 +150,7 @@ export async function runSegment(
     deniedCommand?: string;
     denyReason?: HoldCommandDenyReason;
   } | undefined;
+  const oversteps: GitOverstep[] = [];
   if (resume) {
     for (const id of resume.visited) visited.add(id);
   }
@@ -193,6 +198,20 @@ export async function runSegment(
         turnLog('git-move fail', { thread: thread.id, error: clip(String(err), 120) });
       }
     }
+    let recordedHop = false;
+    const captureGit = async (): Promise<GitOverstep[]> => {
+      if (recordedHop) return [];
+      recordedHop = true;
+      const found = await recordGitMove({
+        thread,
+        context,
+        writeQueue,
+        before,
+        agentName: displayName(currentAgent, catalog),
+      });
+      oversteps.push(...found);
+      return found;
+    };
     try {
     const hopResult = await runAgentTurn(
       context,
@@ -358,6 +377,7 @@ export async function runSegment(
       stop = { kind: 'void', blockedTarget: relayTarget, handoffTask: handoff.task };
       break;
     }
+    if ((await captureGit()).length > 0) break;
     const pendingHop: PendingHop = {
       id: randomUUID(),
       to: relayTarget,
@@ -395,13 +415,7 @@ export async function runSegment(
     });
     break;
     } finally {
-      await recordGitMove({
-        thread,
-        context,
-        writeQueue,
-        before,
-        agentName: displayName(currentAgent, catalog),
-      });
+      await captureGit();
     }
   }
 
@@ -465,5 +479,5 @@ export async function runSegment(
       );
     }
   }
-  return { lastAssistant, lastOutput, visited, firstAgent };
+  return { lastAssistant, lastOutput, visited, firstAgent, oversteps };
 }

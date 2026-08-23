@@ -58,7 +58,7 @@
 - **不裁 git 子进程的 env**。原打算对齐 `hold-command` 那套,查完不做:`hold-command` 要裁是因为**命令来自猫的回复**,猫能写 `等跑 env` 把密钥读走;`git.ts` 的 argv 全由平台拼,猫选不了,git 也不回显自己的 env,没有暴露面。裁了反而会坏——git 靠 `HOME` 找 `.gitconfig` 和 credential helper,`SSH_AUTH_SOCK` 也在,正是下一刀放开 push 要用的。他们公开的 LL-019 / LL-020 就是这条:试过换 `HOME` 隔离 CLI 凭据,401、掉 session、MCP 残缺,补了几轮**回退了**。把针对性缓解搬到没有该威胁的地方,只换来假安全感。
 - **不做鉴权 / 多用户**。不搬 F077 的 `allowedProjectPaths[]` per user、Thread ACL、owner 闸。喵窝没有身份概念,加了就是新的一颗心脏。默认只听本机是这一刀能给的最薄答案。
 - **不做敏感文件 denylist、不做平台代读仓库文件**。那是 F063 那条面(Hub workspace explorer),我们还没有那个功能。只借它的路径判法。
-- **不放开猫 push**。仍是下一刀。
+- **不放开猫 push**。后来就是 [push-boundary.md](push-boundary.md)。
 
 ## 入口
 

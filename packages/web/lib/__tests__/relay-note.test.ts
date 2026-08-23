@@ -22,6 +22,15 @@ describe('parseRelayNote', () => {
     ).toBeNull();
   });
 
+  it('git-overstep 不当交接包', () => {
+    expect(
+      parseRelayNote({
+        content: '⚠️ 基准分支 `main` 的远端引用变了',
+        systemKind: 'git-overstep',
+      }),
+    ).toBeNull();
+  });
+
   it('有 relay kind 时改掉第一行仍当交接包', () => {
     expect(
       parseRelayNote({
