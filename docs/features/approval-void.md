@@ -8,7 +8,7 @@
 
 ## 门（各一句）
 
-- **功能**：`pr-merged` 停接力时，把这条线程上还开着的审批卡改成终态「已失效」并写清原因；失效的卡不能再批
+- **功能**：`pr-merged` 停接力时，把这条线程上还开着的审批卡（`draft` / `reviewing` / `approved`）改成终态「已失效」并写清原因；失效的卡不能再批
 - **价值**：卡不再邀请一个已经没有意义的动作。人点下去才失败，等于让人替平台发现问题
 - **愿景**：仍是人拍板。这一刀不替人做任何决定，只是把一个已经不成立的决定点收掉
 - **落点**：`ApprovalStatus` 加一个终态 + `settleTurn` 里 `pr-merged` 那条已有分支上顺手调一次 + `#approve` 拒掉失效卡。不新开心脏、不加系统消息种类（用 `notice`）
@@ -25,7 +25,11 @@
 
 ## 怎么做
 
-1. **加一个终态**。`ApprovalStatus` 加 `voided`，`ApprovalCard` 加 `voidReason`。Store 加一个方法（形如 `void(id, reason)`），只接受还开着的卡（`reviewing` / `pending`）——已经 `applied` / `rejected` 的不许改，终态不可回退。注意踩坑第 8 条：这个状态机是真的会挡人，`markApplied` 只接受 `approved`，别顺手放宽它。
+1. **加一个终态**。`ApprovalStatus` 加 `voided`，`ApprovalCard` 加 `voidReason`。Store 加一个方法（形如 `void(id, reason)`），只接受**还开着**的卡。
+
+ 「还开着」是哪几个状态，要**逐个枚举**，别只写「开着的」：`draft`、`reviewing`、**`approved`**。前两个是显然的；`approved` 也算，因为它不是终态——人批了但提交失败的卡会停在这里（`approval-failed` 那条路），而 `#approve` 再打上去会**跳过 `approve()` 直接重走一遍落地**。所以改动进了基准分支之后，它和 `reviewing` 一样在邀请一次必然失败的重试。判据放进 `shared` 的纯函数（`isVoidableApprovalStatus`），因为 store 和 `settleTurn` **两处都要筛**，写两份早晚有一处漏。
+
+ `applied` / `rejected` / `voided` 不许改，终态不可回退。注意踩坑第 8 条：这个状态机是真的会挡人，`markApplied` 只接受 `approved`，别顺手放宽它。
 
 2. **只在 `pr-merged` 作废，不在 `git-overstep` 作废**。两者都停接力，但意义不同：PR 合了，卡里那段 diff 已经进 base，批它是空动作；有人动了基准分支，卡里那段改动**仍然待落地**，人可能还是想批。一刀切会把后者误废。**`CLOSED` 也不作废**——PR 被关掉而没合，改动没进去，卡还成立。
 

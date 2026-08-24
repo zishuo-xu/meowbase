@@ -239,7 +239,7 @@ describe('内存 Approval 存储', () => {
     expect(await approvals.get('ap_00000000')).toBeNull();
   });
 
-  it('void 只吃还开着的卡,终态和 approved 都拒并原样留下', async () => {
+  it('void 只吃还开着的卡(含 approved),终态拒并原样留下', async () => {
     const { approvals } = createMemoryStores();
     const open = await approvals.create({
       threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
@@ -260,13 +260,14 @@ describe('内存 Approval 存储', () => {
     });
     expect((await approvals.void(draft.id, 'PR #13 已合并'))?.status).toBe('voided');
 
+    // approved 也算「还开着」:人批了但提交失败的卡停在这里,而 `#approve` 打上去会再走
+    // 一遍落地——改动已经进基准分支之后,那次重试必然 nothing to commit 失败。
     const approved = await approvals.create({
       threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
       diffText: 'd3', diffStat: 's3',
     });
     await approvals.approve(approved.id);
-    expect(await approvals.void(approved.id, 'PR #14 已合并')).toBeNull();
-    expect((await approvals.get(approved.id))?.status).toBe('approved');
+    expect((await approvals.void(approved.id, 'PR #14 已合并'))?.status).toBe('voided');
 
     const applied = await approvals.create({
       threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',

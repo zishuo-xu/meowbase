@@ -169,6 +169,29 @@ describe('pr-merged 作废还开着的审批卡', () => {
     });
   });
 
+  it('人批了但提交失败的卡(approved)合了之后也作废,不留一次必然失败的重试', async () => {
+    const { stores, thread } = await bindThread();
+    const registry = createAgentRegistry([
+      writerThen('写好了 sum.ts。'),
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const first = { stores, registry, agents: DEFAULT_AGENTS, lookupPr: lookupOf(openPr) };
+    await executeTurn({ threadId: thread.id, content: '@墨墨 写个 sum', context: first });
+    await followPendingChain({ threadId: thread.id, context: first });
+
+    const cardId = (await stores.approvals.list(thread.id))[0]!.id;
+    // 人批了、但提交没成(approval-failed 那条路),卡停在 approved 等重试
+    expect((await stores.approvals.approve(cardId))?.status).toBe('approved');
+
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 再看一眼',
+      context: { stores, registry, agents: DEFAULT_AGENTS, lookupPr: lookupOf(mergedPr) },
+    });
+
+    expect((await stores.approvals.get(cardId))?.status).toBe('voided');
+  });
+
   it('git-overstep 不停着的卡,不作废', async () => {
     const { repo, stores, thread } = await bindThread();
     const bare = mkdtempSync(join(tmpdir(), 'meowbase-void-over-'));

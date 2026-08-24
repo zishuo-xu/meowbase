@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Redis } from 'ioredis';
-import { generateApprovalId, generateEvidenceId } from '@meowbase/shared';
+import {
+  generateApprovalId,
+  generateEvidenceId,
+  isVoidableApprovalStatus,
+} from '@meowbase/shared';
 import type {
   AgentId,
   AgentProfile,
@@ -525,7 +529,7 @@ export class RedisApprovalStore implements ApprovalStore {
 
   async void(id: string, reason: string): Promise<ApprovalCard | null> {
     const card = await this.hydrate(id);
-    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    if (!card || !isVoidableApprovalStatus(card.status)) return null;
     const updated: ApprovalCard = { ...card, status: 'voided', voidReason: reason };
     await this.write(updated);
     return updated;

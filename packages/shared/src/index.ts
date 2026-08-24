@@ -58,6 +58,7 @@ export { matchEvidence, tokenizeEvidenceQuery, wantsEvidenceRecall } from './evi
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
+export { isVoidableApprovalStatus } from './approval-status.js';
 export type { GatedVerdict, ReviewVerdict } from './review-verdict.js';
 export {
   allowsAutoApprove,

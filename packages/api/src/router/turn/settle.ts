@@ -1,4 +1,8 @@
-import { parseHoldExit, parseLearnCommand } from '@meowbase/shared';
+import {
+  isVoidableApprovalStatus,
+  parseHoldExit,
+  parseLearnCommand,
+} from '@meowbase/shared';
 import type { EvidenceEntry, MentionCatalog, Message, TeamMember } from '@meowbase/shared';
 import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
 import {
@@ -86,8 +90,8 @@ export async function settleTurn(input: {
         sha: clip(mergedPr.headRefOid, 12),
       });
       const reason = formatApprovalVoidReason(mergedPr.number);
-      const open = (await context.stores.approvals.list(threadId)).filter(
-        (card) => card.status === 'draft' || card.status === 'reviewing',
+      const open = (await context.stores.approvals.list(threadId)).filter((card) =>
+        isVoidableApprovalStatus(card.status),
       );
       for (const card of open) {
         const voided = await context.stores.approvals.void(card.id, reason);

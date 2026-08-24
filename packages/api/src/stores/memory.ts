@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { generateApprovalId, generateEvidenceId } from '@meowbase/shared';
+import {
+  generateApprovalId,
+  generateEvidenceId,
+  isVoidableApprovalStatus,
+} from '@meowbase/shared';
 import type {
   AgentId,
   AgentProfile,
@@ -355,7 +359,7 @@ export class InMemoryApprovalStore implements ApprovalStore {
 
   async void(id: string, reason: string): Promise<ApprovalCard | null> {
     const card = this.cards.get(id);
-    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    if (!card || !isVoidableApprovalStatus(card.status)) return null;
     const updated: ApprovalCard = { ...card, status: 'voided', voidReason: reason };
     this.cards.set(id, updated);
     return updated;

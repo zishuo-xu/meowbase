@@ -47,6 +47,7 @@
 
 - **追 review / CI** —— 开 PR 和合并拉闸已经落地。下一层是他们的 F140（回流 comment、CI 绿要不要叫醒），单独一篇，不能顺手带。
 - **演示路径进 CI 的浏览器测试** —— 补上唯一零自动化的那一层，用 fake CLI 不花钱。今天就吃过亏：人手走演示时漏打了那行 `@墨墨`，流程照样跑通（不写 `@` 会兜到主猫，恰好也是墨墨），于是**看起来全绿其实两条没测到**。
+- **查记分板那一行为什么会飘** —— 2026-08-24 整套 `pnpm eval` 里「猫自己提交，平台就瞎了」出现过一次 2/3（报 `线程不存在`，而**那一跑产品行为是对的**：diff 抓到、审查跑完、卡建出来 `verdict=pass`，挂在骨架的断言上）。整套复跑 12/12，`EVAL_ONLY=self-commit` 单跑两轮 6/6，**隔离复现不出来，原因未知**。`flushdb` 只在每个场景跑前一次、不在三次迭代之间，所以「被别人冲库」这个顺手的解释不成立。记分板的全部价值是「会红的数字」，时红时绿等于没有证据效力，也会在 CI 里无故报红——见到那一行红，先怀疑这个已知的飘，不是自己弄坏的。
 - **预算闸** —— 账本现在只能看不能拦，`GET /api/usage` 有数字但花超了不会停。
 - **剩下的 UX 碎点** —— 干活时只说「猫们正在干活」不说是哪只；Hub 默认停在模型目录不是能力页；交接按钮的无障碍名把「闪闪」和「交接包」粘在一起。
 
@@ -68,8 +69,9 @@
 
 `approval-void.md`。`ApprovalStatus` 加终态 `voided` + `voidReason`。`settleTurn` 的 `pr-merged` 分支作废本线程还开着的卡，系统句用 `notice`。`#approve` 对失效卡当场回「这张卡已失效」，不走到提交。记分板加一行「合了之后那张卡还能批」，只断言卡是 `voided`。
 
-- **偏离**：设计稿写「只接受 `reviewing` / `pending`」。仓库里没有 `pending` 这个 store 状态——`pending` 是前端 UI 映射，开着的是 `draft` / `reviewing`（跟 `approve` / `reject` 同一道门）。`void` 因此吃 `draft` + `reviewing`，不另造 `pending`。`#approve` 拒词写在 `system-commands.ts`，不是预判的 `execute-turn.ts`。记分板新行必须先建卡再合，所以分两段起 API：第一段不带假源建卡，第二段才 `MEOW_PR_FAKE=merged`；`merge-pr` 那行仍从第一跳就假合并、不断言卡状态。
-- **只有人手验过**：没验过。不许真调 GitHub，真机「人手合 PR → 卡变已失效、按钮消失」这一段没有对着真远端跑。自动化盖了 store 状态机、`pr-merged` 作废、`git-overstep` / `CLOSED` 不作废、`#approve` 提前提前拒、卡片无按钮、记分板单独一行。
+- **偏离**：设计稿写「只接受 `reviewing` / `pending`」。仓库里没有 `pending` 这个 store 状态——`pending` 是前端 UI 映射，开着的是 `draft` / `reviewing`（跟 `approve` / `reject` 同一道门）。`#approve` 拒词写在 `system-commands.ts`，不是预判的 `execute-turn.ts`。记分板新行必须先建卡再合，所以分两段起 API：第一段不带假源建卡，第二段才 `MEOW_PR_FAKE=merged`；`merge-pr` 那行仍从第一跳就假合并、不断言卡状态。
+- **验收时补了一格(设计稿同轮改了)**：门原来只枚举 `reviewing` / `pending`，把 **`approved` 漏了**——它不是终态，人批了但提交失败的卡停在这里，而 `#approve` 再打上去会**跳过 `approve()` 直接重走落地**，PR 合掉之后那次重试必然 nothing to commit 失败。也就是说这一刀要消掉的症状（人点下去才发现没意义）在这个状态上原封不动留着。补法：判据抽成 `shared` 的 `isVoidableApprovalStatus`，因为 store 和 `settleTurn` **两处都在筛状态**，只改 store 那份测试仍然红。原先锁「`approved` 拒作废」那条单测的断言和标题一起翻了过来。
+- **只有人手验过**：没验过。不许真调 GitHub，真机「人手合 PR → 卡变已失效、按钮消失」这一段没有对着真远端跑。自动化盖了 store 状态机、`pr-merged` 作废、`approved` 也作废、`git-overstep` / `CLOSED` 不作废、`#approve` 提前拒、卡片无按钮、记分板单独一行。
 - **留了没做**：**不做数据迁移**——开发库里已经存在一张停在 `reviewing` 的旧卡（线程 `6218cc26-4967-4d36-9aee-87aab3066439` 的 `ap_b0d4fc1c`，它就是这一刀的来源），这一刀落地后它不会被追溯作废。不作废 `git-overstep` / `CLOSED`。不做卡的自动重建。不追 PR 关闭 / reopen / 强推改写。不改 `#approve` 之外的批准入口。
 
 ### 2026-08-24 真机验收：整条 PR 闭环第一次对着真 GitHub 跑
