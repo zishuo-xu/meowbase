@@ -357,6 +357,24 @@ describe('ApprovalCardBlock', () => {
     expect(onReject).toHaveBeenCalledWith('ap_a1b2c3d4', '再改改');
   });
 
+  it('已失效时不再显示批准/打回按钮,写出原因', () => {
+    render(
+      <ApprovalCardBlock
+        approvalId="ap_a1b2c3d4"
+        stat="x.txt | 1 +"
+        comment="通过"
+        status="voided"
+        voidReason="PR #12 已合并"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByText('已失效').length).toBeGreaterThan(0);
+    expect(screen.getByText('PR #12 已合并')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '批准落地' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '打回' })).toBeNull();
+  });
+
   it('已确认时不再显示批准按钮', () => {
     render(
       <ApprovalCardBlock

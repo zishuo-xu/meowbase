@@ -19,6 +19,7 @@ export function MessageBubble({
   reviewerName,
   approvalStatus,
   diffText,
+  voidReason,
   onApprove,
   onReject,
   onConfirmEvidence,
@@ -33,6 +34,7 @@ export function MessageBubble({
   reviewerName?: string;
   approvalStatus?: ApprovalUiStatus;
   diffText?: string;
+  voidReason?: string;
   onApprove?: (id: string) => void;
   onReject?: (id: string, reason: string) => void;
   onConfirmEvidence?: (id: string) => void;
@@ -55,6 +57,7 @@ export function MessageBubble({
           reviewerName={reviewerName}
           status={approvalStatus ?? parsed.approvalStatus ?? 'pending'}
           verdict={parsed.verdict}
+          voidReason={voidReason}
           onApprove={onApprove ?? (() => {})}
           onReject={onReject ?? (() => {})}
         />

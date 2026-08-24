@@ -121,6 +121,7 @@ export interface ApprovalStore {
   approve(id: string): Promise<ApprovalCard | null>;
   reject(id: string, reason: string): Promise<ApprovalCard | null>;
   markApplied(id: string): Promise<ApprovalCard | null>;
+  void(id: string, reason: string): Promise<ApprovalCard | null>;
 }
 
 export const AUDIT_LIST_DEFAULT = 100;

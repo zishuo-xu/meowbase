@@ -2,7 +2,7 @@
 
 一篇只写**一个**可验收的特性。做完再开下一篇。
 
-- 状态:`设计中`
+- 状态:`已落地`
 - 对照 clowder:这个动作在他们公开材料里查不到对应规格（没有「审批卡因外部事件失效」这一刀，F246 审批中心清单里也没有 merge 相关项）。能靠的是两条原则句，而且这两条正好说的就是这件事：**LL-027**「Feature 相关 PR 合入后 48h 内必须同步 spec 的 Timeline/Status——spec 停在 in-progress、代码已经合了，盘点会骗自己」；**LL-029**「不要只读 `.md` 就下结论——`.md` 是索引，git 才是真相」。
 - 靠拢:靠那两条的语义，不靠规格。**卡是索引，git 是真相**——真相已经变了（改动进了 base），索引还停在「等人批」，那就是 LL-027 说的「盘点会骗自己」。做成喵窝自己的薄片：他们那两条讲的是人手同步 spec 状态，这一刀让平台自己同步卡的状态。
 
@@ -51,8 +51,9 @@
 ## 入口
 
 - 状态与终态：`packages/shared/src/types.ts`（`ApprovalStatus` / `ApprovalCard`）
-- Store 方法与状态机：`packages/api/src/stores/`（审批 store）
-- 作废时机：`packages/api/src/router/turn/settle.ts`（`pr-merged` 那条分支）
-- 拒掉失效卡：`packages/api/src/router/execute-turn.ts`（`handleSystemCommand` 的 `#approve`）
-- 卡片渲染成终态：`packages/web/components/`（审批卡片组件）+ `packages/web/lib/parse-message.ts`
-- 记分板：`scripts/eval.ts`（复用 `fake-merge-pr.mjs`，单独一行）
+- Store 方法与状态机：`packages/api/src/stores/ports.ts`、`memory.ts`、`redis.ts`（`void`）；审计装饰器 `stores/audit-log.ts`；广播 `http/broadcast-sync.ts`
+- 作废时机：`packages/api/src/router/turn/settle.ts`（`pr-merged` 那条分支）；文案 `packages/api/src/services/pr.ts`
+- 拒掉失效卡：`packages/api/src/router/turn/system-commands.ts`（`handleSystemCommand` 的 `#approve`）
+- 卡片渲染成终态：`packages/web/components/ApprovalCardBlock.tsx` + `packages/web/lib/parse-message.ts`
+- 记分板：`scripts/eval.ts`（`void-after-merge`，复用 `fake-merge-pr.mjs`，单独一行）
+- 协议：见 `AGENTS.md` 协议表「平台自己做的」合了之后作废还开着的卡那一行

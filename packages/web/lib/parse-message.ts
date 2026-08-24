@@ -1,7 +1,7 @@
 import { extractConclusion, PASS_RE, REVISE_RE } from './review-conclusion';
 
 export type MessageBlockKind = 'text' | 'approval' | 'evidence' | 'receipt';
-export type ApprovalUiStatus = 'pending' | 'applied' | 'rejected';
+export type ApprovalUiStatus = 'pending' | 'applied' | 'rejected' | 'voided';
 
 export interface ParsedMessage {
   kind: MessageBlockKind;
@@ -83,6 +83,7 @@ export function approvalStatusFromDto(status: string | undefined): ApprovalUiSta
   if (status === 'applied') return 'applied';
   if (status === 'approved') return 'pending';
   if (status === 'rejected') return 'rejected';
+  if (status === 'voided') return 'voided';
   if (status === 'draft' || status === 'reviewing') return 'pending';
   return undefined;
 }
@@ -101,6 +102,7 @@ export function approvalCardTitle(
 ): string {
   if (status === 'applied') return '改动已确认';
   if (status === 'rejected') return '已打回';
+  if (status === 'voided') return '已失效';
   if (verdict === 'pass') return '审查通过，待你确认';
   if (verdict === 'revise') return '互审未通过，待你决定';
   if (verdict === 'incomplete') return '缺验证证据，待你决定';

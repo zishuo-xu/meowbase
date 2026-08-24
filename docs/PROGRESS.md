@@ -18,9 +18,7 @@
 
 ## 现在停在哪
 
-上一刀：**猫自己开 PR，合了就停**（`pr-open.md`，已落地）。绑仓线程每跳后自己查 PR；第一次看见 OPEN 落 `pr-opened`，MERGED 则停接力、球给人。查不到不是没有。
-
-之后做了一次**真机验收**（增量第一条）：整条 PR 闭环第一次对着真 GitHub 跑通——绑仓 → 猫写 → 提交 → 推自己那根 → 开 PR → 互审 → 审批卡 → 人手合 → 平台停接力，全部成立。靶子仓 `zishuo-xu/meow-pr-probe` 留着当凭据。它同时指出了下一刀：**越界停接力之后那张审批卡没被作废**。
+上一刀：**合了之后那张卡要作废**（`approval-void.md`，已落地）。`pr-merged` 停接力时把还开着的审批卡改成终态 `voided`；`#approve` 当场拒。不作废 `git-overstep` / PR `CLOSED`。
 
 **没有在飞的刀。** `features/` 表里没有 `设计中`（`_template.md` 那篇是模板本身，不算）。要开下一刀，先写一篇薄设计、等人点头。
 
@@ -65,6 +63,14 @@
 ## 增量记录
 
 最新在上。每刀记四样：**动了什么**、**与设计稿的偏离及原因**、**只有人手验过的部分**、**明确留了没做的**。前两样是给「我再接手时知道你改了什么」，后两样是给「别把没验过的当验过了」。
+
+### 2026-08-24 合了之后那张卡要作废
+
+`approval-void.md`。`ApprovalStatus` 加终态 `voided` + `voidReason`。`settleTurn` 的 `pr-merged` 分支作废本线程还开着的卡，系统句用 `notice`。`#approve` 对失效卡当场回「这张卡已失效」，不走到提交。记分板加一行「合了之后那张卡还能批」，只断言卡是 `voided`。
+
+- **偏离**：设计稿写「只接受 `reviewing` / `pending`」。仓库里没有 `pending` 这个 store 状态——`pending` 是前端 UI 映射，开着的是 `draft` / `reviewing`（跟 `approve` / `reject` 同一道门）。`void` 因此吃 `draft` + `reviewing`，不另造 `pending`。`#approve` 拒词写在 `system-commands.ts`，不是预判的 `execute-turn.ts`。记分板新行必须先建卡再合，所以分两段起 API：第一段不带假源建卡，第二段才 `MEOW_PR_FAKE=merged`；`merge-pr` 那行仍从第一跳就假合并、不断言卡状态。
+- **只有人手验过**：没验过。不许真调 GitHub，真机「人手合 PR → 卡变已失效、按钮消失」这一段没有对着真远端跑。自动化盖了 store 状态机、`pr-merged` 作废、`git-overstep` / `CLOSED` 不作废、`#approve` 提前提前拒、卡片无按钮、记分板单独一行。
+- **留了没做**：**不做数据迁移**——开发库里已经存在一张停在 `reviewing` 的旧卡（线程 `6218cc26-4967-4d36-9aee-87aab3066439` 的 `ap_b0d4fc1c`，它就是这一刀的来源），这一刀落地后它不会被追溯作废。不作废 `git-overstep` / `CLOSED`。不做卡的自动重建。不追 PR 关闭 / reopen / 强推改写。不改 `#approve` 之外的批准入口。
 
 ### 2026-08-24 真机验收：整条 PR 闭环第一次对着真 GitHub 跑
 

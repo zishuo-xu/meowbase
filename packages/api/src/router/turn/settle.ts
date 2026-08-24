@@ -1,6 +1,10 @@
 import { parseHoldExit, parseLearnCommand } from '@meowbase/shared';
 import type { EvidenceEntry, MentionCatalog, Message, TeamMember } from '@meowbase/shared';
 import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
+import {
+  formatApprovalVoidReason,
+  formatApprovalVoidedNote,
+} from '../../services/pr.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runReviewFixThenCard } from './review.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
@@ -81,6 +85,23 @@ export async function settleTurn(input: {
         number: mergedPr.number,
         sha: clip(mergedPr.headRefOid, 12),
       });
+      const reason = formatApprovalVoidReason(mergedPr.number);
+      const open = (await context.stores.approvals.list(threadId)).filter(
+        (card) => card.status === 'draft' || card.status === 'reviewing',
+      );
+      for (const card of open) {
+        const voided = await context.stores.approvals.void(card.id, reason);
+        if (!voided) continue;
+        await writeQueue(() =>
+          context.stores.messages.append({
+            threadId,
+            role: 'system',
+            content: formatApprovalVoidedNote({ cardId: voided.id, reason }),
+            status: 'completed',
+            systemKind: 'notice',
+          }),
+        );
+      }
     }
     await context.stores.threads.setPendingHop(threadId, null);
     return lastAssistant;

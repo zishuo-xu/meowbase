@@ -352,6 +352,14 @@ export class InMemoryApprovalStore implements ApprovalStore {
     this.cards.set(id, updated);
     return updated;
   }
+
+  async void(id: string, reason: string): Promise<ApprovalCard | null> {
+    const card = this.cards.get(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'voided', voidReason: reason };
+    this.cards.set(id, updated);
+    return updated;
+  }
 }
 
 export class InMemoryAuditStore implements AuditStore {

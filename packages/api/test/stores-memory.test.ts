@@ -238,4 +238,53 @@ describe('内存 Approval 存储', () => {
     expect((await approvals.list('t1')).length).toBe(1);
     expect(await approvals.get('ap_00000000')).toBeNull();
   });
+
+  it('void 只吃还开着的卡,终态和 approved 都拒并原样留下', async () => {
+    const { approvals } = createMemoryStores();
+    const open = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd', diffStat: 's',
+    });
+    const reviewing = await approvals.setReviewComment(open.id, '通过');
+    expect(reviewing?.status).toBe('reviewing');
+
+    const voided = await approvals.void(open.id, 'PR #12 已合并');
+    expect(voided?.status).toBe('voided');
+    expect(voided?.voidReason).toBe('PR #12 已合并');
+    expect(await approvals.void(open.id, '再废一次')).toBeNull();
+    expect((await approvals.get(open.id))?.status).toBe('voided');
+
+    const draft = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd2', diffStat: 's2',
+    });
+    expect((await approvals.void(draft.id, 'PR #13 已合并'))?.status).toBe('voided');
+
+    const approved = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd3', diffStat: 's3',
+    });
+    await approvals.approve(approved.id);
+    expect(await approvals.void(approved.id, 'PR #14 已合并')).toBeNull();
+    expect((await approvals.get(approved.id))?.status).toBe('approved');
+
+    const applied = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd4', diffStat: 's4',
+    });
+    await approvals.approve(applied.id);
+    await approvals.markApplied(applied.id);
+    expect(await approvals.void(applied.id, 'PR #15 已合并')).toBeNull();
+    expect((await approvals.get(applied.id))?.status).toBe('applied');
+
+    const rejected = await approvals.create({
+      threadId: 't1', writerAgentId: 'claude', reviewerAgentId: 'opencode',
+      diffText: 'd5', diffStat: 's5',
+    });
+    await approvals.reject(rejected.id, '不行');
+    expect(await approvals.void(rejected.id, 'PR #16 已合并')).toBeNull();
+    expect((await approvals.get(rejected.id))?.status).toBe('rejected');
+    expect(await approvals.get('ap_00000000').then((c) => c && approvals.void(c.id, 'x'))).toBeNull();
+    expect(await approvals.void('ap_00000000', 'x')).toBeNull();
+  });
 });

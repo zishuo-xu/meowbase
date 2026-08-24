@@ -8,6 +8,7 @@ import {
 import type { Message } from '@meowbase/shared';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { killHoldCommand } from '../../services/hold-command.js';
+import { formatApproveVoidedReply } from '../../services/pr.js';
 import { landApprovedCard } from './land-approval.js';
 import type { TurnContext } from './types.js';
 
@@ -39,6 +40,18 @@ export async function handleSystemCommand(input: {
   if (approve) {
     turnLog('approve', { thread: threadId, id: approve.id });
     const existing = await context.stores.approvals.get(approve.id);
+    if (existing?.status === 'voided') {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: formatApproveVoidedReply({
+          cardId: existing.id,
+          reason: existing.voidReason ?? '已失效',
+        }),
+        status: 'completed',
+        systemKind: 'notice',
+      });
+    }
     let card = existing;
     if (card && (card.status === 'draft' || card.status === 'reviewing')) {
       card = (await context.stores.approvals.approve(approve.id)) ?? card;

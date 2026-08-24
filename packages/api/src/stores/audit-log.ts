@@ -152,5 +152,20 @@ export function auditApprovals(store: ApprovalStore, audit: AuditStore): Approva
       });
       return card;
     },
+    void: async (id, reason) => {
+      const card = await store.void(id, reason);
+      if (!card) return card;
+      await safeAppendAudit(audit, {
+        threadId: card.threadId,
+        actor: 'platform',
+        action: 'approval-voided',
+        subject: clipAuditSubject(card.voidReason ?? reason),
+        meta: {
+          approvalId: card.id,
+          voidReason: card.voidReason ?? reason,
+        },
+      });
+      return card;
+    },
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalCardTitle, isHiddenChatMessage, parseMessage } from '../parse-message';
+import { approvalCardTitle, approvalStatusFromDto, isHiddenChatMessage, parseMessage } from '../parse-message';
 
 describe('parseMessage', () => {
   it('📋 审批卡片 → approval 块', () => {
@@ -116,12 +116,20 @@ describe('isHiddenChatMessage', () => {
   });
 });
 
+describe('approvalStatusFromDto', () => {
+  it('voided 映射成终态,不是 pending', () => {
+    expect(approvalStatusFromDto('voided')).toBe('voided');
+    expect(approvalStatusFromDto('reviewing')).toBe('pending');
+  });
+});
+
 describe('approvalCardTitle', () => {
   it('按状态和审查结论写标题,不再一律待确认', () => {
     expect(approvalCardTitle('pending', '结论:通过')).toBe('审查通过，待你确认');
     expect(approvalCardTitle('pending', '## 结论\n需修改')).toBe('互审未通过，待你决定');
     expect(approvalCardTitle('applied', '通过')).toBe('改动已确认');
     expect(approvalCardTitle('rejected', '需修改')).toBe('已打回');
+    expect(approvalCardTitle('voided', '通过')).toBe('已失效');
   });
 
   it('verdict=pass → 审查通过，待你确认', () => {

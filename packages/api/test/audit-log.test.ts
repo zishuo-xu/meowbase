@@ -154,6 +154,30 @@ describe('auditApprovals 装饰器', () => {
     });
   });
 
+  it('void 落一行 approval-voided,带原因,失败不落', async () => {
+    const raw = createMemoryStores();
+    const approvals = auditApprovals(raw.approvals, raw.audit);
+    const card = await approvals.create({
+      threadId: 't-void',
+      writerAgentId: 'claude',
+      reviewerAgentId: 'gemini',
+      diffText: 'diff',
+      diffStat: '1 file changed',
+    });
+    await approvals.setReviewComment(card.id, '通过');
+    await approvals.void(card.id, 'PR #12 已合并');
+    expect(await approvals.void(card.id, '再废')).toBeNull();
+
+    const rows = (await raw.audit.list({ threadId: 't-void' })).filter(
+      (r) => r.action === 'approval-voided',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.meta).toMatchObject({
+      approvalId: card.id,
+      voidReason: 'PR #12 已合并',
+    });
+  });
+
   it('批准成功只落一条 approval-applied,带 approvalId;回执消息不重复落', async () => {
     const raw = createMemoryStores();
     const messages = auditMessages(raw.messages, raw.audit);

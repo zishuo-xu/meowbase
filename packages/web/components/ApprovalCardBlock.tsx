@@ -17,6 +17,7 @@ const STATUS_LABEL: Record<ApprovalUiStatus, string> = {
   pending: '待你确认',
   applied: '已确认',
   rejected: '已打回',
+  voided: '已失效',
 };
 
 export function ApprovalCardBlock({
@@ -28,6 +29,7 @@ export function ApprovalCardBlock({
   reviewerName,
   status = 'pending',
   verdict,
+  voidReason,
   onApprove,
   onReject,
 }: {
@@ -39,6 +41,7 @@ export function ApprovalCardBlock({
   reviewerName?: string;
   status?: ApprovalUiStatus;
   verdict?: 'pass' | 'revise' | 'incomplete';
+  voidReason?: string;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
 }) {
@@ -64,7 +67,9 @@ export function ApprovalCardBlock({
               ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)]'
               : status === 'rejected'
                 ? 'bg-red-50 text-red-700'
-                : 'bg-[var(--surface)] text-[var(--ink-soft)]'
+                : status === 'voided'
+                  ? 'bg-[var(--surface)] text-[var(--ink-soft)]'
+                  : 'bg-[var(--surface)] text-[var(--ink-soft)]'
           }`}
         >
           {STATUS_LABEL[status]}
@@ -146,6 +151,9 @@ export function ApprovalCardBlock({
       )}
       {status === 'rejected' && (
         <p className="text-xs text-red-700">没收下。文件还在沙箱里。</p>
+      )}
+      {status === 'voided' && (
+        <p className="text-xs text-[var(--ink-soft)]">{voidReason ?? '已失效'}</p>
       )}
       <div className="mt-2 font-mono text-[10px] text-[var(--ink-soft)]/70">{approvalId}</div>
     </div>

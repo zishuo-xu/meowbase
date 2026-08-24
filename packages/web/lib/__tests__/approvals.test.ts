@@ -10,6 +10,7 @@ describe('pendingThreadIds', () => {
         { threadId: 'c', status: 'draft' },
         { threadId: 'b', status: 'rejected' },
         { threadId: 'd', status: 'approved' },
+        { threadId: 'e', status: 'voided' },
       ]),
     ).toEqual(['a', 'c', 'd']);
   });

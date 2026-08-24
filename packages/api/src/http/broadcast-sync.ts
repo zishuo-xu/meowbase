@@ -56,6 +56,11 @@ export function broadcastApprovalSync(store: ApprovalStore, emit: SyncEmit): App
       emitIfThread(emit, card?.threadId);
       return card;
     },
+    void: async (id, reason) => {
+      const card = await store.void(id, reason);
+      emitIfThread(emit, card?.threadId);
+      return card;
+    },
   };
 }
 

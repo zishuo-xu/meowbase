@@ -440,6 +440,7 @@ export class RedisApprovalStore implements ApprovalStore {
       diffStat: raw.diffStat ?? '',
       reviewComment: raw.reviewComment || undefined,
       rejectReason: raw.rejectReason || undefined,
+      voidReason: raw.voidReason || undefined,
       createdAt: raw.createdAt ?? '',
     };
   }
@@ -455,6 +456,7 @@ export class RedisApprovalStore implements ApprovalStore {
       diffStat: card.diffStat,
       reviewComment: card.reviewComment ?? '',
       rejectReason: card.rejectReason ?? '',
+      voidReason: card.voidReason ?? '',
       createdAt: card.createdAt,
     });
   }
@@ -517,6 +519,14 @@ export class RedisApprovalStore implements ApprovalStore {
     const card = await this.hydrate(id);
     if (!card || card.status !== 'approved') return null;
     const updated: ApprovalCard = { ...card, status: 'applied' };
+    await this.write(updated);
+    return updated;
+  }
+
+  async void(id: string, reason: string): Promise<ApprovalCard | null> {
+    const card = await this.hydrate(id);
+    if (!card || (card.status !== 'draft' && card.status !== 'reviewing')) return null;
+    const updated: ApprovalCard = { ...card, status: 'voided', voidReason: reason };
     await this.write(updated);
     return updated;
   }

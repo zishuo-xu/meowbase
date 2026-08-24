@@ -451,6 +451,52 @@ async function runMergePr(workdirBase: string): Promise<boolean> {
   );
 }
 
+/** true = 合了之后那张还开着的卡变成 voided。只量作废这一关,不和 merge-pr 的拉闸断言合成。 */
+async function runVoidAfterMerge(workdirBase: string): Promise<boolean> {
+  const scratch = makeScratchRepo();
+  try {
+    const threadId = await withApi(
+      { workdirBase, writerBin: mergePrBin, reviewerBin: defaultReviewerBin },
+      async (api) => {
+        const id = await createThread(api.baseUrl, `eval-void-${Date.now()}`, {
+          repoPath: scratch.repoPath,
+          baseBranch: scratch.baseBranch,
+        });
+        await postMessage(api.baseUrl, id, '@墨墨 写个文件');
+        await waitFor('合了之后那张卡还能批:先建卡', async () => {
+          const messages = await getMessages(api.baseUrl, id);
+          if (!hasKind(messages, 'approval-pending')) return undefined;
+          const cards = await getApprovals(api.baseUrl, id);
+          return cards[0];
+        });
+        return id;
+      },
+    );
+    return await withApi(
+      {
+        workdirBase,
+        writerBin: mergePrBin,
+        reviewerBin: defaultReviewerBin,
+        extraEnv: { MEOW_PR_FAKE: 'merged' },
+      },
+      async (api) => {
+        await postMessage(api.baseUrl, threadId, '@墨墨 再看一眼');
+        const cards = await waitFor('合了之后那张卡还能批:卡已作废或链落定', async () => {
+          const list = await getApprovals(api.baseUrl, threadId);
+          const messages = await getMessages(api.baseUrl, threadId);
+          if (list.some((card) => card.status === 'voided')) return list;
+          if (hasKind(messages, 'pr-merged')) return list;
+          return undefined;
+        });
+        if (cards.length === 0) return false;
+        return cards.every((card) => card.status === 'voided');
+      },
+    );
+  } finally {
+    scratch.cleanup();
+  }
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -540,6 +586,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '合并拉闸:pr-merged,停接力,不建卡,审计带 number 和 sha',
     run: runMergePr,
+  },
+  {
+    id: 'void-after-merge',
+    name: '合了之后那张卡还能批',
+    expectedCatch: 1,
+    expectNote: '作废关:卡变成 voided,不和 merge-pr 合成一行',
+    run: runVoidAfterMerge,
   },
 ];
 

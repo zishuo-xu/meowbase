@@ -45,6 +45,18 @@ export function formatPrMergedNote(input: { number: number; url?: string }): str
     : `⚠️ PR #${input.number} 已被合并`;
 }
 
+export function formatApprovalVoidReason(prNumber: number): string {
+  return `PR #${prNumber} 已合并`;
+}
+
+export function formatApprovalVoidedNote(input: { cardId: string; reason: string }): string {
+  return `📋 审批卡片 ${input.cardId} 已失效(${input.reason})`;
+}
+
+export function formatApproveVoidedReply(input: { cardId: string; reason: string }): string {
+  return `⚠️ 这张卡已失效:${input.cardId}（${input.reason}）`;
+}
+
 export function formatPrLookupFailedNote(reason: string): string {
   return `查不到 PR 状态(${reason})`;
 }

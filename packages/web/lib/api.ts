@@ -87,6 +87,7 @@ export interface ApprovalDto {
   diffStat: string;
   diffText?: string;
   reviewComment?: string;
+  voidReason?: string;
   createdAt: string;
 }
 

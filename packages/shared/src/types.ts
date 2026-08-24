@@ -162,7 +162,7 @@ export interface Skill {
   always?: boolean;
 }
 
-export type ApprovalStatus = 'draft' | 'reviewing' | 'approved' | 'rejected' | 'applied';
+export type ApprovalStatus = 'draft' | 'reviewing' | 'approved' | 'rejected' | 'applied' | 'voided';
 
 export interface ApprovalCard {
   id: string;
@@ -174,6 +174,7 @@ export interface ApprovalCard {
   diffStat: string;
   reviewComment?: string;
   rejectReason?: string;
+  voidReason?: string;
   createdAt: string;
 }
 
@@ -194,6 +195,7 @@ export type AuditAction =
   | 'approval-approved'
   | 'approval-rejected'
   | 'approval-applied'
+  | 'approval-voided'
   | 'lease-claim'
   | 'lease-steal'
   | 'lease-release'

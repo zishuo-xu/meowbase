@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   classifyPrLookupError,
   formatPrLookupFailedNote,
+  formatApprovalVoidReason,
+  formatApprovalVoidedNote,
+  formatApproveVoidedReply,
   isPrMerged,
   lookupPr,
   parsePrListJson,
@@ -120,5 +123,15 @@ describe('查不到 ≠ 没有', () => {
     const ghBin = writeFakeGh(dir, '[]');
     const result = await lookupPr({ workdir: dir, head: 'meow/t1', ghBin });
     expect(result).toEqual({ ok: true, pr: null });
+  });
+
+  it('作废文案带卡号和 PR number', () => {
+    expect(formatApprovalVoidReason(12)).toBe('PR #12 已合并');
+    expect(formatApprovalVoidedNote({ cardId: 'ap_a1b2c3d4', reason: 'PR #12 已合并' })).toBe(
+      '📋 审批卡片 ap_a1b2c3d4 已失效(PR #12 已合并)',
+    );
+    expect(formatApproveVoidedReply({ cardId: 'ap_a1b2c3d4', reason: 'PR #12 已合并' })).toBe(
+      '⚠️ 这张卡已失效:ap_a1b2c3d4（PR #12 已合并）',
+    );
   });
 });
