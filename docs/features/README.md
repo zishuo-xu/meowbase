@@ -49,3 +49,4 @@
 | [push-boundary.md](push-boundary.md) | 已落地 | 放开推送,越界就停 |
 | [platform-spend.md](platform-spend.md) | 已落地 | 空模型名不许探测,探测用量当场显示不进账本 |
 | [pr-open.md](pr-open.md) | 已落地 | 猫自己开 PR,合了就停 |
+| [approval-void.md](approval-void.md) | 设计中 | 合了之后那张卡要作废 |
