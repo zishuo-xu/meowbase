@@ -72,8 +72,8 @@
 `approve-after-self-commit.md`。`run()` 起 git 时只加 `LC_ALL=C`，其余 env 照旧继承。`gitErrorReason` 除 stderr 外也读 stdout，噪音行仍跳过。`tryLandApproval` / `isNothingToCommit` 判断没动。env 拼装抽成 `gitChildEnv`，单测断言它钉了 `C`；绑仓集成盖自己提交后 `#approve` 落 `approval-applied`。
 
 - **偏离**：噪音过滤比设计稿多跳了以 `(use ` 开头的那行。真机场景是猫已经 push，stdout 在 `Your branch is ahead` 后面紧跟 `(use "git push" to publish your local commits)`；按原稿只跳 `On branch` / `Your branch` 会先拿到这句，`isNothingToCommit` 匹配不上。英文机器上以前靠 `err.message` 整段兜住的路，读了 stdout 之后反而会被这行掐掉。
-- **只有人手验过**：设计稿第 5 步「中文 locale 机器上绑仓、猫自己提交、人手点批准」没对着真模型再跑一遍。自动化盖了 `LC_ALL` 断言、stdout 取因、绑仓自己提交后批准。中文 commit message 用 `gitCommit('批准记下了：中文提交信息自查')` 走过，`git log` 读回不乱码。
-- **留了没做**：不裁 git 子进程 env、不顺手合 PR、不加记分板行。绑仓那条集成测试在 CI 里因为 git 说英文，即使一行都不修也会绿——真防线是「`gitChildEnv` 钉了 `LC_ALL=C`」那条断言（反向验过：拿掉 `C` 立刻红）。`等跑` 吃整行、一根分支第二个 PR 静默消失，这一刀都没碰。
+- **只有人手验过**：设计稿第 5 步「中文 locale 机器上绑仓、猫自己提交、人手点批准」没对着真模型再跑一遍。自动化盖了 `LC_ALL` 断言、stdout 取因、绑仓自己提交后批准。中文 commit message 用 `gitCommit('批准记下了：中文提交信息自查')` 走过，`git log` 读回不乱码。另外**验收侧手工补了一次 locale 反向验**：`LC_ALL=zh_CN.UTF-8 LANG=zh_CN.UTF-8 pnpm --filter @meowbase/api test git` 在钉着 `C` 时 26/26 绿；把 `gitChildEnv` 打上 `RVCUT` 拆掉钉 locale 后，同一条集成测试**复现真机那个原样失败**（`expected 'approval-failed' to be 'approval-applied'`）。所以那条集成测试不是空的，只是**只有在非英文 locale 下才实心**。
+- **留了没做**：不裁 git 子进程 env、不顺手合 PR、不加记分板行。绑仓那条集成测试在 CI 里因为 git 说英文，即使一行都不修也会绿——真防线是「`gitChildEnv` 钉了 `LC_ALL=C`」那条断言（反向验过：拿掉 `C` 立刻红）。**没有把 CI 改成强制中文 locale 去跑**：GitHub runner 上不一定生成过 `zh_CN.UTF-8`，缺了会静默退回英文，那样只是把「空测试」伪装成「已覆盖」，比现在更糟。要做得先在 CI 里确认 locale 真生成了才有意义。`等跑` 吃整行、一根分支第二个 PR 静默消失，这一刀都没碰。
 
 ### 2026-08-24 合了之后那张卡要作废
 
