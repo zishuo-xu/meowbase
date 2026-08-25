@@ -32,8 +32,13 @@ export function isApprovalNoisePath(path: string): boolean {
   return false;
 }
 
+/** 起 git 时只加 LC_ALL=C,其余 env 照旧继承。裁 env 会伤凭据,那是另一篇的事。 */
+export function gitChildEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, LC_ALL: 'C' };
+}
+
 async function run(dir: string, args: string[]): Promise<string> {
-  const { stdout } = await exec('git', args, { cwd: dir });
+  const { stdout } = await exec('git', args, { cwd: dir, env: gitChildEnv() });
   return stdout;
 }
 
@@ -287,27 +292,31 @@ export async function gitCommit(dir: string, message: string): Promise<void> {
   await run(dir, ['commit', '-q', '-m', message]);
 }
 
-function gitErrorReason(err: unknown): string {
+function pickGitReasonLine(text: string): string | undefined {
+  return text
+    .split('\n')
+    .map((item) => item.trim())
+    .find(
+      (item) =>
+        item &&
+        !item.startsWith('On branch') &&
+        !item.startsWith('Your branch') &&
+        !item.startsWith('(use '),
+    );
+}
+
+export function gitErrorReason(err: unknown): string {
   if (err && typeof err === 'object') {
     const stderr = 'stderr' in err && typeof err.stderr === 'string' ? err.stderr.trim() : '';
-    if (stderr) {
-      const line = stderr
-        .split('\n')
-        .map((item) => item.trim())
-        .find(
-          (item) =>
-            item &&
-            !item.startsWith('On branch') &&
-            !item.startsWith('Your branch'),
-        );
-      if (line) return line;
-    }
+    const stdout = 'stdout' in err && typeof err.stdout === 'string' ? err.stdout.trim() : '';
+    const line = pickGitReasonLine(stderr) ?? pickGitReasonLine(stdout);
+    if (line) return line;
     if (err instanceof Error && err.message) return err.message;
   }
   return String(err);
 }
 
-function isNothingToCommit(reason: string): boolean {
+export function isNothingToCommit(reason: string): boolean {
   return /nothing to commit|no changes added to commit/i.test(reason);
 }
 

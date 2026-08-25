@@ -8,9 +8,11 @@ import {
   gitAddAll,
   gitBranchExists,
   gitChangedPaths,
+  gitChildEnv,
   gitCommit,
   gitCurrentBranch,
   gitDiffHead,
+  gitErrorReason,
   gitInit,
   gitIsRepo,
   snapshotGitState,
@@ -21,6 +23,7 @@ import {
   gitWorktreePrune,
   gitWorktreeRemove,
   isApprovalNoisePath,
+  isNothingToCommit,
   parseStrayFiles,
   sweepStrayFiles,
 } from '../src/services/git.js';
@@ -43,7 +46,56 @@ async function initScratchRepo(dir: string): Promise<void> {
   await exec('git', ['commit', '-q', '-m', 'init'], { cwd: dir });
 }
 
+function gitExecError(opts: { stdout?: string; stderr?: string; message?: string }): Error {
+  const err = new Error(opts.message ?? 'Command failed: git commit -q -m approve ap_x') as Error & {
+    stdout?: string;
+    stderr?: string;
+  };
+  err.stdout = opts.stdout ?? '';
+  err.stderr = opts.stderr ?? '';
+  return err;
+}
+
 describe('git 辅助函数', () => {
+  it('起 git 的 env 钉 LC_ALL=C,其余照旧继承', () => {
+    const env = gitChildEnv({
+      PATH: '/usr/bin',
+      HOME: '/Users/me',
+      LANG: 'zh_CN.UTF-8',
+      LC_ALL: 'zh_CN.UTF-8',
+      GIT_ASKPASS: 'keep-me',
+    });
+    expect(env.LC_ALL).toBe('C');
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.HOME).toBe('/Users/me');
+    expect(env.LANG).toBe('zh_CN.UTF-8');
+    expect(env.GIT_ASKPASS).toBe('keep-me');
+  });
+
+  it('gitErrorReason 能从 stdout 取原因,跳过 On branch / Your branch / (use 噪音行', () => {
+    expect(
+      gitErrorReason(
+        gitExecError({
+          stdout: [
+            'On branch meow/t',
+            "Your branch is ahead of 'origin/meow/t' by 1 commit.",
+            '  (use "git push" to publish your local commits)',
+            '',
+            'nothing to commit, working tree clean',
+            '',
+          ].join('\n'),
+          stderr: '',
+        }),
+      ),
+    ).toBe('nothing to commit, working tree clean');
+  });
+
+  it('isNothingToCommit 认得英文那句', () => {
+    expect(isNothingToCommit('nothing to commit, working tree clean')).toBe(true);
+    expect(isNothingToCommit('no changes added to commit')).toBe(true);
+    expect(isNothingToCommit('Command failed: git commit -q -m approve ap_x')).toBe(false);
+  });
+
   it('init 空基线;新增文件后 diff 非空;commit 后 diff 为空', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-git-'));
     await gitInit(dir);

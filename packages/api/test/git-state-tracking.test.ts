@@ -366,6 +366,43 @@ describe('绑仓线程 git 状态追踪', () => {
     expect(moves).toEqual([]);
   });
 
+  it('猫自己提交之后 #approve 落 approval-applied,不是 approval-failed', async () => {
+    const { stores, thread } = await bindThread();
+    let committed = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          if (!committed) {
+            writeFileSync(join(input.workdir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+            await exec('git', ['add', 'add.ts'], { cwd: input.workdir });
+            await commitAsCat(input.workdir, 'cat commit');
+            committed = true;
+          }
+          return { sessionId: 's-w', content: '写好了并提交了', status: 'completed' };
+        },
+      },
+      stub('gemini', '审查意见:通过'),
+    ]);
+
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 加个函数',
+      context: { stores, registry, agents: DEFAULT_AGENTS },
+    });
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card).toBeTruthy();
+
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: `#approve ${card!.id}`,
+      context: { stores, registry, agents: DEFAULT_AGENTS },
+    });
+    expect(final.systemKind).toBe('approval-applied');
+    expect(final.content).toContain('已批准并落地');
+    expect((await stores.approvals.get(card!.id))?.status).toBe('applied');
+  });
+
   it('建卡后清掉暂存区再 #approve 不假装落地', async () => {
     const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-gst-approve-'));
     cleanups.push(workdirBase);

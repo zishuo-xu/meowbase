@@ -50,3 +50,4 @@
 | [platform-spend.md](platform-spend.md) | 已落地 | 空模型名不许探测,探测用量当场显示不进账本 |
 | [pr-open.md](pr-open.md) | 已落地 | 猫自己开 PR,合了就停 |
 | [approval-void.md](approval-void.md) | 已落地 | 合了之后那张卡要作废 |
+| [approve-after-self-commit.md](approve-after-self-commit.md) | 已落地 | 猫自己提交之后,批准算什么 |
