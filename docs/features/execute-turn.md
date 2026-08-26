@@ -2,7 +2,7 @@
 
 - 状态:`已落地`
 - 对照 clowder:公开架构是 Identity + A2A Router + Memory + SOP + MCP。我们把「人发一条之后发生的事」收进**一个函数**，不把 SOP/MCP 做成并列心脏。
-- 相关:[a2a.md](a2a.md)、[mention-routing.md](mention-routing.md)、[approval.md](approval.md)
+- 相关:[a2a.md](a2a.md)、[mention-routing.md](mention-routing.md)、[approval.md](approval.md)、[one-hop-per-thread.md](one-hop-per-thread.md)
 
 ## 功能
 

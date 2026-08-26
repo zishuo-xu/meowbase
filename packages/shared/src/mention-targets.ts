@@ -41,7 +41,7 @@ export function lastMentionedAgent(
 }
 
 /**
- * 多 @ 同题并行:各占一行的行首 @ 才是目标,同一正文发给每个目标。
+ * 多 @ 同题群发:各占一行的行首 @ 才是目标,同一正文发给每个目标。谁先谁后见协议表。
  * 无行首 mention 时用 fallback。中文名与英文 id 等价。
  */
 export function parseMentionTargets(

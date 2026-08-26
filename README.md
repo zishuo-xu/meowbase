@@ -42,7 +42,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 
 | 落点 | 职责 |
 |---|---|
-| `executeTurn` | 一条消息的心脏:命令 → 若有搁着的棒先续跑 → 多 @ 并行 → A2A 链 → 记忆 → diff 审批。协作细节见 [docs/A2A.md](docs/A2A.md) |
+| `executeTurn` | 一条消息的心脏:命令 → 若有搁着的棒先续跑 → 多 @ 群发 → A2A 链 → 记忆 → diff 审批。协作细节见 [docs/A2A.md](docs/A2A.md);多 `@` 谁先谁后、跟哪一棒见 [AGENTS.md](AGENTS.md) 协议表 |
 | `stores/ports.ts` | 业务只依赖接口,Redis 可换 |
 | 名册 `handoffTo` / `handoff` | 交给谁、何时交,写在配置里,不写 `if (墨墨)` |
 | Provider 适配器 | claude / gemini / opencode,统一 `runTurn` |
@@ -102,7 +102,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 先写失败测试再实现
 ```
 
-同题并行也是各占一行:
+多只猫各占一行(谁先谁后、跟哪一棒见 [AGENTS.md](AGENTS.md) 协议表):
 
 ```
 @墨墨

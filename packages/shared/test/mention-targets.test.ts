@@ -8,7 +8,7 @@ import {
 } from '../src/mention-targets.js';
 
 describe('parseMentionTargets', () => {
-  it('各占一行的行首 @ 才并行', () => {
+  it('各占一行的行首 @ 才都算目标', () => {
     expect(parseMentionTargets('@claude\n@opencode\n帮我看看', 'claude')).toEqual([
       'claude',
       'opencode',

@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { gitAddAll, gitInit } from '../src/services/git.js';
+import { gitAddAll, gitInit, gitWorktreeAdd } from '../src/services/git.js';
 
 const exec = promisify(execFile);
 
@@ -1180,7 +1180,7 @@ describe('executeTurn 多角色协作', () => {
     expect(users).toHaveLength(1);
   });
 
-  it('多 @ 同题并行:每个目标收到同一消息', async () => {
+  it('多 @ 同题群发:每个目标收到同一消息', async () => {
     const stores = createMemoryStores();
     const prompts: string[] = [];
     const registry = createAgentRegistry([
@@ -1212,11 +1212,229 @@ describe('executeTurn 多角色协作', () => {
       expect(p).toContain('写个乘法函数');
       expect(p).not.toContain('@claude');
     }
-    expect(final.agentId).toBe('claude');
+    // lastResult 是最后一个成功的,不是第一个
+    expect(final.agentId).toBe('opencode');
 
     const messages = await stores.messages.list(thread.id);
     const assistants = messages.filter((m) => m.role === 'assistant');
     expect(assistants.map((m) => m.agentId).sort()).toEqual(['claude', 'opencode']);
+  });
+
+  it('多 @ 顺序执行:第二只开始时第一只已经结束', async () => {
+    const stores = createMemoryStores();
+    let firstEnded = false;
+    let secondSawFirstEnded = false;
+    const events: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          events.push('claude-start');
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          firstEnded = true;
+          events.push('claude-end');
+          return { sessionId: 's1', content: '墨墨写好了', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          events.push('opencode-start');
+          secondSawFirstEnded = firstEnded;
+          events.push('opencode-end');
+          return { sessionId: 's2', content: '团团写好了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude\n@opencode\n同一道题',
+      context: { stores, registry },
+    });
+    expect(events).toContain('claude-start');
+    expect(events).toContain('opencode-start');
+    // 只断言「两只都被调过」现在就能过;这条才锁住顺序
+    expect(secondSawFirstEnded).toBe(true);
+    expect(events.indexOf('opencode-start')).toBeGreaterThan(events.indexOf('claude-end'));
+  });
+
+  it('多 @ 失败隔离:第一只抛错,第二只仍跑完', async () => {
+    const stores = createMemoryStores();
+    let secondRan = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          throw new Error('墨墨炸了');
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          secondRan = true;
+          return { sessionId: 's2', content: '团团写好了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: '@claude\n@opencode\n同一道题',
+      context: { stores, registry },
+    });
+    expect(secondRan).toBe(true);
+    expect(final.agentId).toBe('opencode');
+    expect(final.content).toBe('团团写好了');
+  });
+
+  it('多 @ 都交棒:只跟第一个,后一个落 notice', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return {
+            sessionId: 's1',
+            content: `${KEPT_HANDOFF_BODY}\n加法写完了。\n@gemini 请审查加法`,
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return {
+            sessionId: 's2',
+            content: `${KEPT_HANDOFF_BODY}\n乘法写完了。\n@gemini 请审查乘法`,
+            status: 'completed',
+          };
+        },
+      },
+      stubAgent('gemini', '不该被这一轮叫到'),
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude\n@opencode\n各写各的',
+      context: { stores, registry },
+    });
+    const pending = (await stores.threads.get(thread.id))?.pendingHop;
+    expect(pending?.from).toBe('claude');
+    expect(pending?.to).toBe('gemini');
+    expect(pending?.task).toContain('请审查加法');
+    const notice = (await stores.messages.list(thread.id)).find(
+      (m) => m.role === 'system' && m.systemKind === 'notice' && m.content.includes('一次只跟一棒'),
+    );
+    expect(notice?.content).toContain('团团');
+    expect(notice?.content).toContain('闪闪');
+    expect(notice?.content).toContain('得人来接');
+  });
+
+  it('绑仓多 @ 各提交:两份 commit subject 各自对得上', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-onehop-repo-'));
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-onehop-work-'));
+    try {
+      await exec('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+      await exec('git', ['config', 'user.name', 'tester'], { cwd: repo });
+      await exec('git', ['config', 'user.email', 't@t.local'], { cwd: repo });
+      writeFileSync(join(repo, 'README.md'), 'hello\n');
+      await exec('git', ['add', '-A'], { cwd: repo });
+      await exec('git', ['commit', '-q', '-m', 'init'], { cwd: repo });
+
+      const stores = createMemoryStores();
+      const thread = await stores.threads.create({
+        title: '归属',
+        primaryAgentId: 'claude',
+        workdirBase,
+        repo: { path: repo, baseBranch: 'main' },
+      });
+      await gitWorktreeAdd(repo, thread.workdir, thread.repo!.branch, 'main');
+
+      const commitAs = async (dir: string, message: string) => {
+        await exec(
+          'git',
+          [
+            '-c',
+            'user.name=tester',
+            '-c',
+            'user.email=t@t.local',
+            '-c',
+            'commit.gpgsign=false',
+            'commit',
+            '-q',
+            '-m',
+            message,
+          ],
+          { cwd: dir },
+        );
+      };
+
+      // 绑仓自己提交后平台会补问(踩坑 29);第二次再 commit 会 nothing to commit
+      let moCommitted = false;
+      let tuanCommitted = false;
+      const registry = createAgentRegistry([
+        {
+          agentId: 'claude',
+          async runTurn(input) {
+            if (!moCommitted) {
+              writeFileSync(join(input.workdir, 'mo.txt'), 'mo\n');
+              await exec('git', ['add', '.'], { cwd: input.workdir });
+              await new Promise((resolve) => setTimeout(resolve, 40));
+              await commitAs(input.workdir, '墨墨写了加法');
+              moCommitted = true;
+            }
+            return { sessionId: 's1', content: '墨墨交了加法', status: 'completed' };
+          },
+        },
+        {
+          agentId: 'opencode',
+          async runTurn(input) {
+            if (!tuanCommitted) {
+              writeFileSync(join(input.workdir, 'tuan.txt'), 'tuan\n');
+              await exec('git', ['add', '.'], { cwd: input.workdir });
+              await commitAs(input.workdir, '团团写了乘法');
+              tuanCommitted = true;
+            }
+            return { sessionId: 's2', content: '团团交了乘法', status: 'completed' };
+          },
+        },
+      ]);
+
+      await executeTurn({
+        threadId: thread.id,
+        content: '@claude\n@opencode\n各写各的文件并提交',
+        context: { stores, registry, agents: DEFAULT_AGENTS },
+      });
+
+      const { stdout: log } = await exec(
+        'git',
+        ['log', '--reverse', '--format=%H %s', 'main..HEAD'],
+        { cwd: thread.workdir },
+      );
+      const commits = log
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const sha = line.slice(0, 40);
+          return { sha, subject: line.slice(41) };
+        });
+      expect(commits.map((c) => c.subject)).toEqual(['墨墨写了加法', '团团写了乘法']);
+      for (const commit of commits) {
+        const { stdout: filesOut } = await exec(
+          'git',
+          ['diff-tree', '--no-commit-id', '--name-only', '-r', commit.sha],
+          { cwd: thread.workdir },
+        );
+        const files = filesOut.trim().split('\n').filter(Boolean);
+        if (commit.subject === '墨墨写了加法') expect(files).toEqual(['mo.txt']);
+        if (commit.subject === '团团写了乘法') expect(files).toEqual(['tuan.txt']);
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(workdirBase, { recursive: true, force: true });
+    }
   });
 
   it('A2A 接力:回复行首 @ 自动续跑,后角能看到前角输出', async () => {

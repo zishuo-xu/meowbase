@@ -63,7 +63,7 @@ Hub(可选):打开团队 Hub → 能力,应看见墨墨主架构师、闪闪审�
 
 1. 这是多 Agent 协作平台,不是 Chat UI。模型推理,CLI 干活,平台只做邮差。
 2. 平台管路由、线程、身份、记忆、技能、审批、审计。人拍板,猫推理。
-3. 心脏是一条 `executeTurn`:系统命令 → 多 @ 并行 → A2A 接力 → 沉淀 → diff 建卡拉审查。
+3. 心脏是一条 `executeTurn`:系统命令 → 多 @ 群发 → A2A 接力 → 沉淀 → diff 建卡拉审查。多 `@` 的顺序和跟哪一棒见 [AGENTS.md](../AGENTS.md) 协议表。
 4. 交接对象在名册 `handoffTo`,不写 `if (claude)`。
 5. 谁打什么、平台做什么,见 [AGENTS.md](../AGENTS.md) 协议表。演示里能看见行首交棒、升级、持球、顶栏球权。
 6. 存储只依赖端口,Redis 可换。适配器统一 `runTurn`。
@@ -77,7 +77,7 @@ Hub(可选):打开团队 Hub → 能力,应看见墨墨主架构师、闪闪审�
 
 三层:**模型**推理 → **Agent CLI** 干活 → **平台**管路由、线程、身份、记忆、技能、审批、审计。平台不替猫想。
 
-心脏是 `packages/api/src/router/execute-turn.ts`:系统命令 → 多 `@` 同题并行 → 每条链 A2A 接力(交棒后本轮先结束,平台自己续跑) → `#learn` → `git diff` 建卡并拉审查。
+心脏是 `packages/api/src/router/execute-turn.ts`:系统命令 → 多 `@` 群发 → 每条链 A2A 接力(交棒后本轮先结束,平台自己续跑) → `#learn` → `git diff` 建卡并拉审查。多 `@` 的顺序和跟哪一棒见 [AGENTS.md](../AGENTS.md) 协议表。
 
 交接对象在名册 `handoffTo` / `handoff`,不写进 TypeScript 分支。存储只依赖 `stores/ports.ts`。
 

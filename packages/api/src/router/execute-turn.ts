@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { killHoldCommand } from '../services/hold-command.js';
 import {
+  displayName,
   formatEscalatedBallNote,
   formatHopInterruptedNote,
   isPlaceholderTitle,
@@ -17,6 +18,7 @@ import type {
   AgentId,
   EvidenceEntry,
   Message,
+  PendingHop,
 } from '@meowbase/shared';
 import { clip, turnLog } from '../services/turn-log.js';
 import { safeAppendAudit } from '../stores/audit-log.js';
@@ -79,7 +81,7 @@ export async function executeTurn(input: {
     }
   }
 
-  // 多 @ 同题并行:各占一行的行首 @ 才是目标;同一正文发给每个目标;A2A 接力各自串行;失败隔离
+  // 多 @ 同题群发、顺序执行:各占一行的行首 @ 才是目标;同一正文发给每个目标;一只跑完再跑下一只;失败隔离;只跟第一个交出来的棒
   const { catalog, team, maxDepth } = await loadRoster(context);
   const history = await context.stores.messages.list(threadId);
   if (
@@ -141,10 +143,12 @@ export async function executeTurn(input: {
     });
   }
 
-  const targetResults = await Promise.allSettled(
-    targets.map(async (target) => {
+  const targetResults: PromiseSettledResult<SegmentRunResult>[] = [];
+  let keptHop: PendingHop | null = null;
+  for (const target of targets) {
+    try {
       const visited = new Set<AgentId>();
-      return runSegment(
+      const value = await runSegment(
         context,
         thread,
         { agentId: target, text: cleanMessage },
@@ -155,18 +159,35 @@ export async function executeTurn(input: {
         team,
         maxDepth,
       );
-    }),
-  );
-
-  const fulfilled = targetResults.find(
-    (r): r is PromiseFulfilledResult<SegmentRunResult> =>
-      r.status === 'fulfilled',
-  );
-  const lastResult = fulfilled?.value ?? null;
-  for (const result of targetResults) {
-    if (result.status === 'rejected') {
-      turnLog('segment fail', { thread: threadId, error: clip(String(result.reason), 120) });
+      targetResults.push({ status: 'fulfilled', value });
+    } catch (reason) {
+      targetResults.push({ status: 'rejected', reason });
+      turnLog('segment fail', { thread: threadId, error: clip(String(reason), 120) });
     }
+    const currentHop = (await context.stores.threads.get(threadId))?.pendingHop ?? null;
+    if (!currentHop) continue;
+    if (!keptHop) {
+      keptHop = currentHop;
+      continue;
+    }
+    if (currentHop.id === keptHop.id) continue;
+    const dropped = currentHop;
+    const restore = keptHop;
+    await writeQueue(async () => {
+      await context.stores.threads.setPendingHop(threadId, restore);
+      await context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: `这条线程一次只跟一棒。${displayName(dropped.from, catalog)} 交给 ${displayName(dropped.to, catalog)} 的这一棒得人来接。`,
+        status: 'completed',
+        systemKind: 'notice',
+      });
+    });
+  }
+
+  let lastResult: SegmentRunResult | null = null;
+  for (const result of targetResults) {
+    if (result.status === 'fulfilled') lastResult = result.value;
   }
   if (!lastResult) {
     const rejected = targetResults.find(

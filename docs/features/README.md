@@ -51,3 +51,4 @@
 | [pr-open.md](pr-open.md) | 已落地 | 猫自己开 PR,合了就停 |
 | [approval-void.md](approval-void.md) | 已落地 | 合了之后那张卡要作废 |
 | [approve-after-self-commit.md](approve-after-self-commit.md) | 已落地 | 猫自己提交之后,批准算什么 |
+| [one-hop-per-thread.md](one-hop-per-thread.md) | 已落地 | 同一线程同一时刻只跑一跳 |

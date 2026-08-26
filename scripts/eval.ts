@@ -44,6 +44,8 @@ const evalWriterBin = resolve(root, 'scripts/fixtures/fake-claude-eval-writer.mj
 const selfCommitBin = resolve(root, 'scripts/fixtures/fake-self-commit.mjs');
 const pushBaseBin = resolve(root, 'scripts/fixtures/fake-push-base.mjs');
 const mergePrBin = resolve(root, 'scripts/fixtures/fake-merge-pr.mjs');
+const sameTreeMoBin = resolve(root, 'scripts/fixtures/fake-same-tree-mo.mjs');
+const sameTreeTuanBin = resolve(root, 'scripts/fixtures/fake-same-tree-tuan.mjs');
 
 interface Scenario {
   id: string;
@@ -451,6 +453,51 @@ async function runMergePr(workdirBase: string): Promise<boolean> {
   );
 }
 
+/** true = 两只猫各提交各的文件,subject 对得上、没互相卷。只量同树顺序这一关,不断言卡或交棒。 */
+async function runSameTree(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: sameTreeMoBin,
+      reviewerBin: defaultReviewerBin,
+      opencodeBin: sameTreeTuanBin,
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨\n@团团\n各写各的文件并提交');
+      await waitFor('两只猫同时改同一棵树:两只都跑完', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const mo = assistantOf(messages, 'claude').some((m) => m.status === 'completed');
+        const tuan = assistantOf(messages, 'opencode').some((m) => m.status === 'completed');
+        return mo && tuan ? messages : undefined;
+      });
+      const { stdout: log } = await exec(
+        'git',
+        ['log', '--reverse', '--format=%H %s', `${bound.baseBranch}..HEAD`],
+        { cwd: bound.workdir },
+      );
+      const commits = log
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => ({ sha: line.slice(0, 40), subject: line.slice(41) }));
+      if (commits.length !== 2) return false;
+      if (commits[0]?.subject !== '墨墨写了 mo') return false;
+      if (commits[1]?.subject !== '团团写了 tuan') return false;
+      const filesOf = async (sha: string): Promise<string[]> => {
+        const { stdout } = await exec(
+          'git',
+          ['diff-tree', '--no-commit-id', '--name-only', '-r', sha],
+          { cwd: bound.workdir },
+        );
+        return stdout.trim().split('\n').filter(Boolean);
+      };
+      if ((await filesOf(commits[0].sha)).join(',') !== 'mo.txt') return false;
+      if ((await filesOf(commits[1].sha)).join(',') !== 'tuan.txt') return false;
+      return true;
+    },
+  );
+}
+
 /** true = 合了之后那张还开着的卡变成 voided。只量作废这一关,不和 merge-pr 的拉闸断言合成。 */
 async function runVoidAfterMerge(workdirBase: string): Promise<boolean> {
   const scratch = makeScratchRepo();
@@ -593,6 +640,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '作废关:卡变成 voided,不和 merge-pr 合成一行',
     run: runVoidAfterMerge,
+  },
+  {
+    id: 'same-tree',
+    name: '两只猫同时改同一棵树',
+    expectedCatch: 1,
+    expectNote: '同树顺序关:两份提交 subject 各自对得上,文件没互相卷',
+    run: runSameTree,
   },
 ];
 

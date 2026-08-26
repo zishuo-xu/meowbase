@@ -46,7 +46,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 三层:模型(推理)→ Agent CLI(工具)→ **平台(我们写的)**:路由、线程、身份、记忆、技能、审批、审计。
 
 关键文件(按阅读顺序):
-1. `packages/api/src/router/execute-turn.ts` —— **心脏**（阶段在 `router/turn/`）。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 若有搁着的棒先续跑或清掉 → 多 @ 同题并行 → 每目标跑 A2A 接力链(交棒后记下 pending,该交棒没出口则再问同一只一次) → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
+1. `packages/api/src/router/execute-turn.ts` —— **心脏**（阶段在 `router/turn/`）。一条消息的完整管线:系统命令分支(`#confirm`/`#approve`/`#reject`)→ 若有搁着的棒先续跑或清掉 → 多 @ 同题群发、顺序执行 → 每目标跑 A2A 接力链(交棒后记下 pending,该交棒没出口则再问同一只一次) → #learn 沉淀 → diff 检测 → 审批卡片+自动审查 → autoApprove 判断
 2. `packages/api/src/router/pending-runner.ts` —— 交棒后那一棒谁接着跑:抢租约才跑、跑时续期、开机扫一遍、30 秒收尸。API 重启也不丢球
 3. `packages/api/src/app.ts` —— 生产 / e2e / smoke 共用启动接线(`startApp`):loadConfig → stores → registry → `listen` → **之后**才 `startPendingRunner()`。`index.ts`、`scripts/e2e-server.ts` 与 `scripts/smoke.ts` 都调它,只用参数区分(`configPath` / `workdirBase` / host / 端口 / `rebuildAdapter`)
 4. `packages/api/src/stores/ports.ts` —— 存储端口定义(业务只依赖接口)
@@ -67,7 +67,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 语法 | 作用 |
 |---|---|
 | `@墨墨 任务` 或上一行任务、下一行 `@墨墨` | 路由给该猫。`@` 必须在行首(`resolveTurnTargets`) |
-| `@墨墨` 与 `@团团` 各占一行 | 同题并行,同一正文发给所有行首目标;同一行第二个 `@` 不算 |
+| `@墨墨` 与 `@团团` 各占一行 | 同题群发、顺序执行,同一正文发给所有行首目标;一只跑完再跑下一只;同一行第二个 `@` 不算。多 `@` 时只跟第一个交出来的棒,后一个交棒落 `notice`,得人来接 |
 | 句中 `@闪闪` /「不要 `@闪闪`」 | 不当目标,不路由 |
 | 一个 `@` 都不写 | 按顺序兜:最近 1 小时内你点过的那只 → 最后开口的猫 → 线程主猫(`resolveTurnTargets`) |
 | `#learn 标题` | 本轮猫跑完后出证据 draft(仍会叫猫,不是纯系统命令) |
