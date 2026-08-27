@@ -95,6 +95,24 @@ describe('ThreadSidebar', () => {
     });
   });
 
+  it('仓库路径留空时允许远程勾不动,也不会悄悄带上', () => {
+    const onCreate = vi.fn();
+    render(
+      <ThreadSidebar
+        threads={[]}
+        activeId={null}
+        onSelect={vi.fn()}
+        onCreate={onCreate}
+      />,
+    );
+    const box = screen.getByLabelText(/允许推送|会联网/) as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    fireEvent.click(box);
+    expect(box.checked).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.any(String), 'claude', undefined);
+  });
+
   it('仓库路径留空时新建不带绑仓参数', () => {
     const onCreate = vi.fn();
     render(

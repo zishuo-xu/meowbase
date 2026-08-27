@@ -147,10 +147,16 @@ export function ThreadSidebar({
           placeholder="基准分支（可选）"
           className="mb-1.5 w-full rounded-xl border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)]"
         />
-        <label className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
+        <label
+          className={`mb-2 flex items-center gap-1.5 text-[11px] ${
+            repoPath.trim() ? 'text-[var(--ink-soft)]' : 'cursor-not-allowed text-[var(--border)]'
+          }`}
+          title={repoPath.trim() ? undefined : '空沙箱没有远端可推,填了仓库路径才能开'}
+        >
           <input
             type="checkbox"
-            checked={allowRemote}
+            checked={allowRemote && repoPath.trim() !== ''}
+            disabled={repoPath.trim() === ''}
             onChange={(e) => setAllowRemote(e.target.checked)}
             className="shrink-0"
           />
