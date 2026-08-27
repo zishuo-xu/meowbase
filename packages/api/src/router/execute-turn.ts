@@ -8,7 +8,9 @@ import {
   shouldResumePending,
   parseEvidenceRefs,
   parseLearnCommand,
+  filterEvidenceByRecallScope,
   matchEvidence,
+  toEvidenceScopeThread,
   wantsEvidenceRecall,
   resolveTurnTargets,
   titleFromUserMessage,
@@ -75,7 +77,13 @@ export async function executeTurn(input: {
     if (entry?.status === 'confirmed') refs.push(entry);
   }
   if (wantsEvidenceRecall(content)) {
-    const recalled = matchEvidence(content, await context.stores.evidence.list());
+    const threads = await context.stores.threads.list();
+    const scoped = filterEvidenceByRecallScope(
+      await context.stores.evidence.list(),
+      { threadId, repoPath: thread.repo?.path },
+      threads.map(toEvidenceScopeThread),
+    );
+    const recalled = matchEvidence(content, scoped);
     for (const entry of recalled) {
       if (!refs.some((item) => item.id === entry.id)) refs.push(entry);
     }

@@ -77,6 +77,7 @@ export interface EvidenceDto {
   content: string;
   status: 'draft' | 'confirmed';
   createdAt: string;
+  confirmedAt?: string;
 }
 
 export interface ApprovalDto {
@@ -217,7 +218,7 @@ export const api = {
       threadId ? `/api/approvals?threadId=${threadId}` : '/api/approvals',
     ),
   listEvidence: (threadId: string) =>
-    request<EvidenceDto[]>(`/api/evidence?threadId=${threadId}`),
+    request<EvidenceDto[]>(`/api/evidence?threadId=${threadId}&scope=recall`),
   deleteThread: (threadId: string) =>
     request<{ ok: boolean }>(`/api/threads/${threadId}`, { method: 'DELETE' }),
   sendMessage: (threadId: string, content: string) =>

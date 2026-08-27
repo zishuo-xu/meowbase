@@ -44,7 +44,7 @@ describe('api', () => {
     );
     await api.listEvidence('t1');
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/evidence?threadId=t1'),
+      expect.stringContaining('/api/evidence?threadId=t1&scope=recall'),
       undefined,
     );
     vi.stubGlobal(

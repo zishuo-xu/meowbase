@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -14,6 +14,7 @@ import {
   getAudit,
   getMessages,
   getThread,
+  json,
   killHard,
   makeScratchRepo,
   patchAutoApprove,
@@ -47,6 +48,7 @@ const pushLocalBin = resolve(root, 'scripts/fixtures/fake-push-local.mjs');
 const mergePrBin = resolve(root, 'scripts/fixtures/fake-merge-pr.mjs');
 const sameTreeMoBin = resolve(root, 'scripts/fixtures/fake-same-tree-mo.mjs');
 const sameTreeTuanBin = resolve(root, 'scripts/fixtures/fake-same-tree-tuan.mjs');
+const scopeLearnBin = resolve(root, 'scripts/fixtures/fake-scope-learn.mjs');
 
 interface Scenario {
   id: string;
@@ -546,6 +548,79 @@ async function runSameTree(workdirBase: string): Promise<boolean> {
   );
 }
 
+const SCOPE_A_MARK = 'UNIQUE_SCOPE_A_ONLY';
+
+async function listEvidence(
+  baseUrl: string,
+  threadId: string,
+  scope?: 'recall',
+): Promise<{ id: string; status: string; title: string; content: string }[]> {
+  const query = scope
+    ? `threadId=${threadId}&scope=recall`
+    : `threadId=${threadId}`;
+  const res = await fetch(`${baseUrl}/api/evidence?${query}`);
+  return json(res, 'GET /api/evidence');
+}
+
+/** true = 仓A确认的记忆没有进仓B那跳的提示词。走 #learn → #confirm,不往 Redis 塞。 */
+async function runCrossRepoMemory(workdirBase: string): Promise<boolean> {
+  const repoA = makeScratchRepo();
+  const repoB = makeScratchRepo();
+  const dump = join(workdirBase, `prompt-scope-${Date.now()}.txt`);
+  try {
+    return await withApi(
+      {
+        workdirBase,
+        writerBin: scopeLearnBin,
+        reviewerBin: defaultReviewerBin,
+        extraEnv: { FAKE_PROMPT_DUMP: dump },
+      },
+      async (api) => {
+        const threadA = await createThread(api.baseUrl, `eval-scope-a-${Date.now()}`, {
+          repoPath: repoA.repoPath,
+          baseBranch: repoA.baseBranch,
+        });
+        const threadB = await createThread(api.baseUrl, `eval-scope-b-${Date.now()}`, {
+          repoPath: repoB.repoPath,
+          baseBranch: repoB.baseBranch,
+        });
+        try {
+          await postMessage(api.baseUrl, threadA, '@墨墨 #learn 仓A斑马纹约定');
+          const draft = await waitFor('仓A证据进池', async () => {
+            const rows = await listEvidence(api.baseUrl, threadA);
+            return rows.find((item) => item.status === 'draft' && item.content.includes(SCOPE_A_MARK));
+          });
+          await postMessage(api.baseUrl, threadA, `#confirm ${draft.id}`);
+          const confirmed = await listEvidence(api.baseUrl, threadA);
+          if (!confirmed.some((item) => item.id === draft.id && item.status === 'confirmed')) {
+            return false;
+          }
+          await postMessage(api.baseUrl, threadB, '之前我们约定斑马纹怎么写');
+          await waitFor('仓B那跳跑完', async () => {
+            const messages = await getMessages(api.baseUrl, threadB);
+            return assistantOf(messages, 'claude').some((m) => m.status === 'completed')
+              ? messages
+              : undefined;
+          });
+          if (!existsSync(dump)) return false;
+          const prompt = readFileSync(dump, 'utf8');
+          if (prompt.includes(SCOPE_A_MARK)) return false;
+          if (prompt.includes('仓A独有约定')) return false;
+          const railB = await listEvidence(api.baseUrl, threadB, 'recall');
+          if (railB.some((item) => item.content.includes(SCOPE_A_MARK))) return false;
+          return true;
+        } finally {
+          await deleteThread(api.baseUrl, threadA);
+          await deleteThread(api.baseUrl, threadB);
+        }
+      },
+    );
+  } finally {
+    repoA.cleanup();
+    repoB.cleanup();
+  }
+}
+
 /** true = 合了之后那张还开着的卡变成 voided。只量作废这一关,不和 merge-pr 的拉闸断言合成。 */
 async function runVoidAfterMerge(workdirBase: string): Promise<boolean> {
   const scratch = makeScratchRepo();
@@ -703,6 +778,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '同树顺序关:两份提交 subject 各自对得上,文件没互相卷',
     run: runSameTree,
+  },
+  {
+    id: 'cross-repo-memory',
+    name: '别的项目的记忆被灌进来',
+    expectedCatch: 1,
+    expectNote: '跨仓关:仓A确认的内容没有进仓B那跳的提示词',
+    run: runCrossRepoMemory,
   },
 ];
 

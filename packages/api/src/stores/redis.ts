@@ -369,6 +369,7 @@ export class RedisEvidenceStore implements EvidenceStore {
       content: raw.content ?? '',
       status: (raw.status as EvidenceEntry['status']) ?? 'draft',
       createdAt: raw.createdAt ?? '',
+      ...(raw.confirmedAt ? { confirmedAt: raw.confirmedAt } : {}),
     };
   }
 
@@ -406,7 +407,8 @@ export class RedisEvidenceStore implements EvidenceStore {
   async confirm(id: string): Promise<EvidenceEntry | null> {
     const entry = await this.hydrate(id);
     if (!entry || entry.status !== 'draft') return null;
-    await this.redis.hset(evidenceKey(id), 'status', 'confirmed');
+    const confirmedAt = new Date().toISOString();
+    await this.redis.hset(evidenceKey(id), { status: 'confirmed', confirmedAt });
     return this.hydrate(id);
   }
 

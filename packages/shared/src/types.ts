@@ -154,6 +154,8 @@ export interface EvidenceEntry {
   content: string;
   status: EvidenceStatus;
   createdAt: string;
+  /** 人点确认的时间。老数据没有,注入时落「确认时间未记」,不许拿 createdAt 顶替 */
+  confirmedAt?: string;
 }
 
 export interface Skill {

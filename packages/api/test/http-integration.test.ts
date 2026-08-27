@@ -427,6 +427,64 @@ describe('HTTP 集成', () => {
     expect(evidence[0]?.status).toBe('draft');
   });
 
+  it('GET /api/evidence?scope=recall 与 ?threadId= 不是同一批', async () => {
+    const repoA = mkdtempSync(join(tmpdir(), 'meow-scope-a-'));
+    const repoB = mkdtempSync(join(tmpdir(), 'meow-scope-b-'));
+    try {
+      await initScratchRepo(repoA);
+      await initScratchRepo(repoB);
+      const createA = await fetch(`${baseUrl}/api/threads`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: '仓A', repoPath: repoA }),
+      });
+      const threadA = (await createA.json()) as { id: string };
+      const createB = await fetch(`${baseUrl}/api/threads`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: '仓B', repoPath: repoB }),
+      });
+      const threadB = (await createB.json()) as { id: string };
+
+      await fetch(`${baseUrl}/api/threads/${threadA.id}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: '#learn 仓A斑马纹约定' }),
+      });
+      const ownA = (await (
+        await fetch(`${baseUrl}/api/evidence?threadId=${threadA.id}`)
+      ).json()) as { id: string; status: string; title: string }[];
+      expect(ownA.length).toBe(1);
+      const draftId = ownA[0]?.id;
+      expect(draftId).toBeTruthy();
+      await fetch(`${baseUrl}/api/threads/${threadA.id}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: `#confirm ${draftId}` }),
+      });
+
+      const stillOwnA = (await (
+        await fetch(`${baseUrl}/api/evidence?threadId=${threadA.id}`)
+      ).json()) as { title: string; status: string }[];
+      expect(stillOwnA.some((item) => item.title === '仓A斑马纹约定' && item.status === 'confirmed')).toBe(
+        true,
+      );
+
+      const recallB = (await (
+        await fetch(`${baseUrl}/api/evidence?threadId=${threadB.id}&scope=recall`)
+      ).json()) as { title: string }[];
+      expect(recallB.some((item) => item.title === '仓A斑马纹约定')).toBe(false);
+
+      const recallA = (await (
+        await fetch(`${baseUrl}/api/evidence?threadId=${threadA.id}&scope=recall`)
+      ).json()) as { title: string }[];
+      expect(recallA.some((item) => item.title === '仓A斑马纹约定')).toBe(true);
+    } finally {
+      rmSync(repoA, { recursive: true, force: true });
+      rmSync(repoB, { recursive: true, force: true });
+    }
+  });
+
   it('GET /api/skills 返回技能清单', async () => {
     const res = await fetch(`${baseUrl}/api/skills`);
     const skills = (await res.json()) as { id: string; name: string }[];

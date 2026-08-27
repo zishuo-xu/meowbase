@@ -268,7 +268,11 @@ export class InMemoryEvidenceStore implements EvidenceStore {
   async confirm(id: string): Promise<EvidenceEntry | null> {
     const entry = this.entries.get(id);
     if (!entry || entry.status !== 'draft') return null;
-    const updated: EvidenceEntry = { ...entry, status: 'confirmed' };
+    const updated: EvidenceEntry = {
+      ...entry,
+      status: 'confirmed',
+      confirmedAt: new Date().toISOString(),
+    };
     this.entries.set(id, updated);
     return updated;
   }

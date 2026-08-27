@@ -196,6 +196,7 @@ describe('内存 Profile/Evidence 存储', () => {
 
     const confirmed = await evidence.confirm(draft.id);
     expect(confirmed?.status).toBe('confirmed');
+    expect(confirmed?.confirmedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(await evidence.confirm(draft.id)).toBeNull();
     expect(await evidence.confirm('ev_00000000')).toBeNull();
   });

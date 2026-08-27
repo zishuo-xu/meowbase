@@ -24,7 +24,11 @@ export function EvidenceRail({
               type="button"
               onClick={() => onCite(item.id)}
               className="font-medium hover:text-[var(--accent-strong)]"
-              title={item.title}
+              title={
+                item.status === 'confirmed'
+                  ? `${item.title}${item.confirmedAt ? ` · 确认于 ${item.confirmedAt.slice(0, 10)}` : ' · 确认时间未记'}`
+                  : item.title
+              }
             >
               #{item.id}
               <span className="ml-1 text-[var(--ink-soft)]">{item.title}</span>

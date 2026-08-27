@@ -115,7 +115,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 除了点名,人还能打这几样。这里只列**有什么**,规则和边界都在 [AGENTS.md](AGENTS.md) 协议表:
 
 - `#learn 标题` → `#confirm ev_xxx` —— 把这轮结论沉淀成公共证据。**人确认才进**,猫说了不算
-- 说「之前我们约定…」—— 从已确认证据里召回,不必手打 `#ev_`;可跨线程
+- 说「之前我们约定…」—— 从已确认证据里召回,不必手打 `#ev_`;按仓划界,空沙箱只看自己的。规则见 [AGENTS.md](AGENTS.md) 协议表
 - 整行 `星星罐子` —— 拉闸,本轮不再叫猫
 - `#approve ap_xxx` / `#reject ap_xxx 理由` —— 审批决策(也可以直接在卡片上点)
 

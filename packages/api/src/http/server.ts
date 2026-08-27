@@ -7,6 +7,8 @@ import websocket, { type WebSocket } from '@fastify/websocket';
 import type { AgentId, AuditAction, AuditActor, HoldCommandRule } from '@meowbase/shared';
 import {
   defaultAllowedRepoRoots,
+  filterEvidenceByRecallScope,
+  toEvidenceScopeThread,
   isAllowedRequestOrigin,
   isRepoPathAllowed,
   resolveAllowedOrigins,
@@ -465,7 +467,21 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get('/api/evidence', async (request) => {
-    const { threadId } = request.query as { threadId?: string };
+    const { threadId, scope } = request.query as { threadId?: string; scope?: string };
+    if (scope === 'recall') {
+      if (!threadId) return [];
+      const current = await stores.threads.get(threadId);
+      if (!current) return [];
+      const [entries, threads] = await Promise.all([
+        stores.evidence.list(),
+        stores.threads.list(),
+      ]);
+      return filterEvidenceByRecallScope(
+        entries,
+        { threadId, repoPath: current.repo?.path },
+        threads.map(toEvidenceScopeThread),
+      );
+    }
     return stores.evidence.list(threadId);
   });
 

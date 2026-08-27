@@ -225,6 +225,7 @@ describe.skipIf(!redis)('Redis Profile/Evidence 存储', () => {
     const draft = await evidence.createDraft({ threadId, kind: 'fact', title: 'x', content: 'y' });
     const confirmed = await evidence.confirm(draft.id);
     expect(confirmed?.status).toBe('confirmed');
+    expect(confirmed?.confirmedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect((await evidence.list(threadId)).length).toBe(1);
   });
 });

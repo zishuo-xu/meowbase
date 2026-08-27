@@ -20,6 +20,7 @@ import {
   parseHoldCommand,
   parseHoldExit,
   shouldNudgeExit,
+  toEvidenceScopeThread,
   authorizeHoldCommand,
   type A2AStopKind,
   type HoldCommandDenyReason,
@@ -256,11 +257,13 @@ export async function runSegment(
     const spec = context.agents?.find((a) => a.id === currentAgent);
     const profile = overlayProfile(stored, spec);
     const matchedSkills = await matchSkills(currentTask, await context.stores.skills.list());
+    const evidenceThreads = (await context.stores.threads.list()).map(toEvidenceScopeThread);
     const systemPrompt = buildSystemPrompt({
       profile,
       team,
       skills: matchedSkills,
       evidenceRefs: refs,
+      evidenceThreads,
       workdir: thread.workdir,
       repo: thread.repo,
     });

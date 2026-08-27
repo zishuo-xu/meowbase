@@ -7,6 +7,7 @@ import {
   matchSkills,
   parseReviewVerdict,
   selectReviewer,
+  toEvidenceScopeThread,
 } from '@meowbase/shared';
 import type {
   AgentId,
@@ -139,6 +140,7 @@ export async function runReviewFixThenCard(input: {
           team,
           skills: fixSkills,
           evidenceRefs: refs,
+          evidenceThreads: (await context.stores.threads.list()).map(toEvidenceScopeThread),
           workdir: thread.workdir,
           repo: thread.repo,
         }),

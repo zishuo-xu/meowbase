@@ -58,7 +58,7 @@ Fastify 的 `onReady` 在 `listen()` 失败后照样会跑完。撞 `EADDRINUSE`
 
 `pnpm eval` 记分板：每种已知坏毛病喂给 fake CLI 跑 N=3 次，记平台兜住几次，期望值写死在 `scripts/eval.ts`。**还没人拦的那格，期望就写 0**——记分板量现状，不量愿望。
 
-这条规矩真的触发过一次，不是设想。「什么都没干就交棒」曾经期望 0，因为平台确实不拦。虚空传球门禁落地那天实际变成 1，记分板立刻因「期望 0 实际 1」非 0 退出，逼人回来把那行期望改成 1——而不是放宽断言让它蒙着绿过去。现在 9 行期望都是 1，`expectedCatch` 的类型仍是 `0 | 1`，下一格空的时候照样这么走。
+这条规矩真的触发过一次，不是设想。「什么都没干就交棒」曾经期望 0，因为平台确实不拦。虚空传球门禁落地那天实际变成 1，记分板立刻因「期望 0 实际 1」非 0 退出，逼人回来把那行期望改成 1——而不是放宽断言让它蒙着绿过去。现在 15 行期望都是 1，`expectedCatch` 的类型仍是 `0 | 1`，下一格空的时候照样这么走。
 
 ### 6. 谁能让平台干活是另一道门
 
@@ -72,19 +72,19 @@ Fastify 的 `onReady` 在 `listen()` 失败后照样会跑完。撞 `EADDRINUSE`
 
 「不带 `Origin` 放行」不是偷懒：浏览器发跨域请求（含 WS 升级）一定会带 `Origin`，恶意页面伪造不出「不带」这个状态；curl / Node fetch / 整机自检本来就不带，一律拒会把 e2e 和人手 curl 全弄挂。
 
-代码在 `repo-path.ts` / `listen-origin.ts`。证据是 shared 单测，不是记分板——记分板那 9 行量的是猫不守协议，不管谁能连上来。
+代码在 `repo-path.ts` / `listen-origin.ts`。证据是 shared 单测，不是记分板——记分板量的是猫不守协议，不管谁能连上来。
 
 ## 凭什么说它没坏
 
 | 层 | 命令 | 验什么 |
 |---|---|---|
-| 单测 | `pnpm test`（681：shared 184 / api 311 / web 186） | 纯函数和适配器 |
+| 单测 | `pnpm test`（691：shared 191 / api 314 / web 186） | 纯函数和适配器 |
 | 整机 | `pnpm e2e`（3 段：happy-path / crash-resume / bind-conflict） | 真进程 + fake CLI |
-| 记分板 | `pnpm eval`（9 行） | 已知坏毛病平台兜住几次 |
+| 记分板 | `pnpm eval`（15 行） | 已知坏毛病平台兜住几次 |
 
 全部在 CI 上每次 push 跑（`.github/workflows/ci.yml` 还有 `pnpm -r build` 和 `typecheck:scripts`）。用 fake CLI 而不是真模型：确定性、不花钱、能进 CI。真模型冒烟是 `pnpm smoke`，花钱，不进 CI。
 
-CI 里挂了 Redis service，所以 671 是满数。本机连不上 Redis 时，那几个 Redis 套件用 `describe.skipIf` 真跳过，输出是 skipped 而不是 passed——早先写成 `if (!redis) return` 时 vitest 会把它算成 passed，那是假绿。
+CI 里挂了 Redis service，所以 691 是满数。本机连不上 Redis 时，那几个 Redis 套件用 `describe.skipIf` 真跳过，输出是 skipped 而不是 passed——早先写成 `if (!redis) return` 时 vitest 会把它算成 passed，那是假绿。
 
 审计大部分由 store 装饰器派生（`audit-log.ts` 的 `auditMessages` / `auditApprovals`）。租约事件（`pending-runner.ts` 的 `lease-claim` / `lease-steal`）和半截重跑（`resumePendingTurn` 的 `hop-rerun`）是显式补的。
 

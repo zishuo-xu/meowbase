@@ -54,7 +54,17 @@ export {
   parseRejectCommand,
   parseFreezeCommand,
 } from './commands.js';
-export { matchEvidence, tokenizeEvidenceQuery, wantsEvidenceRecall } from './evidence-recall.js';
+export {
+  evidenceSourceLabel,
+  filterEvidenceByRecallScope,
+  formatEvidenceConfirmedAt,
+  formatEvidenceInjectionLine,
+  matchEvidence,
+  toEvidenceScopeThread,
+  tokenizeEvidenceQuery,
+  wantsEvidenceRecall,
+} from './evidence-recall.js';
+export type { EvidenceScopeThread } from './evidence-recall.js';
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { matchSkills } from './skills.js';
 export { selectReviewer } from './pairing.js';
