@@ -48,22 +48,26 @@ function assertPortFree(port: number): Promise<void> {
 }
 
 function buildWeb(apiPort: number): void {
-  execFileSync('pnpm', ['--filter', '@meowbase/web', 'build'], {
-    cwd: root,
-    env: {
-      ...process.env,
-      NEXT_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}`,
-      NEXT_DIST_DIR,
-    },
-    stdio: 'inherit',
-  });
-  // next build 会把 next-env.d.ts 指到 .next-e2e,拨回默认 .next,免得日常 build 和工作区来回脏
-  const nextEnvPath = resolve(root, 'packages/web/next-env.d.ts');
-  const nextEnv = readFileSync(nextEnvPath, 'utf8').replace(
-    './.next-e2e/types/routes.d.ts',
-    './.next/types/routes.d.ts',
-  );
-  writeFileSync(nextEnvPath, nextEnv);
+  try {
+    execFileSync('pnpm', ['--filter', '@meowbase/web', 'build'], {
+      cwd: root,
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}`,
+        NEXT_DIST_DIR,
+      },
+      stdio: 'inherit',
+    });
+  } finally {
+    // next build 会把 next-env.d.ts 指到 .next-e2e,拨回默认 .next。
+    // 必须在 finally 里:build 失败时它已经被改过了,不拨回就在工作区留一个来历不明的 modified
+    const nextEnvPath = resolve(root, 'packages/web/next-env.d.ts');
+    const nextEnv = readFileSync(nextEnvPath, 'utf8').replace(
+      './.next-e2e/types/routes.d.ts',
+      './.next/types/routes.d.ts',
+    );
+    writeFileSync(nextEnvPath, nextEnv);
+  }
 }
 
 function startWeb(port: number): Promise<{ proc: ChildProcess; baseUrl: string }> {
