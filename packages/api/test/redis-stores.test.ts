@@ -152,6 +152,14 @@ describe.skipIf(!redis)('Redis 存储', () => {
       baseBranch: 'develop',
       branch: `meow/${thread.id}`,
     });
+    expect(loaded?.repo?.allowRemote).toBeUndefined();
+    const remote = await threads.create({
+      title: `redis-repo-remote-${Date.now()}`,
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'develop', allowRemote: true },
+    });
+    expect((await threads.get(remote.id))?.repo?.allowRemote).toBe(true);
+    await threads.delete(remote.id);
     await threads.setLastApprovedSha(thread.id, 'abc123def456');
     expect((await threads.get(thread.id))?.repo?.lastApprovedSha).toBe('abc123def456');
     await threads.delete(thread.id);

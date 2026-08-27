@@ -40,6 +40,8 @@ export interface ThreadRepo {
   branch: string;
   /** 人上次批准落地时的 HEAD；没有则审批 diff 回退到与基准分支的分叉点 */
   lastApprovedSha?: string;
+  /** 准不准出仓。缺失 = 本地,不查 PR、不许推 */
+  allowRemote?: boolean;
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -79,6 +81,8 @@ export interface SystemMeta {
   baseBranch?: string;
   beforeSha?: string;
   afterSha?: string;
+  /** 越界那条:碰基准远端 / 碰基准本地 / 本地模式下推了自己这根 */
+  side?: 'remote' | 'local' | 'push';
   /** PR 那条:number + 当时的 head sha,不用 FETCH_HEAD */
   prNumber?: number;
   prUrl?: string;

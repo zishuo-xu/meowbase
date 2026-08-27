@@ -62,7 +62,7 @@ async function bindThread() {
     title: 'approval-void',
     primaryAgentId: 'claude',
     workdirBase,
-    repo: { path: repo, baseBranch: 'main' },
+    repo: { path: repo, baseBranch: 'main', allowRemote: true },
   });
   await gitWorktreeAdd(repo, thread.workdir, thread.repo!.branch, 'main');
   return { repo, stores, thread, audit: raw.audit };

@@ -24,6 +24,13 @@ describe('内存存储', () => {
       baseBranch: 'main',
       branch: `meow/${thread.id}`,
     });
+    expect(thread.repo?.allowRemote).toBeUndefined();
+    const remote = await threads.create({
+      title: '开远程',
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'main', allowRemote: true },
+    });
+    expect(remote.repo?.allowRemote).toBe(true);
     expect((await threads.get(thread.id))?.repo).toEqual(thread.repo);
   });
 

@@ -63,7 +63,7 @@ export interface GitStateSnapshot {
 }
 
 export interface GitOverstep {
-  side: 'remote' | 'local';
+  side: 'remote' | 'local' | 'push';
   baseBranch: string;
   beforeSha?: string;
   afterSha?: string;
@@ -142,6 +142,7 @@ export function describeGitMoves(input: {
   commitsSinceBefore: number;
   agentName: string;
   baseBranch?: string;
+  allowRemote?: boolean;
 }): GitMoveClassification {
   const notes: string[] = [];
   const oversteps: GitOverstep[] = [];
@@ -157,6 +158,17 @@ export function describeGitMoves(input: {
   ) {
     const remote = input.after.remoteName ?? input.before.remoteName ?? 'origin';
     notes.push(`${input.agentName} 把 \`${branch}\` 推到了 ${remote}`);
+    if (!input.allowRemote) {
+      oversteps.push({
+        side: 'push',
+        baseBranch: input.baseBranch ?? 'main',
+        ...(input.before.remoteTrackingSha
+          ? { beforeSha: input.before.remoteTrackingSha }
+          : {}),
+        afterSha: input.after.remoteTrackingSha,
+        note: `⚠️ 本线程是本地模式,不该推送。\`${branch}\` 的远端跟踪引用变了`,
+      });
+    }
   }
   const baseBranch = input.baseBranch ?? 'main';
   if (isGitOverstep(input.before, input.after)) {

@@ -210,6 +210,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       primaryAgentId?: AgentId;
       repoPath?: string;
       baseBranch?: string;
+      allowRemote?: boolean;
     } | null;
     const repoPathRaw = body?.repoPath?.trim();
     if (repoPathRaw) {
@@ -236,7 +237,11 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         title: body?.title?.trim() || '新会话',
         primaryAgentId: body?.primaryAgentId ?? live.defaultAgentId,
         workdirBase: deps.workdirBase,
-        repo: { path: repoPath, baseBranch },
+        repo: {
+          path: repoPath,
+          baseBranch,
+          ...(body?.allowRemote === true ? { allowRemote: true } : {}),
+        },
       });
       const workdir = resolve(thread.workdir);
       const listed = await gitWorktreeList(repoPath);

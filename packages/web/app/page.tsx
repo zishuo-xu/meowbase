@@ -119,7 +119,7 @@ export default function Home() {
     async (
       title: string,
       primaryAgentId: string,
-      opts?: { repoPath?: string; baseBranch?: string },
+      opts?: { repoPath?: string; baseBranch?: string; allowRemote?: boolean },
     ) => {
       try {
         const thread = await api.createThread(title, primaryAgentId, opts);

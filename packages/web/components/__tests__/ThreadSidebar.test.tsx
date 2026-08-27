@@ -71,6 +71,28 @@ describe('ThreadSidebar', () => {
       repoPath: '/tmp/myapp',
       baseBranch: 'main',
     });
+    expect(onCreate.mock.calls[0]?.[2]).not.toHaveProperty('allowRemote', true);
+  });
+
+  it('勾选允许远程后新建会带上 allowRemote', () => {
+    const onCreate = vi.fn();
+    render(
+      <ThreadSidebar
+        threads={[]}
+        activeId={null}
+        onSelect={vi.fn()}
+        onCreate={onCreate}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('仓库路径（可选）'), {
+      target: { value: '/tmp/myapp' },
+    });
+    fireEvent.click(screen.getByLabelText(/允许推送|会联网/));
+    fireEvent.click(screen.getByRole('button', { name: '+ 新会话' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.any(String), 'claude', {
+      repoPath: '/tmp/myapp',
+      allowRemote: true,
+    });
   });
 
   it('仓库路径留空时新建不带绑仓参数', () => {
@@ -87,7 +109,7 @@ describe('ThreadSidebar', () => {
     expect(onCreate).toHaveBeenCalledWith(expect.any(String), 'claude', undefined);
   });
 
-  it('绑仓线程显示仓库名和分支,未绑的不显示', () => {
+  it('绑仓线程显示仓库名、分支和模式,未绑的不显示', () => {
     render(
       <ThreadSidebar
         threads={[
@@ -96,13 +118,23 @@ describe('ThreadSidebar', () => {
             ...thread('b', '绑仓任务'),
             repo: { path: '/tmp/throwaway-app', baseBranch: 'main', branch: 'meow/b' },
           },
+          {
+            ...thread('c', '远程任务'),
+            repo: {
+              path: '/tmp/throwaway-app',
+              baseBranch: 'main',
+              branch: 'meow/c',
+              allowRemote: true,
+            },
+          },
         ]}
         activeId="b"
         onSelect={vi.fn()}
         onCreate={vi.fn()}
       />,
     );
-    expect(screen.getByText('throwaway-app · meow/b')).toBeTruthy();
+    expect(screen.getByText('throwaway-app · meow/b · 本地')).toBeTruthy();
+    expect(screen.getByText('throwaway-app · meow/c · 远程')).toBeTruthy();
     expect(screen.getByText('空沙箱').closest('button')?.textContent).not.toMatch(/meow\//);
   });
 

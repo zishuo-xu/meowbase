@@ -71,7 +71,7 @@ export class RedisThreadStore implements ThreadStore {
     primaryAgentId: AgentId;
     workdirBase?: string;
     repo?: Pick<ThreadRepo, 'path' | 'baseBranch'> &
-      Partial<Pick<ThreadRepo, 'branch' | 'lastApprovedSha'>>;
+      Partial<Pick<ThreadRepo, 'branch' | 'lastApprovedSha' | 'allowRemote'>>;
   }): Promise<Thread> {
     const id = randomUUID();
     const thread: Thread = {
@@ -90,6 +90,7 @@ export class RedisThreadStore implements ThreadStore {
               ...(input.repo.lastApprovedSha
                 ? { lastApprovedSha: input.repo.lastApprovedSha }
                 : {}),
+              ...(input.repo.allowRemote === true ? { allowRemote: true } : {}),
             },
           }
         : {}),

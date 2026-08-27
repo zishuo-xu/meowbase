@@ -103,8 +103,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 命令白名单 | 只跑猫 `等跑` 里白名单形状;元字符拒、不在表里拒。命令字符串来自猫的回复 |
 | 重启后捡棒 | 开机扫 pending,见踩坑第 1 条 |
 | 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);自己那根 HEAD 前进 / 自己那根远端跟踪引用变了(含 force)则落 `git-move`(不参与球权)。空沙箱跳过 |
-| 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。自己那根的提交/推送只落 `git-move`,接力继续 |
-| PR 合了就停 | 绑仓线程每跳后自己查这个分支的 PR(不读猫正文)。状态变成 MERGED 则落参与球权的 `pr-merged`、清掉 pending、不建审批卡。查不到落「查不到 PR 状态(原因)」、不停接力,不许落成「没有 PR」。第一次看见 OPEN 只落 `pr-opened`(不参与球权) |
+| 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。开了远程时自己那根的提交/推送只落 `git-move`,接力继续;本地模式(`allowRemote` 缺失即 false)下自己那根远端跟踪引用变了也落 `git-overstep`(不该推送) |
+| PR 合了就停 | **开了远程的**绑仓线程每跳后自己查这个分支的 PR(不读猫正文)。状态变成 MERGED 则落参与球权的 `pr-merged`、清掉 pending、不建审批卡。查不到落「查不到 PR 状态(原因)」、不停接力,不许落成「没有 PR」。第一次看见 OPEN 只落 `pr-opened`(不参与球权)。本地模式一次 `gh` 都不跑 |
 | 合了之后作废还开着的卡 | `pr-merged` 停接力时，把本线程还开着的审批卡改成终态 `voided` 并写清原因（PR #N 已合并）。`#approve` 对失效卡当场拒，不走到提交。`git-overstep` / PR `CLOSED` 不作废 |
 
 ## 开发约定
@@ -119,7 +119,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))。store 已经负责的 kind(`STORE_OWNED_SYSTEM_KINDS`,现为 `approval-applied`)消息侧不再重复派生,回执从 `GET /messages` 能拿到;`approval-failed` 只有消息没有 store 动作,仍从消息落。没有 `pendingHop` 不落租约行。
-- 测试:`pnpm test`(shared 183 + api 304 + web 184 = 671);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
+- 测试:`pnpm test`(shared 184 + api 311 + web 185 = 680);api 的 Redis 测试需要本地 Redis 在跑(连不上则 `describe.skipIf` 真跳过,输出是 skipped 不是 passed)
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 
@@ -160,7 +160,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 
 ## 常见操作
 
-- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;改动落在 `meow/<threadId>`,不落基准分支、不 push。空路径仍是空沙箱。路径必须在允许的根下面,否则 403,返回体带 `selectedPath` 和 `allowedRoots`;怎么改根看 [README.md](README.md)。API 默认只听 `127.0.0.1`,本机自用是唯一推荐用法;`API_SERVER_HOST=0.0.0.0` 能开 LAN 但**不建议**（没有鉴权 + 窄屏没适配,见 [README.md](README.md)）
+- **绑真实仓库建线程**:侧栏填仓库路径(可选基准分支)后点 + 新会话;默认本地模式,不推、不查 PR。要推送和开 PR 时勾「允许推送和开 PR（会联网）」(`allowRemote: true`)。改动落在 `meow/<threadId>`,不落基准分支。空路径仍是空沙箱。路径必须在允许的根下面,否则 403,返回体带 `selectedPath` 和 `allowedRoots`;怎么改根看 [README.md](README.md)。API 默认只听 `127.0.0.1`,本机自用是唯一推荐用法;`API_SERVER_HOST=0.0.0.0` 能开 LAN 但**不建议**（没有鉴权 + 窄屏没适配,见 [README.md](README.md)）
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:Hub 里改名册/模型并保存(`PATCH /api/config`)立即生效;或手改仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`)后重启 API。`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore

@@ -57,6 +57,7 @@ export async function settleTurn(input: {
           systemKind: 'git-overstep',
           systemMeta: {
             baseBranch: primary.baseBranch,
+            side: primary.side,
             ...(primary.beforeSha ? { beforeSha: primary.beforeSha } : {}),
             ...(primary.afterSha ? { afterSha: primary.afterSha } : {}),
           },

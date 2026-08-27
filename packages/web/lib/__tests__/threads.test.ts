@@ -40,10 +40,13 @@ describe('titleFromUserMessage', () => {
 });
 
 describe('threadRepoHint', () => {
-  it('只展示仓库目录名和分支', () => {
+  it('展示仓库目录名、分支和远程模式,缺失即本地', () => {
     expect(threadRepoHint({ path: '/tmp/throwaway-app', branch: 'meow/t1' })).toBe(
-      'throwaway-app · meow/t1',
+      'throwaway-app · meow/t1 · 本地',
     );
+    expect(
+      threadRepoHint({ path: '/tmp/throwaway-app', branch: 'meow/t1', allowRemote: true }),
+    ).toBe('throwaway-app · meow/t1 · 远程');
   });
 });
 

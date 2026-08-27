@@ -53,3 +53,4 @@
 | [approve-after-self-commit.md](approve-after-self-commit.md) | 已落地 | 猫自己提交之后,批准算什么 |
 | [one-hop-per-thread.md](one-hop-per-thread.md) | 已落地 | 同一线程同一时刻只跑一跳 |
 | [demo-path-in-ci.md](demo-path-in-ci.md) | 已落地 | 演示路径进 CI:人打字那一层也要有人管 |
+| [remote-opt-in.md](remote-opt-in.md) | 已落地 | 本地是默认,碰远程要显式开 |

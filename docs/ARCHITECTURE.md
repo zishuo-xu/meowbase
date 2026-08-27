@@ -78,7 +78,7 @@ Fastify 的 `onReady` 在 `listen()` 失败后照样会跑完。撞 `EADDRINUSE`
 
 | 层 | 命令 | 验什么 |
 |---|---|---|
-| 单测 | `pnpm test`（671：shared 183 / api 304 / web 184） | 纯函数和适配器 |
+| 单测 | `pnpm test`（680：shared 184 / api 311 / web 185） | 纯函数和适配器 |
 | 整机 | `pnpm e2e`（3 段：happy-path / crash-resume / bind-conflict） | 真进程 + fake CLI |
 | 记分板 | `pnpm eval`（9 行） | 已知坏毛病平台兜住几次 |
 

@@ -47,7 +47,7 @@ function stub(agentId: AgentId, reply: string): AgentService {
   };
 }
 
-async function bindThread() {
+async function bindThread(opts?: { allowRemote?: boolean }) {
   const repo = mkdtempSync(join(tmpdir(), 'meowbase-pr-open-repo-'));
   const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-pr-open-work-'));
   cleanups.push(repo, workdirBase);
@@ -62,7 +62,11 @@ async function bindThread() {
     title: 'pr-open',
     primaryAgentId: 'claude',
     workdirBase,
-    repo: { path: repo, baseBranch: 'main' },
+    repo: {
+      path: repo,
+      baseBranch: 'main',
+      ...(opts?.allowRemote !== false ? { allowRemote: true } : {}),
+    },
   });
   await gitWorktreeAdd(repo, thread.workdir, thread.repo!.branch, 'main');
   return { repo, stores, thread, audit: raw.audit };
@@ -289,5 +293,45 @@ describe('绑仓线程开 PR / 合了就停', () => {
     const rows = await stores.messages.list(thread.id);
     expect(rows.some((m) => m.systemKind === 'pr-opened')).toBe(false);
     expect(rows.some((m) => m.content.includes('#99'))).toBe(false);
+  });
+
+  it('本地模式不查 PR,lookup 一次都不跑,也不落查不到', async () => {
+    const { stores, thread } = await bindThread({ allowRemote: false });
+    let lookedUp = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          writeFileSync(join(input.workdir, 'local.txt'), 'ok\n');
+          return {
+            sessionId: 's-w',
+            content: '写了。\n@闪闪 请审查 local.txt',
+            status: 'completed',
+          };
+        },
+      },
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: async () => {
+        lookedUp = true;
+        return { ok: false, reason: 'no git remotes found' };
+      },
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写个文件',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
+
+    expect(lookedUp).toBe(false);
+    const rows = await stores.messages.list(thread.id);
+    expect(rows.some((m) => m.content.includes('查不到 PR'))).toBe(false);
+    expect(rows.some((m) => m.systemKind === 'pr-opened' || m.systemKind === 'pr-merged')).toBe(false);
+    expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(true);
   });
 });

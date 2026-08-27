@@ -216,7 +216,7 @@ export function makeScratchRepo(opts?: { withRemote?: boolean }): ScratchRepo {
 export async function createThread(
   baseUrl: string,
   title: string,
-  opts?: { repoPath?: string; baseBranch?: string },
+  opts?: { repoPath?: string; baseBranch?: string; allowRemote?: boolean },
 ): Promise<string> {
   const res = await fetch(`${baseUrl}/api/threads`, {
     method: 'POST',
@@ -226,6 +226,7 @@ export async function createThread(
       primaryAgentId: 'claude',
       ...(opts?.repoPath ? { repoPath: opts.repoPath } : {}),
       ...(opts?.baseBranch ? { baseBranch: opts.baseBranch } : {}),
+      ...(opts?.allowRemote === true ? { allowRemote: true } : {}),
     }),
   });
   const thread = await json<{ id: string }>(res, 'POST /api/threads');

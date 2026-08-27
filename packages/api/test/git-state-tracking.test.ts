@@ -65,7 +65,7 @@ function stub(agentId: AgentId, reply: string): AgentService {
   };
 }
 
-async function bindThread() {
+async function bindThread(opts?: { allowRemote?: boolean }) {
   const repo = mkdtempSync(join(tmpdir(), 'meowbase-gst-repo-'));
   const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-gst-work-'));
   cleanups.push(repo, workdirBase);
@@ -75,7 +75,11 @@ async function bindThread() {
     title: 'git-state',
     primaryAgentId: 'claude',
     workdirBase,
-    repo: { path: repo, baseBranch: 'main' },
+    repo: {
+      path: repo,
+      baseBranch: 'main',
+      ...(opts?.allowRemote === true ? { allowRemote: true } : {}),
+    },
   });
   await gitWorktreeAdd(repo, thread.workdir, thread.repo!.branch, 'main');
   return { repo, stores, thread };
@@ -177,7 +181,7 @@ describe('绑仓线程 git 状态追踪', () => {
   });
 
   it('推自己那根只落 git-move,接力继续', async () => {
-    const { repo, stores, thread } = await bindThread();
+    const { repo, stores, thread } = await bindThread({ allowRemote: true });
     const bare = mkdtempSync(join(tmpdir(), 'meowbase-gst-own-'));
     cleanups.push(bare);
     await exec('git', ['init', '--bare', '-q'], { cwd: bare });
@@ -221,6 +225,51 @@ describe('绑仓线程 git 状态追踪', () => {
     ).toBe(true);
     expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(true);
     expect((await stores.approvals.list(thread.id)).length).toBe(1);
+  });
+
+  it('本地模式推自己这根:落 git-overstep,停接力,note 写明本地模式', async () => {
+    const { repo, stores, thread } = await bindThread();
+    const bare = mkdtempSync(join(tmpdir(), 'meowbase-gst-localpush-'));
+    cleanups.push(bare);
+    await exec('git', ['init', '--bare', '-q'], { cwd: bare });
+    await exec('git', ['remote', 'add', 'origin', bare], { cwd: repo });
+    await exec('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: repo });
+
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          writeFileSync(join(input.workdir, 'sneak.txt'), 'ok\n');
+          await exec('git', ['add', 'sneak.txt'], { cwd: input.workdir });
+          await commitAsCat(input.workdir, 'sneak commit');
+          await exec('git', ['push', '-q', '-u', 'origin', thread.repo!.branch], { cwd: input.workdir });
+          return {
+            sessionId: 's-w',
+            content: '推了自己这根。\n@闪闪 请审查 sneak.txt',
+            status: 'completed',
+          };
+        },
+      },
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 推自己这根',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
+
+    const rows = await stores.messages.list(thread.id);
+    const over = rows.filter((m) => m.role === 'system' && m.systemKind === 'git-overstep');
+    expect(over.length).toBe(1);
+    expect(over[0]?.content).toMatch(/本地模式/);
+    expect(over[0]?.content).not.toMatch(/基准分支/);
+    expect(over[0]?.systemMeta?.side).toBe('push');
+    expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(false);
+    expect(rows.some((m) => m.role === 'system' && m.systemKind === 'relay')).toBe(false);
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
   });
 
   it('推基准分支:停接力、不建卡、球给人、审计带 sha', async () => {

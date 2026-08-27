@@ -34,6 +34,7 @@ export interface ThreadRepoDto {
   baseBranch: string;
   branch: string;
   lastApprovedSha?: string;
+  allowRemote?: boolean;
 }
 
 export interface ThreadDto {
@@ -193,7 +194,7 @@ export const api = {
   createThread: (
     title: string,
     primaryAgentId: string,
-    opts?: { repoPath?: string; baseBranch?: string },
+    opts?: { repoPath?: string; baseBranch?: string; allowRemote?: boolean },
   ) => {
     const repoPath = opts?.repoPath?.trim();
     const baseBranch = opts?.baseBranch?.trim();
@@ -205,6 +206,7 @@ export const api = {
         primaryAgentId,
         ...(repoPath ? { repoPath } : {}),
         ...(baseBranch ? { baseBranch } : {}),
+        ...(opts?.allowRemote === true ? { allowRemote: true } : {}),
       }),
     });
   },

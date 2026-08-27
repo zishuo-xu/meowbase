@@ -84,6 +84,7 @@ describe('api', () => {
     await api.createThread('绑仓', 'claude', {
       repoPath: '/tmp/myapp',
       baseBranch: 'main',
+      allowRemote: true,
     });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/threads'),
@@ -94,6 +95,7 @@ describe('api', () => {
           primaryAgentId: 'claude',
           repoPath: '/tmp/myapp',
           baseBranch: 'main',
+          allowRemote: true,
         }),
       }),
     );

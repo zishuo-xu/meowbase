@@ -179,6 +179,27 @@ describe('HTTP 集成', () => {
     expect(thread.repo?.path).toBe(repo);
     expect(thread.repo?.baseBranch).toBe('main');
     expect(thread.repo?.branch).toBe(`meow/${thread.id}`);
+    expect(
+      (thread.repo as { allowRemote?: boolean } | undefined)?.allowRemote,
+    ).toBeUndefined();
+
+    const remoteOk = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: '开远程',
+        primaryAgentId: 'claude',
+        repoPath: repo,
+        allowRemote: true,
+      }),
+    });
+    expect(remoteOk.status).toBe(201);
+    const remoteThread = (await remoteOk.json()) as {
+      id: string;
+      repo?: { allowRemote?: boolean };
+    };
+    expect(remoteThread.repo?.allowRemote).toBe(true);
+    await fetch(`${baseUrl}/api/threads/${remoteThread.id}`, { method: 'DELETE' });
     const listed = await exec('git', ['-C', repo, 'worktree', 'list', '--porcelain']);
     expect(listed.stdout).toContain(thread.id);
 

@@ -185,15 +185,28 @@ describe('buildSystemPrompt', () => {
     expect(bound).toContain('/src/myapp');
     expect(bound).toContain('/tmp/meowbase-work/t1');
     expect(bound).toContain('meow/t1');
-    expect(bound).toContain('可以 push 你自己这根 meow/t1');
-    expect(bound).toContain('也可以对自己这根开 PR');
-    expect(bound).toContain('gh pr create --base main');
-    expect(bound).not.toContain('不许 push');
-    expect(bound).toContain('不许自己把 PR 合进去');
+    expect(bound).toContain('只在本地提交,不许推送、不许开 PR');
+    expect(bound).not.toContain('可以 push 你自己这根 meow/t1');
+    expect(bound).not.toContain('也可以对自己这根开 PR');
     expect(bound).toContain('不许切分支');
     expect(bound).toContain('不许动 .git');
     expect(bound).toContain('不许碰 main');
     expect(bound).toContain('worktree');
+  });
+
+  it('开了远程的绑仓才授权 push 和开 PR', () => {
+    const remote = buildSystemPrompt({
+      profile,
+      evidenceRefs: [],
+      workdir: '/tmp/meowbase-work/t1',
+      repo: { path: '/src/myapp', baseBranch: 'main', branch: 'meow/t1', allowRemote: true },
+    });
+    expect(remote).toContain('可以 push 你自己这根 meow/t1');
+    expect(remote).toContain('也可以对自己这根开 PR');
+    expect(remote).toContain('gh pr create --base main');
+    expect(remote).not.toContain('不许推送');
+    expect(remote).toContain('不许自己把 PR 合进去');
+    expect(remote).toContain('不许碰 main');
   });
 });
 

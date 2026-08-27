@@ -310,6 +310,7 @@ describe('git 辅助函数', () => {
       commitsSinceBefore: 1,
       agentName: '墨墨',
       baseBranch: 'main',
+      allowRemote: true,
     });
     expect(isGitOverstep(before, afterOwn)).toBe(false);
     expect(own.oversteps).toEqual([]);
@@ -347,6 +348,67 @@ describe('git 辅助函数', () => {
     expect(isGitOverstep(before, afterLocal)).toBe(true);
     expect(local.notes).toEqual([]);
     expect(local.oversteps).toEqual([
+      {
+        side: 'local',
+        baseBranch: 'main',
+        beforeSha: 'mmm',
+        afterSha: 'nnn',
+        note: '⚠️ 基准分支 `main` 的本地引用变了',
+      },
+    ]);
+  });
+
+  it('本地模式推自己这根算越界,越界闸本身仍只看基准分支', () => {
+    const before = {
+      branch: 'meow/t',
+      headSha: 'aaa',
+      remoteName: 'origin',
+      remoteTrackingSha: 'aaa',
+      baseRemoteTrackingSha: 'mmm',
+      baseLocalSha: 'mmm',
+      aheadCount: 1,
+    };
+    const afterOwn = { ...before, headSha: 'bbb', remoteTrackingSha: 'bbb', aheadCount: 2 };
+    expect(isGitOverstep(before, afterOwn)).toBe(false);
+
+    const missing = describeGitMoves({
+      before,
+      after: afterOwn,
+      commitsSinceBefore: 1,
+      agentName: '墨墨',
+      baseBranch: 'main',
+    });
+    expect(missing.oversteps).toEqual([
+      {
+        side: 'push',
+        baseBranch: 'main',
+        beforeSha: 'aaa',
+        afterSha: 'bbb',
+        note: '⚠️ 本线程是本地模式,不该推送。`meow/t` 的远端跟踪引用变了',
+      },
+    ]);
+
+    const local = describeGitMoves({
+      before,
+      after: afterOwn,
+      commitsSinceBefore: 1,
+      agentName: '墨墨',
+      baseBranch: 'main',
+      allowRemote: false,
+    });
+    expect(local.oversteps).toEqual(missing.oversteps);
+
+    const afterBase = { ...before, baseLocalSha: 'nnn' };
+    expect(isGitOverstep(before, afterBase)).toBe(true);
+    const stillBase = describeGitMoves({
+      before,
+      after: afterBase,
+      commitsSinceBefore: 0,
+      agentName: '墨墨',
+      baseBranch: 'main',
+      allowRemote: false,
+    });
+    expect(stillBase.oversteps).toEqual([
       {
         side: 'local',
         baseBranch: 'main',

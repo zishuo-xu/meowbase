@@ -31,9 +31,13 @@ export function sortThreadsByCreated<T extends { createdAt: string }>(threads: T
   return [...threads].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-/** 侧栏/顶栏用:仓库目录名 · 线程分支 */
-export function threadRepoHint(repo: { path: string; branch: string }): string {
+/** 侧栏/顶栏用:仓库目录名 · 线程分支 · 本地/远程 */
+export function threadRepoHint(repo: {
+  path: string;
+  branch: string;
+  allowRemote?: boolean;
+}): string {
   const parts = repo.path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean);
   const base = parts[parts.length - 1] ?? repo.path;
-  return `${base} · ${repo.branch}`;
+  return `${base} · ${repo.branch} · ${repo.allowRemote ? '远程' : '本地'}`;
 }

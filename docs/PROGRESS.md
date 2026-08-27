@@ -18,7 +18,7 @@
 
 ## 现在停在哪
 
-上一刀：**演示路径进 CI**（`demo-path-in-ci.md`，已落地）。`pnpm e2e:web` 用 Playwright chromium 打开真界面，走完演示主路径的输入层和渲染层。
+上一刀：**本地是默认,碰远程要显式开**（`remote-opt-in.md`，已落地）。绑仓线程带 `allowRemote`，缺失即本地：不查 PR、提示词不许推、推了自己这根也落 `git-overstep`。
 
 **没有在飞的刀。** `features/` 表里没有 `设计中`（`_template.md` 那篇是模板本身，不算）。要开下一刀，先写一篇薄设计、等人点头。
 
@@ -65,6 +65,14 @@
 ## 增量记录
 
 最新在上。每刀记四样：**动了什么**、**与设计稿的偏离及原因**、**只有人手验过的部分**、**明确留了没做的**。前两样是给「我再接手时知道你改了什么」，后两样是给「别把没验过的当验过了」。
+
+### 2026-08-28 本地是默认,碰远程要显式开
+
+`remote-opt-in.md`。`ThreadRepo.allowRemote` 缺失即本地。本地：提示词改口「只在本地提交,不许推送、不许开 PR」；`recordPrState` 开头直接 return，一次 `gh` 都不跑；`describeGitMoves` 见自己那根 `remoteTrackingSha` 变了就落 `git-overstep`（`side: 'push'`，复用现有 kind）。越界闸 `isGitOverstep` 一个字没改，碰基准分支照样拦。侧栏仓库路径下加勾选框「允许推送和开 PR（会联网）」，默认不勾；列表/顶栏 `threadRepoHint` 带「本地 / 远程」。记分板 `withBoundApi` 和 `void-after-merge` 两处建绑仓线程显式 `allowRemote: true`；新加一行「本地模式下猫偷偷推了」，期望 1，拒因 `/本地模式/`，审计 `side=push`。
+
+- **偏离**：`SystemMeta` 多了可选 `side`——设计稿只写 `GitOverstep.side`，但审计从 `systemMeta` 抄字段，不加审计分不出「本地模式推了」和「碰了基准」。DEMO 绑仓那段改成要先勾选才推，否则口播会对不上新默认。`failure-mode-eval.md` 目录加了一行，不然记分板清单缺这一关。
+- **只有人手验过**：没对着真模型绑一个没有 remote 的仓发一句话看「查不到 PR」是否真的消失。浏览器闸走的是空沙箱 +「+ 新会话」，勾选框在侧栏里但没点过；`e2e:web` 4/4 绿，说明多出来的 checkbox 没把演示主路径的选择器弄红。反向验把 `describeGitMoves` 里 `!allowRemote` 那支掐成 `false &&`（`RVCUT`），`EVAL_ONLY=local-push` 掉到 0/3，接力照跑还建了卡；复原后 `rg RVCUT packages/ scripts/` 干净。这关在 api 源码里，不经过 shared dist。
+- **留了没做**：不做全局默认配置、不裁 git env、不给已有线程改模式。空路径时勾了远程也不会发出 `allowRemote`（opts 只在填了仓库路径或基准分支时才带）。已有 Redis 绑仓线程字段缺失，会自动落到本地——设计要的，但没对着那两条真线程看过时间线。
 
 ### 2026-08-27 演示路径进 CI
 

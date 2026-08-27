@@ -77,6 +77,7 @@ async function recordGitMove(input: {
       commitsSinceBefore,
       agentName: input.agentName,
       baseBranch: input.thread.repo.baseBranch,
+      allowRemote: input.thread.repo.allowRemote === true,
     });
     if (classified.notes.length > 0) {
       await input.writeQueue(() =>
@@ -106,6 +107,7 @@ async function recordPrState(input: {
   agentName: string;
 }): Promise<PrMergeStop | undefined> {
   if (!input.thread.repo) return undefined;
+  if (!input.thread.repo.allowRemote) return undefined;
   const branch = input.thread.repo.branch;
   const lookup = input.context.lookupPr ?? lookupPr;
   let result;

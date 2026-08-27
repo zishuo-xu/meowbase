@@ -97,7 +97,7 @@ export function ThreadSidebar({
   onCreate: (
     title: string,
     primaryAgentId: string,
-    opts?: { repoPath?: string; baseBranch?: string },
+    opts?: { repoPath?: string; baseBranch?: string; allowRemote?: boolean },
   ) => void;
   onDelete?: (id: string) => void;
   onOpenTeam?: (agentId?: string) => void;
@@ -117,6 +117,7 @@ export function ThreadSidebar({
   const [showNoise, setShowNoise] = useState(false);
   const [repoPath, setRepoPath] = useState('');
   const [baseBranch, setBaseBranch] = useState('');
+  const [allowRemote, setAllowRemote] = useState(false);
   const ordered = sortThreadsByCreated(threads);
   const visible = ordered.filter((t) => !isNoiseThreadTitle(t.title));
   const noise = ordered.filter((t) => isNoiseThreadTitle(t.title));
@@ -144,15 +145,28 @@ export function ThreadSidebar({
           value={baseBranch}
           onChange={(e) => setBaseBranch(e.target.value)}
           placeholder="基准分支（可选）"
-          className="mb-2 w-full rounded-xl border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)]"
+          className="mb-1.5 w-full rounded-xl border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)]"
         />
+        <label className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
+          <input
+            type="checkbox"
+            checked={allowRemote}
+            onChange={(e) => setAllowRemote(e.target.checked)}
+            className="shrink-0"
+          />
+          允许推送和开 PR（会联网）
+        </label>
         <button
           onClick={() => {
             const path = repoPath.trim();
             const branch = baseBranch.trim();
             const opts =
               path || branch
-                ? { ...(path ? { repoPath: path } : {}), ...(branch ? { baseBranch: branch } : {}) }
+                ? {
+                    ...(path ? { repoPath: path } : {}),
+                    ...(branch ? { baseBranch: branch } : {}),
+                    ...(allowRemote ? { allowRemote: true } : {}),
+                  }
                 : undefined;
             onCreate(defaultSessionTitle(), primary, opts);
           }}
