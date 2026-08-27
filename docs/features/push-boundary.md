@@ -4,7 +4,7 @@
 
 - 状态:`已落地`
 - 对照 clowder:闭环**主语是猫**——猫在自己的 feature worktree 里 `commit`、`git push`、`gh pr create`,过完跨猫 review 和机器门禁后自己 `gh pr merge --squash`。平台不代劳任何一步。人的闸**不在出仓**,在方向(Design Gate)和**不可逆**(改 main 历史、合第三方 PR、close feat、碰圣域);他们的审批中心 F246 清单里没有 push / PR / merge。空间墙写在 **F140 AC-C6**:「只操作 feature worktree,绝不碰 main/runtime,操作超时 abort」。**LL-090** 把口径收准:自己拥有的 feature 分支上 `--force-with-lease` 不算不可逆越权,禁的是改写 main / 共享分支 / 他人工作——**看动的是谁的东西,不看命令名带不带 force**。
-- 靠拢:三条照抄语义。①主语交给猫,平台不代劳 push;②人的闸不落在每次出仓,落在不可逆——喵窝的「跨猫 review + 机器门禁」已经有了(审查官结论 + 五道闸),不必再为 push 造一道人工闸;③F140 那面空间墙照抄。**一处比他们严**:他们的墙靠 SOP 纪律,而他们自己的 [issue #63](https://github.com/zts212653/clowder-ai/issues/63) 记着四只猫都没建 worktree、直接在主目录 `checkout -b`——纪律型墙会破,所以这一刀把墙做成机器闸(越界就停接力、球给人、审计留证)。
+- 靠拢:三条照抄语义。①主语交给猫,平台不代劳 push;②人的闸不落在每次出仓,落在不可逆——喵窝的「跨猫 review + 机器门禁」已经有了(审查官结论 + 六道闸),不必再为 push 造一道人工闸;③F140 那面空间墙照抄。**一处比他们严**:他们的墙靠 SOP 纪律,而他们自己的 [issue #63](https://github.com/zts212653/clowder-ai/issues/63) 记着四只猫都没建 worktree、直接在主目录 `checkout -b`——纪律型墙会破,所以这一刀把墙做成机器闸(越界就停接力、球给人、审计留证)。
 
 ## 门（各一句）
 

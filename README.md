@@ -130,6 +130,7 @@ curl -X POST localhost:3200/api/threads/<id>/messages \
 pnpm test              # 全部单测(shared/api/web);api 的 Redis 测试需本机 Redis,连不上则真跳过(skipped,不是 passed)
 pnpm typecheck:scripts # scripts/ 的类型检查(三个包的 build 不覆盖它)
 pnpm e2e               # 整机自检:fake CLI 跑通全链 + 杀进程验续跑 + 绑不上端口不抢租约,不花钱
+pnpm e2e:web           # 浏览器整机:真界面走演示主路径,fake CLI,不花钱。必须在沙箱外跑(Next 在沙箱里枚举网卡会 EPERM)。第一次先 `pnpm exec playwright install chromium`,装不上就该红,不许跳过
 pnpm eval              # 失败模式记分板:已知坏毛病 × 平台兜住率,fake CLI,不花钱
 pnpm smoke             # 真实冒烟:调 startApp,读仓库根配置;bin 可被 CLAUDE_BIN / GEMINI_BIN / OPENCODE_BIN 覆盖。脚本点的是 @claude,还要审查官那一跳,配置里挂了哪几条真实 CLI 就得哪几条能跑。需要本机 Redis,花钱,不进 CI
 ```

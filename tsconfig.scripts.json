@@ -7,5 +7,10 @@
     "sourceMap": false,
     "typeRoots": ["./packages/api/node_modules/@types"]
   },
-  "include": ["scripts/**/*.ts", "packages/api/src/**/*.ts", "packages/shared/src/**/*.ts"]
+  "include": [
+    "scripts/**/*.ts",
+    "playwright.config.ts",
+    "packages/api/src/**/*.ts",
+    "packages/shared/src/**/*.ts"
+  ]
 }

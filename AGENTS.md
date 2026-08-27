@@ -20,11 +20,12 @@ pnpm test         # 全部单测(shared/api/web)
 pnpm -r build     # 三包构建 + 类型检查
 pnpm typecheck:scripts # scripts/ 的类型检查(包不含它,漏了会静默烂掉)
 pnpm e2e          # 整机自检:fake CLI 跑全链 + 杀进程验续跑,不花钱
+pnpm e2e:web      # 浏览器整机:真界面走演示主路径,fake CLI,不花钱。必须在沙箱外跑
 pnpm eval         # 失败模式记分板:已知坏毛病 × 平台是否兜住,fake CLI,不花钱
 pnpm smoke        # 真实冒烟(调 startApp,读仓库根配置;bin 可被环境变量覆盖;花钱)
 ```
 
-CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`、`pnpm e2e`、`pnpm eval`（`.github/workflows/ci.yml`）。`pnpm smoke` 花钱,不进 CI。
+CI 在 push/PR 上跑 `pnpm -r build`、`pnpm typecheck:scripts`、`pnpm test`、`pnpm e2e`、`pnpm eval`、`pnpm e2e:web`（`.github/workflows/ci.yml`）。`pnpm smoke` 花钱,不进 CI。
 
 浏览器打开 http://localhost:3300。API 只读接口可直接 curl localhost:3200。
 
@@ -36,7 +37,7 @@ packages/
 ├── api/      Fastify 后端:存储(端口-适配器)、provider 适配器、executeTurn 路由、审批流;启动接线在 `src/app.ts`
 └── web/      Next.js 前端:猫耳气泡 UI、@补全、审批卡片、WebSocket 流式
 skills/      技能文件(manifest.json + prompts/*.md),启动时加载
-scripts/      e2e.ts + eval.ts + e2e-server.ts(整机自检 / 记分板,fake CLI;子进程调 `startApp`)、lib/harness.ts(两者共用)、smoke.ts(真实冒烟,也调 `startApp`)、fixtures/(fake CLI)
+scripts/      e2e.ts + eval.ts + e2e-web.ts(整机自检 / 记分板 / 浏览器演示路径,fake CLI;子进程调 `startApp`)、lib/harness.ts(共用接线)、smoke.ts(真实冒烟,也调 `startApp`)、fixtures/(fake CLI)
 work/         线程工作区:空沙箱 git 仓库,或绑仓后的 worktree(gitignore 忽略)
 docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/plans
 ```
@@ -113,7 +114,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **计划先对照 clowder**:每次设计先想同一问题他们公开怎么做、这一刀能靠多近;只拿语义和踩坑,不抄源码。能靠就靠,本刀没更近要写清为什么。
 - **TDD**:新功能先写失败测试 → 实现 → 全绿 → 提交
 - **一刀做完在 [docs/PROGRESS.md](docs/PROGRESS.md) 记一条增量**:动了什么、与设计稿的偏离及原因、只有人手验过的部分、留了什么没做。增量标题和 commit 标题要对得上,后来的人才能 `git log --grep` 找回那一刀
-- **一刀一次提交,五道闸全绿后推 `main`**。不开特性分支:交接是顺序的,同一个目录只有一个 HEAD,切分支会坏 `.next` 缓存和 `shared/dist`(踩坑 2、12),还容易把提交落到别人分支上。也别用 `git worktree` 开第二个目录干活——两个实例同扫 Redis db 0 的 pending 会抢棒、端口还撞(踩坑 17、22)。**花钱的事仍归人拍板**(`pnpm smoke`、真模型演示)
+- **一刀一次提交,六道闸全绿后推 `main`**。不开特性分支:交接是顺序的,同一个目录只有一个 HEAD,切分支会坏 `.next` 缓存和 `shared/dist`(踩坑 2、12),还容易把提交落到别人分支上。也别用 `git worktree` 开第二个目录干活——两个实例同扫 Redis db 0 的 pending 会抢棒、端口还撞(踩坑 17、22)。**花钱的事仍归人拍板**(`pnpm smoke`、真模型演示)
 - **文档同轮更新**:协议只改本文件协议表;演示只改现象;功能稿只改为什么。不要再抄一份完整规则。其余入口改成引用,见 [docs/README.md](docs/README.md)
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))

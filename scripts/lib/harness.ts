@@ -11,6 +11,7 @@ export const serverPath = resolve(root, 'scripts/e2e-server.ts');
 
 export const E2E_REDIS_URL = process.env.E2E_REDIS_URL ?? 'redis://127.0.0.1:6379/14';
 export const EVAL_REDIS_URL = process.env.EVAL_REDIS_URL ?? 'redis://127.0.0.1:6379/13';
+export const WEB_E2E_REDIS_URL = process.env.WEB_E2E_REDIS_URL ?? 'redis://127.0.0.1:6379/12';
 
 export const READY_RE = /E2E_API_READY (http:\/\/127\.0\.0\.1:\d+)/;
 export const START_TIMEOUT_MS = 20_000;

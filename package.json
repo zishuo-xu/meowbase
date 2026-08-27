@@ -10,10 +10,12 @@
     "smoke": "pnpm --filter @meowbase/api build && tsx scripts/smoke.ts",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "e2e": "tsx scripts/e2e.ts",
+    "e2e:web": "tsx scripts/e2e-web.ts",
     "eval": "tsx scripts/eval.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@playwright/test": "^1.55.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
