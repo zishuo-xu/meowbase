@@ -99,6 +99,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 补问同一只一次 | 该交棒却忘了行首 `@`;问答收尾、审查已写结论、持球不问。仍没有则「球还在地上」 |
 | 空手不许交棒 | 没新文件 **且** 没结论 **且** 去掉交接行后正文短于 60 字才拦(`isVoidHandoff`)。长方案没改文件照传 |
 | 建审批卡并拉审查 | 本轮有 `git diff`、没有「下一跳还没跑的 pending」、没有持球(`settleTurn`)。只聊天不改文件不建卡 |
+| 按风险面选审查官 | 建卡拉审查时先 `classifyDiffRisk`(路径表:安全面=白名单/仓根校验,契约面=协议表/shared 协议解析;同时命中 safety 优先)。非 default 面优先选名册里声明了 `reviewRisk` 含该面的猫;没有或不可用则退回 `handoffTo` 现状逻辑。铁律不变:任何情况不许自审。链尾复用(chainReviewer)优先于风险面选官 |
 | 验证闸 | 只管卡上 `verdict` 和不许 `autoApprove`。不管顶栏文案(顶栏读审查正文关键词) |
 | 命令白名单 | 只跑猫 `等跑` 里白名单形状;元字符拒、不在表里拒。命令字符串来自猫的回复 |
 | 重启后捡棒 | 开机扫 pending,见踩坑第 1 条 |
@@ -140,7 +141,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 13. **未跟踪源码会被沙箱清扫误搬走**:新文件若还没 `git add`,旧版 `sweepStrayFiles` 会把它 `rename` 进 `work/<threadId>/`,tsx 记成 `unlink`,API 重启后模块找不到、3200 掉线。规避:新适配器/测试立刻提交(或至少 `git add`);改清扫规则后只允许浅层散落文件;API 日志出现 `sweepStrayFiles: 移回沙箱` 时去对应线程目录找回。
 14. **手改仓库根 `meowbase.config.json` 不会热重载**:`tsx watch` 只盯 `src/`。改完 `GET /api/config` 还是旧值,必须重启 API 才生效。名册里改 `handoffTo` / 模型也一样。常见操作「改 agent / 模型」写了重启,就是这条路。**另一条路**:Hub 点保存走 `PATCH /api/config`,改内存再落盘,立即生效,不必重启。
 15. **`kill -9` 掉 3200 上的进程后,`tsx watch` 不会自动重生**:它只在文件变化时重启,进程崩了不管。第 1 条说了必须按端口杀、重启后平台会捡棒;杀完还得自己再起一次(`pnpm --filter @meowbase/api dev`),别以为它会自愈。
-16. **写 fake CLI 别忘了可执行位**:`scripts/fixtures/` 下新加的 fake 若是 `644`,适配器 `spawn` 直接 `EACCES`,链会在那一跳静默失败(日志只有「启动失败」)。新文件 `chmod +x` 并确认 git 记的是 `100755`。
+16. **写 fake CLI 别忘了可执行位**:`scripts/fixtures/` 下新加的 fake 若是 `644`,适配器 `spawn` 直接 `EACCES`,链会在那一跳静默失败。两种长相:日志只有「启动失败」;**更隐蔽的一种是 `hop done status=completed ms=1` 且 assistant 正文为空**——`child.on('error')` 吞掉 EACCES 后 accumulator 是空的、status 不算 failed,看起来是「猫没说话」而不是「fake 没跑」(2026-09-02 记分板新行实测踩中,已登记的坑又踩了一次)。新文件 `chmod +x` 并确认 git 记的是 `100755`。
 17. **`pnpm e2e` 用 Redis db 14,不要改成 db 0**:本机 3200 的 API 也在扫 pending,共用一个 db 时它可能把 e2e 的棒抢走、甚至打到真 CLI 上花钱。e2e 进出各 `FLUSHDB` 一次,所以别把真数据放 db 14。
 18. **fake 写手的正文必须落在 claude 的 `result` 事件里**:`StreamAccumulator` 收到 `result` 会用它整段覆盖 assistant 增量。行首 `@` 只写在 assistant 事件里会被覆盖掉,交棒不成立。
 19. **e2e 必须验发货的那份接线**:API 启动顺序只许写在 `startApp` 一处。`index.ts`、`e2e-server.ts` 和 `smoke.ts` 都调它,只用参数区分(`configPath` / `workdirBase` / host / 端口 / `rebuildAdapter`)。以前两份副本时,改生产入口的开机扫,`pnpm e2e` 照样绿——它验的是自己那份。happy-path 不依赖开机扫棒(POST 里的 `void runner.run()` 会把当轮 pending 跟完),反向验分两半:把 `startPendingRunner()` **注掉**,崩溃续跑那一段红(开机没扫棒);把它挪到 `listen` **之前**,`runBindConflictPath` 红(`lease-steal` 会增加——绑不上端口的进程去抢了 #1 的棒)。`PORT=0` 永远绑得上,盖不到后一半,所以绑冲突段先 `listen(0)` 拿一个空闲固定端口(避开 3200/3300),#1 占上再起 #2。见 [e2e-harness.md](docs/features/e2e-harness.md)。

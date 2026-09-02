@@ -41,6 +41,7 @@ export interface ApprovalRow {
   status: string;
   reviewComment?: string;
   diffText?: string;
+  reviewerAgentId?: string;
 }
 
 export interface ThreadRow {

@@ -1,6 +1,7 @@
 import {
   allowsAutoApprove,
   buildSystemPrompt,
+  classifyDiffRisk,
   displayName,
   formatA2AHandoffPrompt,
   gateReviewVerdict,
@@ -23,6 +24,8 @@ import { runAgentTurn } from './agent-hop.js';
 import { overlayProfile } from './context.js';
 import { MAX_REVIEW_FIX_ROUNDS, type ThreadRuntime, type TurnContext, type WriteQueue } from './types.js';
 
+const RISK_LABEL = { safety: '安全面', contract: '契约面' } as const;
+
 export function reviewPrompt(diff: { stat: string; text: string }, workdir: string): string {
   return (
     `请作为审查官审查以下代码改动。当前工作目录是 ${workdir}。` +
@@ -41,7 +44,7 @@ export async function runReviewFixThenCard(input: {
   writerAgentId: AgentId;
   chainLastAgent?: AgentId;
   chainLastContent?: string;
-  initialDiff: { text: string; stat: string };
+  initialDiff: { text: string; stat: string; files?: string[] };
   writeQueue: WriteQueue;
   catalog: MentionCatalog;
   team: readonly TeamMember[];
@@ -55,12 +58,14 @@ export async function runReviewFixThenCard(input: {
     available.includes(input.chainLastAgent)
       ? input.chainLastAgent
       : undefined;
-  const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available, team);
+  const risk = classifyDiffRisk(input.initialDiff.files ?? []);
+  const reviewerAgentId = chainReviewer ?? selectReviewer(writerAgentId, available, team, risk);
   turnLog('review start', {
     thread: threadId,
     writer: writerAgentId,
     reviewer: reviewerAgentId,
     reused: Boolean(chainReviewer),
+    risk,
   });
   let latestDiff = input.initialDiff;
   let reviewComment = '(无可用审查 agent)';
@@ -83,9 +88,10 @@ export async function runReviewFixThenCard(input: {
         context.stores.messages.append({
           threadId,
           role: 'system',
-          content: `🤝 审查:${displayName(writerAgentId, catalog)} → ${displayName(reviewerAgentId, catalog)}`,
+          content: `🤝 审查:${displayName(writerAgentId, catalog)} → ${displayName(reviewerAgentId, catalog)}${risk === 'default' ? '' : `·${RISK_LABEL[risk]}`}`,
           status: 'completed',
           systemKind: 'notice',
+          systemMeta: { risk },
         }),
       );
       const reviewHop = await runAgentTurn(

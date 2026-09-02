@@ -766,6 +766,93 @@ describe('executeTurn 审批流', () => {
     expect(card?.reviewerAgentId).toBe('gemini');
   });
 
+  it('安全面改动 → 审查官是声明了 safety 的猫,不是 handoffTo 默认那只', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    // 名册:claude 的 handoffTo 是 opencode(团团),但闪闪声明了 safety 面
+    const team = [
+      { id: 'claude' as const, name: '墨墨', aliases: ['墨墨'], role: '主架构师', personality: '', expertise: [], bin: 'claude', handoffTo: 'opencode' as const },
+      { id: 'gemini' as const, name: '闪闪', aliases: ['闪闪'], role: '审查官', personality: '', expertise: [], bin: 'gemini', reviewRisk: ['safety' as const] },
+      { id: 'opencode' as const, name: '团团', aliases: ['团团'], role: '执行者', personality: '', expertise: [], bin: 'opencode' },
+    ];
+    let geminiCalls = 0;
+    let opencodeCalls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '改好了'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          geminiCalls += 1;
+          return { sessionId: 's-g', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          opencodeCalls += 1;
+          return { sessionId: 's-o', content: '团团不该出场', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    // 改一个安全面路径的文件(hold-command 白名单)
+    mkdirSync(join(thread.workdir, 'packages/shared/src'), { recursive: true });
+    writeFileSync(join(thread.workdir, 'packages/shared/src/hold-command.ts'), 'export {}');
+
+    await executeTurn({
+      threadId: thread.id, content: '改白名单', context: { stores, registry, agents: team },
+    });
+
+    // 虽然 handoffTo 指向团团,但安全面应由声明了 safety 的闪闪审
+    expect(geminiCalls).toBe(1);
+    expect(opencodeCalls).toBe(0);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewerAgentId).toBe('gemini');
+    // 审查系统消息带风险面标签
+    const messages = await stores.messages.list(thread.id);
+    const reviewNotice = messages.find((m) => m.role === 'system' && m.content.includes('🤝 审查:'));
+    expect(reviewNotice?.content).toContain('·安全面');
+    expect(reviewNotice?.systemMeta?.risk).toBe('safety');
+  });
+
+  it('default 面改动 → 维持 handoffTo 选官(带 reviewRisk 名册)', async () => {
+    const stores = createMemoryStores([reviewSkill]);
+    const team = [
+      { id: 'claude' as const, name: '墨墨', aliases: ['墨墨'], role: '主架构师', personality: '', expertise: [], bin: 'claude', handoffTo: 'opencode' as const },
+      { id: 'gemini' as const, name: '闪闪', aliases: ['闪闪'], role: '审查官', personality: '', expertise: [], bin: 'gemini', reviewRisk: ['safety' as const] },
+      { id: 'opencode' as const, name: '团团', aliases: ['团团'], role: '执行者', personality: '', expertise: [], bin: 'opencode' },
+    ];
+    let geminiCalls = 0;
+    let opencodeCalls = 0;
+    const registry = createAgentRegistry([
+      stubAgent('claude', '写好了'),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          geminiCalls += 1;
+          return { sessionId: 's-g', content: '闪闪不该出场', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          opencodeCalls += 1;
+          return { sessionId: 's-o', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await makeGitThread(stores);
+    writeFileSync(join(thread.workdir, 'x.txt'), 'hello');
+
+    await executeTurn({
+      threadId: thread.id, content: '写个文件', context: { stores, registry, agents: team },
+    });
+
+    expect(opencodeCalls).toBe(1);
+    expect(geminiCalls).toBe(0);
+    const card = (await stores.approvals.list(thread.id))[0];
+    expect(card?.reviewerAgentId).toBe('opencode');
+  });
+
   it('审查官跟配置 handoffTo,不写死闪闪', async () => {
     const stores = createMemoryStores([reviewSkill]);
     let geminiCalls = 0;

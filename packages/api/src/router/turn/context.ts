@@ -46,6 +46,7 @@ export async function loadRoster(context: TurnContext): Promise<{
           handoffTo: a.handoffTo,
           handoff: a.handoff,
           doneWhen: a.doneWhen,
+          reviewRisk: a.reviewRisk,
         }))
       : profiles.length > 0
         ? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }))

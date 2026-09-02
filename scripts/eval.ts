@@ -49,6 +49,7 @@ const mergePrBin = resolve(root, 'scripts/fixtures/fake-merge-pr.mjs');
 const sameTreeMoBin = resolve(root, 'scripts/fixtures/fake-same-tree-mo.mjs');
 const sameTreeTuanBin = resolve(root, 'scripts/fixtures/fake-same-tree-tuan.mjs');
 const scopeLearnBin = resolve(root, 'scripts/fixtures/fake-scope-learn.mjs');
+const safetyWriterBin = resolve(root, 'scripts/fixtures/fake-safety-writer.mjs');
 
 interface Scenario {
   id: string;
@@ -621,6 +622,41 @@ async function runCrossRepoMemory(workdirBase: string): Promise<boolean> {
   }
 }
 
+/** true = 安全面改动落到了声明 safety 的审查官,不是 handoffTo 默认那只。
+ * 把 claude 的 handoffTo 热改成 opencode:若风险面选官没生效,审查会落到团团;生效则应落到闪闪。 */
+async function runSafetyReview(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    { workdirBase, writerBin: safetyWriterBin, reviewerBin: defaultReviewerBin },
+    async (api, bound) => {
+      const patch = await fetch(`${api.baseUrl}/api/config/agents/claude`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ handoffTo: 'opencode' }),
+      });
+      if (!patch.ok) return false;
+      try {
+        await postMessage(api.baseUrl, bound.threadId, '@墨墨 改白名单');
+        await waitFor('安全面选官:审查跑完', async () => {
+          const messages = await getMessages(api.baseUrl, bound.threadId);
+          return assistantOf(messages, 'gemini').some((m) => m.status === 'completed') ||
+            assistantOf(messages, 'opencode').some((m) => m.status === 'completed')
+            ? messages
+            : undefined;
+        });
+        // 生效:闪闪(gemini)审,团团(opencode)没出场
+        const cards = await getApprovals(api.baseUrl, bound.threadId);
+        if (cards[0]?.reviewerAgentId !== 'gemini') return false;
+        return true;
+      } finally {
+        await fetch(`${api.baseUrl}/api/config/agents/claude`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ handoffTo: 'gemini' }),
+        });
+      }
+    },
+  );
+}
 /** true = 合了之后那张还开着的卡变成 voided。只量作废这一关,不和 merge-pr 的拉闸断言合成。 */
 async function runVoidAfterMerge(workdirBase: string): Promise<boolean> {
   const scratch = makeScratchRepo();
@@ -785,6 +821,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '跨仓关:仓A确认的内容没有进仓B那跳的提示词',
     run: runCrossRepoMemory,
+  },
+  {
+    id: 'safety-review',
+    name: '安全面改动落到默认审查官',
+    expectedCatch: 1,
+    expectNote: '风险面选官:handoffTo 指向团团时,安全面改动仍由声明了 safety 的闪闪审',
+    run: runSafetyReview,
   },
 ];
 

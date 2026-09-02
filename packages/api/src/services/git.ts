@@ -287,7 +287,7 @@ export async function gitChangedPaths(dir: string, fromRef = 'HEAD'): Promise<st
 export async function gitDiffHead(
   dir: string,
   fromRef = 'HEAD',
-): Promise<{ stat: string; text: string } | null> {
+): Promise<{ stat: string; text: string; files: string[] } | null> {
   const names = (await run(dir, ['diff', fromRef, '--name-only', '--', '.']))
     .split('\n')
     .map((line) => line.trim())
@@ -297,7 +297,7 @@ export async function gitDiffHead(
   const text = await run(dir, ['diff', fromRef, '--', ...names]);
   if (!text.trim()) return null;
   const stat = await run(dir, ['diff', fromRef, '--stat', '--', ...names]);
-  return { stat: stat.trim(), text: text.slice(0, 20_000) };
+  return { stat: stat.trim(), text: text.slice(0, 20_000), files: names };
 }
 
 export async function gitCommit(dir: string, message: string): Promise<void> {

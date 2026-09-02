@@ -14,6 +14,8 @@ export interface TeamMember {
   role: string;
   /** 做完本职后交接给谁;平台选审查官也读这个 */
   handoffTo?: AgentId;
+  /** 声明审哪类风险面的改动;缺失 = 只参与 default 面选官 */
+  reviewRisk?: readonly ('safety' | 'contract')[];
   /** 何时必须交接;`{to}` 替换成对手 @名 */
   handoff?: readonly string[];
   /** 怎样算做完;`{to}` 替换成对手 @名 */
@@ -42,6 +44,7 @@ export const DEFAULT_ROSTER: readonly TeamMember[] = [
     name: '闪闪',
     role: '审查官',
     handoffTo: 'claude',
+    reviewRisk: ['safety', 'contract'],
     handoff: [
       '审查结束后写出结论,必须写明「通过」或「需修改」;需修改时列出要点,不要问人,不要再 @ 写手。需修改由平台打回。',
       '你自己写完代码后交 {to} 看一眼,不要自己审自己。',

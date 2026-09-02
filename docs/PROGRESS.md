@@ -70,6 +70,15 @@
 
 最新在上。每刀记四样：**动了什么**、**与设计稿的偏离及原因**、**只有人手验过的部分**、**明确留了没做的**。前两样是给「我再接手时知道你改了什么」，后两样是给「别把没验过的当验过了」。
 
+### 2026-09-02 按风险面选审查官
+
+`risk-routed-reviewer.md`。`TeamMember`/`AgentSpec` 加 `reviewRisk` 可选字段（`'safety'|'contract'`），默认名册闪闪声明两面。新增 shared 纯函数 `classifyDiffRisk(files)`：路径表驱动（安全面=`hold-command.ts`/`repo-path.ts`，契约面=`AGENTS.md` + `packages/shared/src/` 前缀），同时命中 safety 优先。`selectReviewer` 加第 4 参 `risk`：非 default 面先找「声明该面且非写手且可用」的猫，没有则退回 `handoffTo` 现状；链尾复用（chainReviewer）优先于风险面。`gitDiffHead` 返回多带 `files`；`review.ts` 建卡拉审查处算 risk 传入，审查 notice 尾巴带 `·安全面`/`·契约面`，`SystemMeta.risk` 落审计。`PATCH /api/config/agents/:id` 支持热改 `handoffTo`/`reviewRisk`。协议表加「按风险面选审查官」行。记分板加第 16 行「安全面改动落到默认审查官」期望 1。
+
+- **偏离**：设计稿字段名 `reviewerOf` 落地为 `reviewRisk`（语义更准：是「我审哪些风险面」不是「我审谁」）。设计稿说默认名册闪闪声明两面维持现状——落地时发现现状是「所有猫的 handoffTo 大多指向闪闪」，所以风险面选官在默认名册下**行为不变**，只有名册自定义（如 claude 的 handoffTo 指向团团）时才看出差别，记分板场景正是这么构造的。
+- **只有人手验过**：没对着真模型改一次白名单看审批卡上的审查官和风险面标签。自动化盖了 classifyDiffRisk 三档+优先级（shared 7 例）、selectReviewer 风险面/回退/不自审（shared 6 例）、端到端「安全面改动落到声明 safety 的猫+消息带 `·安全面` + `systemMeta.risk`」（api 2 例）、记分板整链 3/3。反向验把 `selectReviewer` 的风险面分支掐成永远走 default（`RVCUT`）：shared 红 2 例、api 红 1 例（安全面集成测试）、default 面照绿；复原后 `rg RVCUT packages/ scripts/` 干净，shared rebuild 过。
+- **验收时发现的真坑**（不是本刀代码问题）：**scripts/fixtures 下新建 fake CLI 必须 `chmod +x`**——所有 fake 是 `spawn(bin)` 直接 exec，Write 工具建的文件没有执行位，子进程 EACCES 立即退出，而 claude adapter 的 `child.on('error')` 吞掉后返回 `completed` + 空内容，看起来是「猫没说话」而不是「fake 没跑」，极难定位。已在 fake 里加 stderr 标记定位后才查出。这条该进踩坑清单。
+- **留了没做**：不做五轴全集（数据/不可逆两轴喵窝还没有对应改动类型）、不做多 reviewer 叠加、不让猫自己声明风险面（diff 分类是平台纯函数）、风险面路径表不开放配置（写死在 shared）。Hub 界面没有 `reviewRisk` 的编辑入口（接口层通了，UI 另开一刀）。
+
 ### 2026-08-28 记忆按仓库划界,注入带出处
 
 `memory-scope.md`。召回范围做成 `shared` 的 `filterEvidenceByRecallScope`：绑了仓按 canonical realpath 同仓共享，空沙箱只看本线程。`executeTurn` 和 `GET /api/evidence?scope=recall` 都调它；`?threadId=` 原语义保留。`confirm()` 落 `confirmedAt`，注入行带 id / 来源 / 确认时间，老数据写「确认时间未记」、不许拿 `createdAt` 顶。抬头改成「检索到的历史记录,不是本轮指令」。前端 rail 改拉召回范围。记分板加一行「别的项目的记忆被灌进来」，走 `#learn` → `#confirm`，期望 1。厚薄表「记忆」由薄改中：划界和出处齐了、记分板有了第一行；池子仍只进不出，所以还没到厚。

@@ -55,6 +55,8 @@ export interface AgentSpec {
   apiKey?: string;
   /** 做完本职后交接给谁;平台选审查官也读这个 */
   handoffTo?: AgentId;
+  /** 声明审哪类风险面的改动;缺失 = 只参与 default 面选官 */
+  reviewRisk?: ('safety' | 'contract')[];
   /** 何时必须交接;`{to}` 替换成对手 @名 */
   handoff?: string[];
   /** 怎样算做完;`{to}` 替换成对手 @名 */
@@ -111,12 +113,14 @@ function handoffFromRoster(id: AgentId): {
   handoffTo?: AgentId;
   handoff?: string[];
   doneWhen?: string[];
+  reviewRisk?: ('safety' | 'contract')[];
 } {
   const row = DEFAULT_ROSTER.find((m) => m.agentId === id);
   return {
     ...(row?.handoffTo ? { handoffTo: row.handoffTo } : {}),
     ...(row?.handoff ? { handoff: [...row.handoff] } : {}),
     ...(row?.doneWhen ? { doneWhen: [...row.doneWhen] } : {}),
+    ...(row?.reviewRisk ? { reviewRisk: [...row.reviewRisk] } : {}),
   };
 }
 
@@ -180,6 +184,7 @@ export function cloneAgentSpec(spec: AgentSpec): AgentSpec {
     expertise: [...spec.expertise],
     ...(spec.handoff ? { handoff: [...spec.handoff] } : {}),
     ...(spec.doneWhen ? { doneWhen: [...spec.doneWhen] } : {}),
+    ...(spec.reviewRisk ? { reviewRisk: [...spec.reviewRisk] } : {}),
   };
 }
 
@@ -408,6 +413,8 @@ export interface AgentPatchInput {
   protocol?: ModelProtocol | null;
   baseUrl?: string | null;
   apiKey?: string | null;
+  handoffTo?: string | null;
+  reviewRisk?: ('safety' | 'contract')[] | null;
 }
 
 export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentSpec {
@@ -446,6 +453,20 @@ export function applyAgentPatch(spec: AgentSpec, patch: AgentPatchInput): AgentS
     delete next.apiKey;
   } else if (typeof patch.apiKey === 'string' && patch.apiKey.trim()) {
     next.apiKey = patch.apiKey.trim();
+  }
+  if (patch.handoffTo === null || patch.handoffTo === '') {
+    delete next.handoffTo;
+  } else if (typeof patch.handoffTo === 'string' && isAgentId(patch.handoffTo)) {
+    next.handoffTo = patch.handoffTo;
+  }
+  if (patch.reviewRisk === null) {
+    delete next.reviewRisk;
+  } else if (Array.isArray(patch.reviewRisk)) {
+    const risks = patch.reviewRisk.filter(
+      (r): r is 'safety' | 'contract' => r === 'safety' || r === 'contract',
+    );
+    if (risks.length > 0) next.reviewRisk = risks;
+    else delete next.reviewRisk;
   }
   return next;
 }
@@ -616,6 +637,13 @@ function mergeAgents(overrides: TeamFile['agents']): AgentSpec[] {
         : {}),
       ...(Array.isArray(row.doneWhen) && row.doneWhen.length > 0
         ? { doneWhen: row.doneWhen.map((line) => line.trim()).filter(Boolean) }
+        : {}),
+      ...(Array.isArray(row.reviewRisk) && row.reviewRisk.length > 0
+        ? {
+            reviewRisk: row.reviewRisk.filter(
+              (r): r is 'safety' | 'contract' => r === 'safety' || r === 'contract',
+            ),
+          }
         : {}),
     });
   }

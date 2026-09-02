@@ -87,6 +87,8 @@ export interface SystemMeta {
   prNumber?: number;
   prUrl?: string;
   headRefOid?: string;
+  /** 审查那条:本轮 diff 命中的风险面(按风险面选审查官) */
+  risk?: 'safety' | 'contract' | 'default';
 }
 
 export interface TokenUsage {
