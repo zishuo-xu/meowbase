@@ -111,6 +111,16 @@ export class InMemoryThreadStore implements ThreadStore {
     thread.repo = { ...thread.repo, seenPrCheckIds: ids };
   }
 
+  async setSeenPrMergeable(
+    threadId: string,
+    value: 'CONFLICTING' | 'MERGEABLE' | null,
+  ): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread?.repo) return;
+    const { seenPrMergeable: _drop, ...rest } = thread.repo;
+    thread.repo = value ? { ...rest, seenPrMergeable: value } : rest;
+  }
+
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);

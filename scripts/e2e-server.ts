@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { startApp } from '../packages/api/src/app.js';
 import {
   createFixedPrChecks,
+  createFixedPrMergeable,
   createFixedPrReviewList,
   createMergedPrLookup,
   createOpenPrLookup,
@@ -27,6 +28,13 @@ try {
       ? {
           lookupPr: createOpenPrLookup(),
           listPrChecks: createFixedPrChecks(process.env.MEOW_PR_CI_FAKE),
+        }
+      : {}),
+    ...(process.env.MEOW_PR_CONFLICT_FAKE === 'CONFLICTING' ||
+    process.env.MEOW_PR_CONFLICT_FAKE === 'MERGEABLE'
+      ? {
+          lookupPr: createOpenPrLookup(),
+          lookupPrMergeable: createFixedPrMergeable(process.env.MEOW_PR_CONFLICT_FAKE),
         }
       : {}),
   });

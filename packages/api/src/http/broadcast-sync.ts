@@ -82,6 +82,10 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       await store.setSeenPrCheckIds(threadId, ids);
       emit(threadId);
     },
+    setSeenPrMergeable: async (threadId, value) => {
+      await store.setSeenPrMergeable(threadId, value);
+      emit(threadId);
+    },
     setSession: (threadId, agentId, sessionId) => store.setSession(threadId, agentId, sessionId),
     setPendingHop: async (threadId, hop) => {
       await store.setPendingHop(threadId, hop);

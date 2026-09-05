@@ -52,6 +52,7 @@ const scopeLearnBin = resolve(root, 'scripts/fixtures/fake-scope-learn.mjs');
 const safetyWriterBin = resolve(root, 'scripts/fixtures/fake-safety-writer.mjs');
 const prReviewWriterBin = resolve(root, 'scripts/fixtures/fake-pr-review-writer.mjs');
 const prCiWriterBin = resolve(root, 'scripts/fixtures/fake-pr-ci-writer.mjs');
+const prConflictWriterBin = resolve(root, 'scripts/fixtures/fake-pr-conflict-writer.mjs');
 
 interface Scenario {
   id: string;
@@ -864,6 +865,40 @@ async function runPrCiGreen(workdirBase: string): Promise<boolean> {
   );
 }
 
+async function runPrConflict(workdirBase: string): Promise<boolean> {
+  const dump = join(
+    workdirBase,
+    `pr-conflict-wake-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+  );
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: prConflictWriterBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_CONFLICT_FAKE: 'CONFLICTING', FAKE_PROMPT_DUMP: dump },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写 hello.txt');
+      const rows = await waitFor('PR 合不进去:叫醒那一跳跑完', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const woke = assistantOf(messages, 'claude').some(
+          (m) => m.status === 'completed' && m.content.includes('已处理 PR 冲突'),
+        );
+        return woke ? messages : undefined;
+      });
+      const notes = rows.filter((m) => m.role === 'system' && m.systemKind === 'pr-conflict');
+      if (notes.length !== 1) return false;
+      if (!notes[0]?.content.includes('合不进去')) return false;
+      if (!existsSync(dump)) return false;
+      const prompts = readFileSync(dump, 'utf8');
+      if (!prompts.includes('合不进去')) return false;
+      const audit = await getAudit(api.baseUrl, bound.threadId);
+      if (!audit.some((item) => item.action === 'pr-conflict')) return false;
+      return true;
+    },
+  );
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -1016,6 +1051,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: 'CI 绿关:只落 pr-ci 消息,不叫醒',
     run: runPrCiGreen,
+  },
+  {
+    id: 'pr-conflict',
+    name: 'PR 合不进去了',
+    expectedCatch: 1,
+    expectNote: '冲突关:落 pr-conflict、叫醒写手且输入带合不进去',
+    run: runPrConflict,
   },
 ];
 

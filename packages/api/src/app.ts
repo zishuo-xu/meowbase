@@ -13,10 +13,12 @@ import { createAgentRegistry } from './providers/registry.js';
 import {
   type PrCheckList,
   type PrLookup,
+  type PrMergeableLookup,
   type PrReviewList,
   listPrChecks,
   listPrReviews,
   lookupPr,
+  lookupPrMergeable,
 } from './services/pr.js';
 
 export interface StartAppOptions {
@@ -35,6 +37,8 @@ export interface StartAppOptions {
   listPrReviews?: PrReviewList;
   /** 测试换成假 PR CI 源;不传就真查 gh */
   listPrChecks?: PrCheckList;
+  /** 测试换成假 PR mergeable 源;不传就真查 gh */
+  lookupPrMergeable?: PrMergeableLookup;
   /**
    * 有则用它当沙箱根,不读、不改 config 里的 workdirBase。
    * 不传才按 repoRoot + config.workdirBase 解析(e2e 走这条,WORKDIR_BASE 已是绝对路径)。
@@ -85,6 +89,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     lookupPr: opts.lookupPr ?? ((input) => lookupPr(input)),
     listPrReviews: opts.listPrReviews ?? ((input) => listPrReviews(input)),
     listPrChecks: opts.listPrChecks ?? ((input) => listPrChecks(input)),
+    lookupPrMergeable: opts.lookupPrMergeable ?? ((input) => lookupPrMergeable(input)),
     ...(opts.configPath ? { configPath: opts.configPath } : {}),
     ...(opts.rebuildAdapter
       ? { rebuildAdapter: (spec) => registry.register(createAdapter(spec, config.agentTimeoutMs)) }

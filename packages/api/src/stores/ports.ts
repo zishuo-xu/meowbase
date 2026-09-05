@@ -33,6 +33,11 @@ export interface ThreadStore {
   setSeenPrCommentIds(threadId: string, ids: string[]): Promise<void>;
   /** PR CI 回流的指纹;只在消息落库成功后更新 */
   setSeenPrCheckIds(threadId: string, ids: string[]): Promise<void>;
+  /** PR 冲突回流的上次 mergeable;只在消息落库成功后更新 */
+  setSeenPrMergeable(
+    threadId: string,
+    value: 'CONFLICTING' | 'MERGEABLE' | null,
+  ): Promise<void>;
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;

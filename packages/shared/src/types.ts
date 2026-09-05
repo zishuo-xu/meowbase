@@ -56,6 +56,8 @@ export interface ThreadRepo {
   seenPrCommentIds?: string[];
   /** 已回流过的 PR 检查指纹 name:state;投成功的才记 */
   seenPrCheckIds?: string[];
+  /** 上次落地的 PR mergeable:CONFLICTING / MERGEABLE */
+  seenPrMergeable?: 'CONFLICTING' | 'MERGEABLE';
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -85,6 +87,8 @@ export type SystemKind =
   | 'pr-review'
   /** PR CI 回流:不参与球权,红了才叫醒写手 */
   | 'pr-ci'
+  /** PR 冲突回流:不参与球权,合不进去才叫醒写手 */
+  | 'pr-conflict'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';

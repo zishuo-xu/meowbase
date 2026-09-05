@@ -112,6 +112,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 合了之后作废还开着的卡 | `pr-merged` 停接力时，把本线程还开着的审批卡改成终态 `voided` 并写清原因（PR #N 已合并）。`#approve` 对失效卡当场拒，不走到提交。`git-overstep` / PR `CLOSED` 不作废 |
 | PR 评论回流 | 绑仓开远程的线程,每跳后 PR 是 OPEN 就查一次评论(`gh api` 拉 issues/comments + pulls/reviews):新评论落 `pr-review` 系统消息(不参与球权),指纹在消息 append 成功后逐条记;作者是人(`User`)则 settle 时给写手猫起一跳去处理,bot 写的只落消息不叫醒。四条叫醒护栏:交接中的棒不覆盖、等跑的命令不取消、持球不叫醒、叫醒过本轮不建卡。merged/closed 后不再查 |
 | PR CI 追踪 | 绑仓开远程且 PR 是 OPEN 时,每跳后查 `gh pr checks`:PENDING 不落;SUCCESS 落 `pr-ci`(绿)不叫醒;FAILURE/ERROR 落 `pr-ci`(红)且链已停则叫醒写手。指纹 `name:state`,投成功才记。本地模式一次都不查。评论叫醒已占槽则本轮不覆盖 |
+| PR 冲突检测 | 绑仓开远程且 PR 是 OPEN 时,每跳后查 `gh pr view --json mergeable`:CONFLICTING 落 `pr-conflict` 并叫醒写手;变成 MERGEABLE 只记「冲突解开了」。UNKNOWN 不落。评论 / CI 叫醒已占槽则本轮不覆盖。本地模式一次都不查 |
 
 ## 开发约定
 

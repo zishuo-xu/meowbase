@@ -10,6 +10,7 @@ import {
   formatApprovalVoidReason,
   formatApprovalVoidedNote,
   formatPrCiWakeTask,
+  formatPrConflictWakeTask,
   formatPrReviewWakeTask,
 } from '../../services/pr.js';
 import { clip, turnLog } from '../../services/turn-log.js';
@@ -127,6 +128,7 @@ export async function settleTurn(input: {
   // 叫醒过就跳过本轮建卡(卡上冻结的不能是处理评论之前的旧 diff)。
   const humanReviews = (lastResult.prReviews ?? []).filter((r) => r.item.authorType === 'User');
   const redChecks = (lastResult.prChecks ?? []).filter((c) => c.item.conclusion === 'red');
+  const conflicts = (lastResult.prConflicts ?? []).filter((c) => c.conflicting);
   let wokeForReview = false;
   if (
     lastOutput.status === 'completed' &&
@@ -180,6 +182,28 @@ export async function settleTurn(input: {
     });
     wokeForReview = true;
     turnLog('pr-ci wake', { thread: threadId, to: writerAgentId, count: redChecks.length });
+  } else if (
+    lastOutput.status === 'completed' &&
+    conflicts.length > 0 &&
+    !waiting &&
+    !holding &&
+    !pending?.holdCommand
+  ) {
+    const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;
+    const first = conflicts[0]!;
+    await context.stores.threads.setPendingHop(threadId, {
+      id: randomUUID(),
+      to: writerAgentId,
+      from: writerAgentId,
+      task: formatPrConflictWakeTask({ number: first.prNumber, url: first.prUrl }),
+      goal: '处理 PR 冲突',
+      previousOutput: lastOutput.content ?? '',
+      visited: [writerAgentId],
+      firstAgent: writerAgentId,
+      hop: 0,
+    });
+    wokeForReview = true;
+    turnLog('pr-conflict wake', { thread: threadId, to: writerAgentId, count: conflicts.length });
   }
 
   if (lastOutput.status === 'completed' && !waiting && !holding && !wokeForReview) {

@@ -14,6 +14,7 @@ import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 import {
   createFixedPrChecks,
+  createFixedPrMergeable,
   createFixedPrReviewList,
   type PrLookup,
   type PrReviewList,
@@ -413,5 +414,88 @@ describe('PR CI 追踪:绿只记,红叫醒', () => {
     const rows = await stores.messages.list(thread.id);
     expect(rows.some((m) => m.systemKind === 'pr-ci')).toBe(false);
     expect((await stores.threads.get(thread.id))?.repo?.seenPrCheckIds).toBeUndefined();
+  });
+});
+
+describe('PR 冲突检测:合不进去叫醒', () => {
+  it('合不进去:落 pr-conflict 消息、pendingHop 指回写手、指纹推进、本轮不建卡', async () => {
+    const { stores, thread } = await bindThread();
+    const registry = createAgentRegistry([writerNoHandoff(), stub('gemini', '审查意见:通过')]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: lookupOf(openPr42),
+      listPrReviews: createFixedPrReviewList('bot'),
+      lookupPrMergeable: createFixedPrMergeable('CONFLICTING'),
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    const notes = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'system' && m.systemKind === 'pr-conflict',
+    );
+    expect(notes.length).toBe(1);
+    expect(notes[0]?.content).toContain('合不进去');
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop?.to).toBe('claude');
+    expect(after?.pendingHop?.task).toContain('合不进去');
+    expect(after?.repo?.seenPrMergeable).toBe('CONFLICTING');
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
+  });
+
+  it('冲突解开了:落消息不叫醒', async () => {
+    const { stores, thread } = await bindThread();
+    await stores.threads.setSeenPrMergeable(thread.id, 'CONFLICTING');
+    const registry = createAgentRegistry([
+      stub('claude', '好,知道了。'),
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: lookupOf(openPr42),
+      listPrReviews: createFixedPrReviewList('bot'),
+      lookupPrMergeable: createFixedPrMergeable('MERGEABLE'),
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 看一眼',
+      context: ctx,
+    });
+    const notes = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'system' && m.systemKind === 'pr-conflict',
+    );
+    expect(notes.length).toBe(1);
+    expect(notes[0]?.content).toContain('冲突解开了');
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect((await stores.threads.get(thread.id))?.repo?.seenPrMergeable).toBe('MERGEABLE');
+  });
+
+  it('本地模式零调用:lookupPrMergeable 一次都不跑', async () => {
+    const { stores, thread } = await bindThread({ allowRemote: false });
+    const registry = createAgentRegistry([writerNoHandoff(), stub('gemini', '审查意见:通过')]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: (async () => {
+        throw new Error('本地模式不该查 PR');
+      }) satisfies PrLookup,
+      lookupPrMergeable: async () => {
+        throw new Error('本地模式不该查冲突');
+      },
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    const rows = await stores.messages.list(thread.id);
+    expect(rows.some((m) => m.systemKind === 'pr-conflict')).toBe(false);
+    expect((await stores.threads.get(thread.id))?.repo?.seenPrMergeable).toBeUndefined();
   });
 });

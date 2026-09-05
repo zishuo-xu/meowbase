@@ -47,7 +47,7 @@ import {
   broadcastThreadSync,
 } from './broadcast-sync.js';
 import { executeTurn, type TurnContext } from '../router/execute-turn.js';
-import type { PrCheckList, PrLookup, PrReviewList } from '../services/pr.js';
+import type { PrCheckList, PrLookup, PrMergeableLookup, PrReviewList } from '../services/pr.js';
 import {
   createPendingRunner,
   HOP_LEASE_RENEW_MS,
@@ -100,6 +100,8 @@ export interface ApiDeps {
   listPrReviews?: PrReviewList;
   /** PR CI 只读查询;不传则每跳走默认 gh。测试注入假源。 */
   listPrChecks?: PrCheckList;
+  /** PR mergeable 只读查询;不传则每跳走默认 gh。测试注入假源。 */
+  lookupPrMergeable?: PrMergeableLookup;
 }
 
 interface LiveConfig {
@@ -558,6 +560,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ...(deps.lookupPr ? { lookupPr: deps.lookupPr } : {}),
       ...(deps.listPrReviews ? { listPrReviews: deps.listPrReviews } : {}),
       ...(deps.listPrChecks ? { listPrChecks: deps.listPrChecks } : {}),
+      ...(deps.lookupPrMergeable ? { lookupPrMergeable: deps.lookupPrMergeable } : {}),
     };
     return {
       context,

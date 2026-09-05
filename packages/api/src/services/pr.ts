@@ -404,6 +404,73 @@ export function createFixedPrChecks(kind: 'green' | 'red'): PrCheckList {
   });
 }
 
+export type PrMergeable = 'CONFLICTING' | 'MERGEABLE';
+
+export type PrMergeableResult =
+  | { ok: true; mergeable: PrMergeable | null }
+  | { ok: false; reason: string };
+
+export type PrMergeableLookup = (input: {
+  workdir: string;
+  number: number;
+}) => Promise<PrMergeableResult>;
+
+export interface PrConflictRef {
+  conflicting: boolean;
+  prNumber: number;
+  prUrl: string;
+}
+
+export function parsePrMergeableJson(raw: string): PrMergeable | null {
+  try {
+    const data = JSON.parse(raw) as unknown;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const value = String((data as { mergeable?: unknown }).mergeable ?? '').toUpperCase();
+    if (value === 'CONFLICTING' || value === 'MERGEABLE') return value;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function formatPrConflictNote(input: {
+  number: number;
+  url: string;
+  conflicting: boolean;
+}): string {
+  return input.conflicting
+    ? `⚠️ PR #${input.number} 合不进去 ${input.url}`
+    : `PR #${input.number} 冲突解开了 ${input.url}`;
+}
+
+export function formatPrConflictWakeTask(input: { number: number; url: string }): string {
+  return `PR #${input.number}(${input.url}) 合不进去了,请处理冲突后再推。`;
+}
+
+export function createFixedPrMergeable(kind: 'CONFLICTING' | 'MERGEABLE' | 'UNKNOWN'): PrMergeableLookup {
+  return async () => ({
+    ok: true,
+    mergeable: kind === 'UNKNOWN' ? null : kind,
+  });
+}
+
+export async function lookupPrMergeable(input: {
+  workdir: string;
+  number: number;
+  ghBin?: string;
+}): Promise<PrMergeableResult> {
+  const bin = input.ghBin ?? 'gh';
+  try {
+    const { stdout } = await exec(bin, ['pr', 'view', String(input.number), '--json', 'mergeable'], {
+      cwd: input.workdir,
+      timeout: GH_TIMEOUT_MS,
+    });
+    return { ok: true, mergeable: parsePrMergeableJson(stdout) };
+  } catch (err) {
+    return { ok: false, reason: classifyPrLookupError(err) };
+  }
+}
+
 export async function listPrChecks(input: {
   workdir: string;
   number: number;

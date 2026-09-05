@@ -31,7 +31,7 @@
 
 ## 不做（本篇）
 
-- 冲突检测 / 自动 rebase
+- 冲突检测已另篇 [pr-conflict.md](pr-conflict.md);自动 rebase 仍不做
 - 按 intent 决定绿了去合
 - webhook 常驻轮询
 

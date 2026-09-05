@@ -189,6 +189,19 @@ describe('describeBall', () => {
     ]);
   });
 
+  it('pr-conflict 不改球权,仍看接力条', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } },
+          { role: 'system', content: 'PR #42 合不进去', systemKind: 'pr-conflict' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
+  });
+
   it('pr-ci 不改球权,仍看接力条', () => {
     expect(
       describeBall(

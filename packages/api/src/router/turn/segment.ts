@@ -45,6 +45,7 @@ import {
 } from '../../services/git.js';
 import {
   formatPrCiNote,
+  formatPrConflictNote,
   formatPrLookupFailedNote,
   formatPrMergedNote,
   formatPrOpenedNote,
@@ -53,11 +54,14 @@ import {
   listPrChecks,
   listPrReviews,
   lookupPr,
+  lookupPrMergeable,
   selectUnseenPrChecks,
   selectUnseenPrReviews,
   type PrCheckItem,
   type PrCheckListResult,
   type PrCheckRef,
+  type PrConflictRef,
+  type PrMergeableResult,
   type PrMergeStop,
   type PrReviewItem,
   type PrReviewListResult,
@@ -313,6 +317,56 @@ async function syncPrChecks(input: {
   return fresh.filter((i) => delivered.includes(i.id));
 }
 
+async function syncPrConflict(input: {
+  thread: ThreadRuntime;
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  pr: PrSnapshot;
+}): Promise<PrConflictRef | undefined> {
+  if (input.pr.state !== 'OPEN') return undefined;
+  const lookup = input.context.lookupPrMergeable ?? lookupPrMergeable;
+  let result: PrMergeableResult;
+  try {
+    result = await lookup({ workdir: input.thread.workdir, number: input.pr.number });
+  } catch (err) {
+    result = { ok: false as const, reason: clip(String(err), 80) };
+  }
+  if (!result.ok) {
+    const reason = result.reason;
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrLookupFailedNote(reason),
+        status: 'completed',
+        systemKind: 'notice',
+      }),
+    );
+    return undefined;
+  }
+  if (!result.mergeable) return undefined;
+  const seen =
+    (await input.context.stores.threads.get(input.thread.id))?.repo?.seenPrMergeable;
+  if (seen === result.mergeable) return undefined;
+  const conflicting = result.mergeable === 'CONFLICTING';
+  await input.writeQueue(() =>
+    input.context.stores.messages.append({
+      threadId: input.thread.id,
+      role: 'system',
+      content: formatPrConflictNote({
+        number: input.pr.number,
+        url: input.pr.url,
+        conflicting,
+      }),
+      status: 'completed',
+      systemKind: 'pr-conflict',
+      systemMeta: { prNumber: input.pr.number, prUrl: input.pr.url },
+    }),
+  );
+  await input.context.stores.threads.setSeenPrMergeable(input.thread.id, result.mergeable);
+  return { conflicting, prNumber: input.pr.number, prUrl: input.pr.url };
+}
+
 async function rememberHoldCommand(input: {
   thread: { id: string };
   context: TurnContext;
@@ -377,6 +431,7 @@ export async function runSegment(
   let mergedPr: PrMergeStop | undefined;
   const prReviews: PrReviewRef[] = [];
   const prChecks: PrCheckRef[] = [];
+  const prConflicts: PrConflictRef[] = [];
   if (resume) {
     for (const id of resume.visited) visited.add(id);
   }
@@ -453,6 +508,8 @@ export async function runSegment(
           for (const item of checks) {
             prChecks.push({ item, prNumber: pr.number, prUrl: pr.url });
           }
+          const conflict = await syncPrConflict({ thread, context, writeQueue, pr });
+          if (conflict) prConflicts.push(conflict);
         },
       });
       if (foundMerge) mergedPr = foundMerge;
@@ -725,5 +782,15 @@ export async function runSegment(
       );
     }
   }
-  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr, prReviews, prChecks };
+  return {
+    lastAssistant,
+    lastOutput,
+    visited,
+    firstAgent,
+    oversteps,
+    mergedPr,
+    prReviews,
+    prChecks,
+    prConflicts,
+  };
 }
