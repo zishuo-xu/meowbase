@@ -15,6 +15,8 @@ import {
   formatHoldBallNote,
   hasExplicitReviewVerdict,
   isVoidHandoff,
+  isPingPongTrip,
+  relayPairKey,
   matchSkills,
   parseA2AHandoff,
   parseHoldCommand,
@@ -684,21 +686,20 @@ export async function runSegment(
       break;
     }
     if (hop + 1 >= maxDepth) {
-      await writeQueue(() =>
-        context.stores.messages.append({
-          threadId: thread.id,
-          role: 'system',
-          content: `⚠️ 接力链已达上限(${maxDepth}),停止交接`,
-          status: 'completed',
-          systemKind: 'notice',
-        }),
-      );
+      stop = { kind: 'final-slot', blockedTarget: handoff.target };
       break;
     }
     const relayFiles = await listHandoffFiles(thread.workdir, thread.repo);
     const relayTarget: AgentId = handoff.target;
     if (isVoidHandoff({ changedFiles: relayFiles, reply: prevContent })) {
       stop = { kind: 'void', blockedTarget: relayTarget, handoffTask: handoff.task };
+      break;
+    }
+    const pairKey = relayPairKey(currentAgent, relayTarget);
+    const livePairs = (await context.stores.threads.get(thread.id))?.relayPairs ?? {};
+    const pairCount = livePairs[pairKey] ?? 0;
+    if (isPingPongTrip({ changedFiles: relayFiles, reply: prevContent, count: pairCount })) {
+      stop = { kind: 'pingpong', blockedTarget: relayTarget };
       break;
     }
     if (await captureAfterHop()) break;
@@ -714,6 +715,10 @@ export async function runSegment(
       hop: hop + 1,
     };
     await writeQueue(async () => {
+      await context.stores.threads.setRelayPairs(thread.id, {
+        ...livePairs,
+        [pairKey]: pairCount + 1,
+      });
       await context.stores.threads.setPendingHop(thread.id, pendingHop);
       await context.stores.messages.append({
         threadId: thread.id,

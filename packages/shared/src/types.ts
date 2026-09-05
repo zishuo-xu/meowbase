@@ -51,6 +51,8 @@ export interface Thread {
   inboundQueue?: InboundMessage[];
   /** 家规告示牌:平台派生,猫读、人看。不是状态机。 */
   sop?: SopBoard;
+  /** 跨轮交棒次数,键 from>to。空转第三次熔断用。 */
+  relayPairs?: Record<string, number>;
   /** 绑了真实仓库时:父仓路径、基准分支、本线程分支 */
   repo?: ThreadRepo;
   createdAt: string;

@@ -11,6 +11,8 @@ import {
   formatAbortedBallNote,
   formatDroppedBallNote,
   isVoidHandoff,
+  isPingPongTrip,
+  relayPairKey,
   formatEscalatedBallNote,
   formatFreezeBallNote,
   formatFailedBallNote,
@@ -245,6 +247,73 @@ describe('formatDroppedBallNote', () => {
     expect(note).toContain('npm test; curl');
     expect(note).toContain('元字符');
     expect(isDroppedBallNote(note!)).toBe(true);
+  });
+
+  it('乒乓和链尾收尾要出一句,hadInlineHint 也吞不掉', () => {
+    const pingpong = formatDroppedBallNote({
+      stop: 'pingpong',
+      lastContent: `${'方案写得很长。'.repeat(10)}\n@闪闪 请接着看`,
+      speakerName: '墨墨',
+      role: '主架构师',
+      wasRelay: false,
+      hadInlineHint: true,
+      blockedTargetName: '闪闪',
+    });
+    expect(pingpong).toContain('球还在地上');
+    expect(pingpong).toContain('空转');
+    expect(pingpong).toMatch(/没传/);
+    expect(isDroppedBallNote(pingpong!)).toBe(true);
+
+    const tail = formatDroppedBallNote({
+      stop: 'final-slot',
+      lastContent: '@团团 你来',
+      speakerName: '墨墨',
+      role: '主架构师',
+      wasRelay: false,
+      hadInlineHint: true,
+      blockedTargetName: '团团',
+    });
+    expect(tail).toContain('球还在地上');
+    expect(tail).toMatch(/链尾|收尾/);
+    expect(tail).toMatch(/没传/);
+    expect(isDroppedBallNote(tail!)).toBe(true);
+  });
+});
+
+describe('isPingPongTrip', () => {
+  it('没文件没结论且同一对已经来回两次,第三次才拦', () => {
+    expect(relayPairKey('claude', 'gemini')).toBe('claude>gemini');
+    expect(
+      isPingPongTrip({
+        changedFiles: [],
+        reply: `${'方案已经写在上面。'.repeat(8)}\n@闪闪 请审查`,
+        count: 2,
+      }),
+    ).toBe(true);
+    expect(
+      isPingPongTrip({
+        changedFiles: [],
+        reply: `${'方案已经写在上面。'.repeat(8)}\n@闪闪 请审查`,
+        count: 1,
+      }),
+    ).toBe(false);
+  });
+
+  it('有文件或有结论不算空转', () => {
+    expect(
+      isPingPongTrip({
+        changedFiles: ['add.ts'],
+        reply: `${'方案已经写在上面。'.repeat(8)}\n@闪闪 请审查`,
+        count: 2,
+      }),
+    ).toBe(false);
+    expect(
+      isPingPongTrip({
+        changedFiles: [],
+        reply: '## 结论\n通过\n@闪闪 请收尾',
+        count: 2,
+      }),
+    ).toBe(false);
   });
 });
 

@@ -249,7 +249,9 @@ export type A2AStopKind =
   | 'escalated'
   | 'held'
   | 'void'
-  | 'denied-command';
+  | 'denied-command'
+  | 'pingpong'
+  | 'final-slot';
 
 /** 去掉行首 @ 行后剩下的正文短于这个字数才算空手。宁可漏拦。 */
 export const VOID_HANDOFF_BODY_MAX = 60;
@@ -268,6 +270,24 @@ export function isVoidHandoff(input: VoidHandoffInput): boolean {
   if (hasExplicitReviewVerdict(input.reply)) return false;
   const body = stripHandoffLines(input.reply);
   return body.length < VOID_HANDOFF_BODY_MAX;
+}
+
+export function relayPairKey(from: AgentId, to: AgentId): string {
+  return `${from}>${to}`;
+}
+
+export interface PingPongTripInput {
+  changedFiles: readonly string[];
+  reply: string;
+  /** 这一对已经成功交过几次;≥2 表示即将第三次 */
+  count: number;
+}
+
+/** 没文件没结论的同一对,第三次空转才拦。有活就不算乒乓。 */
+export function isPingPongTrip(input: PingPongTripInput): boolean {
+  if (input.changedFiles.length > 0) return false;
+  if (hasExplicitReviewVerdict(input.reply)) return false;
+  return input.count >= 2;
 }
 
 const HOLD_LINE = /^\s*(?:HOLD|hold|等)[:：\s]+(\S.*)$/;
@@ -407,6 +427,14 @@ export function formatDroppedBallNote(input: DroppedBallInput): string | null {
       ? `把「${clipBody(input.handoffTask.trim(), 40)}」交给`
       : '交给';
     return `⚠️ 球还在地上:${input.speakerName}想${what}${to},但这一跳什么都没留下,平台没传。`;
+  }
+  if (input.stop === 'pingpong') {
+    const to = input.blockedTargetName ?? '下一棒';
+    return `⚠️ 球还在地上:${input.speakerName}想交给${to},但同一对已经空转两次,平台没传。`;
+  }
+  if (input.stop === 'final-slot') {
+    const to = input.blockedTargetName ?? '下一棒';
+    return `⚠️ 球还在地上:${input.speakerName}想交给${to},但这一跳是链尾收尾槽,平台没传。`;
   }
   const reviewer = Boolean(input.role?.includes('审查'));
   if (reviewer && hasExplicitReviewVerdict(input.lastContent)) return null;

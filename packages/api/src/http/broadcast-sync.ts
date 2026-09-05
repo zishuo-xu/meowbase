@@ -132,6 +132,10 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       await store.setSopBoard(threadId, board);
       emit(threadId);
     },
+    setRelayPairs: async (threadId, pairs) => {
+      await store.setRelayPairs(threadId, pairs);
+      emit(threadId);
+    },
     clearPendingHopIfSame: async (threadId, hopId) => {
       const cleared = await store.clearPendingHopIfSame(threadId, hopId);
       if (cleared) emit(threadId);

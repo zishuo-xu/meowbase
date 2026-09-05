@@ -2,7 +2,7 @@
 
 对照 clowder 公开能力：他们是异步邮箱 + 结构化 packet + 线程隔离 + 共享证据。这一版只拿接力语义：交棒后本轮先结束，平台自己续跑。mailbox、MCP 派球、读另一只猫的 CLI 会话都还没做——按迭代节奏来，不是判它们不该做。
 
-设计理由见 [features/a2a.md](features/a2a.md)。现行补问见 [features/exit-nudge.md](features/exit-nudge.md)。空手不传见 [features/void-handoff-gate.md](features/void-handoff-gate.md)。
+设计理由见 [features/a2a.md](features/a2a.md)。现行补问见 [features/exit-nudge.md](features/exit-nudge.md)。空手不传见 [features/void-handoff-gate.md](features/void-handoff-gate.md)。跨轮乒乓和链尾收尾见 [features/chain-quality.md](features/chain-quality.md)。
 
 人在页面上看到的是一条线程。平台在底下拆成：谁该开口、这一棒带什么字、各猫自己的 CLI 记忆、大家共用的沙箱和证据。
 
@@ -21,7 +21,7 @@
 
 谁打什么、平台读哪一段正文、什么时候建卡 / 补问 / 拦空手，见 [AGENTS.md](../AGENTS.md) 协议表。这里只记协作怎么拆：
 
-一条用户消息进 `executeTurn`。人打的系统命令就地处理、不叫猫；行首 `@` 决定本轮目标，每个目标跑一条 A2A 链。猫交棒后本轮先结束，平台记下 pending、自己续跑下一只。多 `@` 谁先谁后、跟哪一棒见 [AGENTS.md](../AGENTS.md) 协议表。写 Redis 走队列，避免两只猫同时 append 丢更新。已出场的猫不再回来（防环）。
+一条用户消息进 `executeTurn`。人打的系统命令就地处理、不叫猫；行首 `@` 决定本轮目标，每个目标跑一条 A2A 链。猫交棒后本轮先结束，平台记下 pending、自己续跑下一只。多 `@` 谁先谁后、跟哪一棒见 [AGENTS.md](../AGENTS.md) 协议表。写 Redis 走队列，避免两只猫同时 append 丢更新。已出场的猫不再回来（防环）。跨轮同一对空转第三次也不传；链尾那一跳再交棒只收尾，不写 pending。
 
 ```
 人: 写 add.ts，写完自检。

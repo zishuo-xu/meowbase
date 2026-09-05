@@ -305,6 +305,17 @@ describe.skipIf(!redis)('Redis 存储', () => {
     await threads.delete(thread.id);
   });
 
+  it('relayPairs 写入后回读', async () => {
+    const threads = createThreadStore(redis!);
+    const thread = await threads.create({
+      title: `redis-pairs-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    await threads.setRelayPairs(thread.id, { 'claude>gemini': 2 });
+    expect((await threads.get(thread.id))?.relayPairs).toEqual({ 'claude>gemini': 2 });
+    await threads.delete(thread.id);
+  });
+
   it('消息追加与 patch', async () => {
     const threads = createThreadStore(redis!);
     const messages = createMessageStore(redis!);

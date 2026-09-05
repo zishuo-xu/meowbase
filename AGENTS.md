@@ -99,6 +99,8 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 |---|---|
 | 补问同一只一次 | 该交棒却忘了行首 `@`;问答收尾、审查已写结论、持球不问。仍没有则「球还在地上」 |
 | 空手不许交棒 | 没新文件 **且** 没结论 **且** 去掉交接行后正文短于 60 字才拦(`isVoidHandoff`)。长方案没改文件照传 |
+| 跨轮乒乓熔断 | 同一对 `from>to` 没文件也没结论交棒两次后,第三次空转不传(`pingpong`)。有文件或有结论的来回不算。链内已出场仍走 `visited`/`blocked` |
+| 链尾收尾槽 | `hop + 1 >= maxDepth` 再交棒不写 pending,落 `dropped`(`final-slot`),球回人手里。不再只落 notice |
 | 建审批卡并拉审查 | 本轮有 `git diff`、没有「下一跳还没跑的 pending」、没有持球(`settleTurn`)。只聊天不改文件不建卡 |
 | 按风险面选审查官 | 建卡拉审查时先 `classifyDiffRisk`(路径表:安全面=白名单/仓根校验,契约面=协议表/shared 协议解析;同时命中 safety 优先)。非 default 面优先选名册里声明了 `reviewRisk` 含该面的猫;没有或不可用则退回 `handoffTo` 现状逻辑。铁律不变:任何情况不许自审。链尾复用(chainReviewer)优先于风险面选官 |
 | 验证闸 | 只管卡上 `verdict` 和不许 `autoApprove`。不管顶栏文案(顶栏读审查正文关键词) |

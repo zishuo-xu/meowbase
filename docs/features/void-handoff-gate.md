@@ -2,7 +2,7 @@
 
 - 状态:`已落地`
 - 对照 clowder:[F167](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F167-a2a-chain-quality.md) 把「语义上交了棒、但没有任何系统动作」叫虚空传球,和乒乓熔断一起当运行时刹车。
-- 靠拢:靠「运行时数一眼再决定要不要把球传下去」这条。**本刀只做虚空那一半**,乒乓那半在喵窝结构上已经不成立(`visited` + 链深 3;记分板「想交回已出场的猫」三次全判 `blocked`)。不靠他们的 `hold_ball` MCP 工具,也不做角色护栏。
+- 靠拢:靠「运行时数一眼再决定要不要把球传下去」这条。**本刀只做虚空那一半**;跨轮乒乓和链尾收尾见 [chain-quality.md](chain-quality.md)。不靠他们的 `hold_ball` MCP 工具,也不做角色护栏。
 
 ## 门（各一句）
 

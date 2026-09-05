@@ -2464,8 +2464,90 @@ describe('executeTurn 多角色协作', () => {
       context: { stores, registry, a2aMaxDepth: 1 },
     });
     expect(calls).toEqual(['claude']);
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
     const messages = await stores.messages.list(thread.id);
-    expect(messages.some((m) => m.content.includes('接力链已达上限'))).toBe(true);
+    const dropped = messages.find((m) => m.role === 'system' && m.systemKind === 'dropped');
+    expect(dropped?.content).toMatch(/链尾|收尾/);
+    expect(dropped?.content).toContain('球还在地上');
+    expect(messages.some((m) => m.systemKind === 'relay')).toBe(false);
+  });
+
+  it('同一对空转交棒第三次拦,不写 pending', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          calls.push('claude');
+          return {
+            sessionId: `s-${calls.length}`,
+            content: `${KEPT_HANDOFF_BODY}\n@闪闪 请接着看`,
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          throw new Error('乒乓熔断不该叫闪闪');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) };
+    await executeTurn({ threadId: thread.id, content: '@墨墨 先看', context: ctx });
+    await stores.threads.setPendingHop(thread.id, null);
+    await executeTurn({ threadId: thread.id, content: '@墨墨 继续', context: ctx });
+    expect((await stores.threads.get(thread.id))?.relayPairs?.['claude>gemini']).toBe(2);
+    expect((await stores.threads.get(thread.id))?.pendingHop?.to).toBe('gemini');
+
+    await stores.threads.setPendingHop(thread.id, null);
+    await executeTurn({ threadId: thread.id, content: '@墨墨 再来', context: ctx });
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop).toBeUndefined();
+    expect(after?.relayPairs?.['claude>gemini']).toBe(2);
+    const messages = await stores.messages.list(thread.id);
+    const dropped = messages.find((m) => m.role === 'system' && m.systemKind === 'dropped');
+    expect(dropped?.content).toContain('空转');
+    expect(dropped?.content).toContain('没传');
+    expect(calls).toHaveLength(3);
+  });
+
+  it('有文件的同一对来回不拦乒乓', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-pingpong-'));
+    const registry = createAgentRegistry([
+      stubAgent('claude', `${KEPT_HANDOFF_BODY}\n@闪闪 请审查`),
+      {
+        agentId: 'gemini',
+        async runTurn() {
+          throw new Error('本测不续跑闪闪');
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    writeFileSync(join(thread.workdir, 'add.ts'), 'export const add = (a: number, b: number) => a + b;\n');
+    const ctx = { stores, registry, agents: DEFAULT_AGENTS.map(cloneAgentSpec) };
+    await executeTurn({ threadId: thread.id, content: '@墨墨 写', context: ctx });
+    await stores.threads.setPendingHop(thread.id, null);
+    await executeTurn({ threadId: thread.id, content: '@墨墨 继续', context: ctx });
+    await stores.threads.setPendingHop(thread.id, null);
+    await executeTurn({ threadId: thread.id, content: '@墨墨 再来', context: ctx });
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop?.to).toBe('gemini');
+    expect(after?.relayPairs?.['claude>gemini']).toBe(3);
+    const dropped = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'system' && m.systemKind === 'dropped',
+    );
+    expect(dropped.some((m) => m.content.includes('空转'))).toBe(false);
+    rmSync(workdirBase, { recursive: true, force: true });
   });
 
   it('systemPrompt 用 config.agents 身份覆盖 Redis profile', async () => {

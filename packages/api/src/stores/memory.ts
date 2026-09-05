@@ -222,6 +222,12 @@ export class InMemoryThreadStore implements ThreadStore {
     thread.sop = board;
   }
 
+  async setRelayPairs(threadId: string, pairs: Record<string, number>): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    thread.relayPairs = { ...pairs };
+  }
+
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);

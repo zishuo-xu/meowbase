@@ -57,6 +57,8 @@ export interface ThreadStore {
   clearInboundQueue(threadId: string): Promise<void>;
   /** 写入家规告示牌。 */
   setSopBoard(threadId: string, board: SopBoard): Promise<void>;
+  /** 写入跨轮交棒次数账本,键 from>to。 */
+  setRelayPairs(threadId: string, pairs: Record<string, number>): Promise<void>;
   /** 改人话队序。beforeId 省略到队头,空到队尾。找不到 false。 */
   steerInbound(threadId: string, id: string, beforeId?: string | null): Promise<boolean>;
   /** 改交棒队序。beforeId 省略到队头,空到队尾。找不到 false。不碰槽里那一棒。 */

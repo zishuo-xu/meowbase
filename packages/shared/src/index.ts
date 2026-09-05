@@ -108,6 +108,7 @@ export type {
   DroppedBallInput,
   ExitNudgeInput,
   VoidHandoffInput,
+  PingPongTripInput,
 } from './a2a.js';
 export { clipAuditSubject, AUDIT_SUBJECT_MAX } from './audit-subject.js';
 export {
@@ -133,6 +134,8 @@ export {
   formatHopInterruptedNote,
   formatPickupCommand,
   isVoidHandoff,
+  isPingPongTrip,
+  relayPairKey,
   VOID_HANDOFF_BODY_MAX,
   isDroppedBallNote,
   isEscalatedBallNote,

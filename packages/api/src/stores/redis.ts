@@ -159,6 +159,7 @@ export class RedisThreadStore implements ThreadStore {
         ? { inboundQueue: JSON.parse(raw.inboundQueue) as InboundMessage[] }
         : {}),
       ...(raw.sop ? { sop: JSON.parse(raw.sop) as SopBoard } : {}),
+      ...(raw.relayPairs ? { relayPairs: JSON.parse(raw.relayPairs) as Record<string, number> } : {}),
       ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
     };
@@ -322,6 +323,12 @@ export class RedisThreadStore implements ThreadStore {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     await this.redis.hset(threadKey(threadId), 'sop', JSON.stringify(board));
+  }
+
+  async setRelayPairs(threadId: string, pairs: Record<string, number>): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    await this.redis.hset(threadKey(threadId), 'relayPairs', JSON.stringify(pairs));
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {
