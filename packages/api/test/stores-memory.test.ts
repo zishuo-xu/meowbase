@@ -115,6 +115,47 @@ describe('内存存储', () => {
     expect(await threads.clearPendingHopIfSame(thread.id, 'hop-a')).toBe(false);
   });
 
+  it('enqueuePendingHop 排在槽后面,promoteQueuedHop 把队头填进槽,clearPendingQueue 整队清掉', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'queue', primaryAgentId: 'claude' });
+    const hopA = {
+      id: 'hop-a',
+      to: 'gemini' as const,
+      from: 'claude' as const,
+      task: '请审查加法',
+      goal: '写 add.ts',
+      previousOutput: '加法写完了',
+      visited: ['claude' as const],
+      firstAgent: 'claude' as const,
+      hop: 1,
+    };
+    const hopB = {
+      id: 'hop-b',
+      to: 'gemini' as const,
+      from: 'opencode' as const,
+      task: '请审查乘法',
+      goal: '写 mul.ts',
+      previousOutput: '乘法写完了',
+      visited: ['opencode' as const],
+      firstAgent: 'opencode' as const,
+      hop: 1,
+    };
+    await threads.setPendingHop(thread.id, hopA);
+    await threads.enqueuePendingHop(thread.id, hopB);
+    expect((await threads.get(thread.id))?.pendingHop?.id).toBe('hop-a');
+    expect((await threads.get(thread.id))?.pendingQueue?.map((h) => h.id)).toEqual(['hop-b']);
+
+    expect(await threads.clearPendingHopIfSame(thread.id, 'hop-a')).toBe(true);
+    expect(await threads.promoteQueuedHop(thread.id)).toBe(true);
+    expect((await threads.get(thread.id))?.pendingHop?.id).toBe('hop-b');
+    expect((await threads.get(thread.id))?.pendingQueue ?? []).toEqual([]);
+
+    await threads.enqueuePendingHop(thread.id, hopA);
+    await threads.clearPendingQueue(thread.id);
+    expect((await threads.get(thread.id))?.pendingQueue ?? []).toEqual([]);
+    expect(await threads.promoteQueuedHop(thread.id)).toBe(false);
+  });
+
   it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: 'lease', primaryAgentId: 'claude' });

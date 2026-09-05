@@ -3,6 +3,7 @@ import { killHoldCommand } from '../services/hold-command.js';
 import {
   displayName,
   formatEscalatedBallNote,
+  formatQueuedHandoffNote,
   formatHopInterruptedNote,
   isPlaceholderTitle,
   shouldResumePending,
@@ -89,7 +90,7 @@ export async function executeTurn(input: {
     }
   }
 
-  // 多 @ 同题群发、顺序执行:各占一行的行首 @ 才是目标;同一正文发给每个目标;一只跑完再跑下一只;失败隔离;只跟第一个交出来的棒
+  // 多 @ 同题群发、顺序执行:各占一行的行首 @ 才是目标;同一正文发给每个目标;一只跑完再跑下一只;失败隔离;第一个交棒留槽,后一个入队
   const { catalog, team, maxDepth } = await loadRoster(context);
   const history = await context.stores.messages.list(threadId);
   if (
@@ -123,11 +124,13 @@ export async function executeTurn(input: {
     if (pending.holdCommand) {
       killHoldCommand(threadId);
       await context.stores.threads.setPendingHop(threadId, null);
+      await context.stores.threads.clearPendingQueue(threadId);
     } else if (shouldResumePending(content, pending.to, catalog)) {
       const followed = await resumePendingTurn({ threadId, context, learn, refs });
       if (followed) return followed;
     } else {
       await context.stores.threads.setPendingHop(threadId, null);
+      await context.stores.threads.clearPendingQueue(threadId);
     }
     if (userEscalates(content)) {
       return context.stores.messages.append({
@@ -179,14 +182,18 @@ export async function executeTurn(input: {
       continue;
     }
     if (currentHop.id === keptHop.id) continue;
-    const dropped = currentHop;
+    const queued = currentHop;
     const restore = keptHop;
     await writeQueue(async () => {
       await context.stores.threads.setPendingHop(threadId, restore);
+      await context.stores.threads.enqueuePendingHop(threadId, queued);
       await context.stores.messages.append({
         threadId,
         role: 'system',
-        content: `这条线程一次只跟一棒。${displayName(dropped.from, catalog)} 交给 ${displayName(dropped.to, catalog)} 的这一棒得人来接。`,
+        content: formatQueuedHandoffNote(
+          displayName(queued.from, catalog),
+          displayName(queued.to, catalog),
+        ),
         status: 'completed',
         systemKind: 'notice',
       });
@@ -307,16 +314,23 @@ export async function resumePendingTurn(input: {
   }
 }
 
-/** 平台自己把 pending 跟完,直到没下一跳、升级、或链深用尽。 */
+/** 平台自己把 pending 跟完,直到没下一跳、升级、或链深用尽。槽空了就把队头填回去再跑。 */
 export async function followPendingChain(input: {
   threadId: string;
   context: TurnContext;
 }): Promise<void> {
   const max = input.context.a2aMaxDepth ?? MAX_A2A_DEPTH;
-  await finishHoldCommandThenWake(input);
-  for (let i = 0; i < max; i++) {
+  for (let safety = 0; safety < 16; safety++) {
     if (input.context.signal?.aborted) return;
-    const ran = await resumePendingTurn(input);
-    if (!ran) return;
+    await finishHoldCommandThenWake(input);
+    for (let i = 0; i < max; i++) {
+      if (input.context.signal?.aborted) return;
+      const ran = await resumePendingTurn(input);
+      if (!ran) break;
+    }
+    const thread = await input.context.stores.threads.get(input.threadId);
+    if (thread?.pendingHop) return;
+    const promoted = await input.context.stores.threads.promoteQueuedHop(input.threadId);
+    if (!promoted) return;
   }
 }

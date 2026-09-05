@@ -117,6 +117,31 @@ export class InMemoryThreadStore implements ThreadStore {
     else delete thread.pendingHop;
   }
 
+  async enqueuePendingHop(threadId: string, hop: PendingHop): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    thread.pendingQueue = [...(thread.pendingQueue ?? []), hop];
+  }
+
+  async promoteQueuedHop(threadId: string): Promise<boolean> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (thread.pendingHop) return false;
+    const next = thread.pendingQueue?.[0];
+    if (!next) return false;
+    thread.pendingHop = next;
+    const rest = thread.pendingQueue?.slice(1) ?? [];
+    if (rest.length > 0) thread.pendingQueue = rest;
+    else delete thread.pendingQueue;
+    return true;
+  }
+
+  async clearPendingQueue(threadId: string): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    delete thread.pendingQueue;
+  }
+
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);

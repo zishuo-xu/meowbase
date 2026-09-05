@@ -193,6 +193,30 @@ describe('describeBall', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });
 
+  it('队里有货时顶栏同一行跟后面还有 N 棒', () => {
+    expect(
+      describeBall(
+        [{ role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } }],
+        false,
+        nameOf,
+        roleOf,
+        1,
+      ),
+    ).toEqual({ text: '球在闪闪手上 · 后面还有 1 棒', tone: 'cat', agentId: 'gemini' });
+  });
+
+  it('空队不加后面还有', () => {
+    expect(
+      describeBall(
+        [{ role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } }],
+        false,
+        nameOf,
+        roleOf,
+        0,
+      ),
+    ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
+  });
+
   it('升级后即使有句中@提示,顶栏仍是球在人手里', () => {
     expect(
       describeBall(

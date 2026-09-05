@@ -111,6 +111,7 @@ export async function settleTurn(input: {
       }
     }
     await context.stores.threads.setPendingHop(threadId, null);
+    await context.stores.threads.clearPendingQueue(threadId);
     return lastAssistant;
   }
 

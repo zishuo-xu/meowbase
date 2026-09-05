@@ -87,7 +87,11 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
         return;
       }
     }
-    const pending = (await deps.threads.get(threadId))?.pendingHop;
+    let pending = (await deps.threads.get(threadId))?.pendingHop;
+    if (!pending) {
+      await deps.threads.promoteQueuedHop(threadId);
+      pending = (await deps.threads.get(threadId))?.pendingHop;
+    }
     if (!pending) {
       prepared?.release?.();
       await deps.threads.releasePendingHopLease(threadId, runnerId);
@@ -149,7 +153,9 @@ export function createPendingRunner(deps: PendingRunnerDeps): PendingRunner {
     if (sweeping) return;
     sweeping = true;
     try {
-      const pending = (await deps.threads.list()).filter((t) => t.pendingHop);
+      const pending = (await deps.threads.list()).filter(
+        (t) => t.pendingHop || (t.pendingQueue?.length ?? 0) > 0,
+      );
       write(formatTurnLog('resume sweep', { n: pending.length }));
       for (const thread of pending) {
         const ageMs = await hopAgeMs(thread.id, thread.createdAt);

@@ -43,6 +43,8 @@ export interface ThreadDto {
   primaryAgentId: string;
   workdir: string;
   sessions: Record<string, string>;
+  pendingHop?: { id: string; to: string; from: string };
+  pendingQueue?: { id: string; to: string; from: string }[];
   repo?: ThreadRepoDto;
   createdAt: string;
 }

@@ -39,6 +39,7 @@ export async function finishHoldCommandThenWake(input: {
       systemKind: 'dropped',
     });
     await context.stores.threads.setPendingHop(threadId, null);
+    await context.stores.threads.clearPendingQueue(threadId);
     return;
   }
   await context.stores.messages.append({

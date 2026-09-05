@@ -1,5 +1,7 @@
 # 同一线程同一时刻只跑一跳
 
+> 后来的刀把「后一个交棒得人来接」改成入队自动跟,见 [pending-handoff-queue.md](pending-handoff-queue.md)。本篇当时不扩数据模型,那条限制已经解开。
+
 - 状态:`已落地`
 - 对照 clowder:他们的 ADR-018 在执行层留了一道 **thread 级 busy gate**（`tryStartThread()`，「同一 thread 不会并发两个 invocation」）。而 LL-085 记了他们真撞过的坑:**同一棵工作树共享同一个 git index**，平行 invocation 在同树里裸 `git commit` 会把别的猫 `git add` 过的文件一起卷走，作者落对了但 subject 张冠李戴。他们给的对策是**纪律**（commit 精确到文件），不是平台自动隔离;ADR-008 D5 里任务级 worktree 因为「生命周期、并发、磁盘」被暂缓。
 - 靠拢:靠 ADR-018 那道 thread 级闸——**一条线程同一时刻只跑一跳**。不靠 LL-085 的纪律路线:我们的猫跑在 `bypassPermissions` 下，纪律写在系统提示里管不住，只能由平台这一侧硬来（同踩坑第 4 条的思路）。也不做每猫一棵 worktree，理由和他们 ADR-008 D5 一样，外加我们连「两棵树的产出怎么并成一张审批卡」都还没想清。

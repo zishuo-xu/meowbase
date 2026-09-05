@@ -108,6 +108,29 @@ describe('pending-runner', () => {
     expect(auditActions).toContain('lease-claim');
   });
 
+  it('开机扫:槽空但队里有棒也自己续跑', async () => {
+    const stores = createMemoryStores();
+    const calls: string[] = [];
+    const registry = createAgentRegistry([
+      stubAgent('claude', '不该来'),
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          calls.push('opencode');
+          return { sessionId: 's2', content: '审查通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.threads.enqueuePendingHop(thread.id, sampleHop());
+    const runner = makeRunner({ stores, registry });
+    await runner.sweep();
+    expect(calls).toEqual(['opencode']);
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop).toBeUndefined();
+    expect(after?.pendingQueue ?? []).toEqual([]);
+  });
+
   it('没有 pendingHop 时 run 不落租约行并立刻释放租约', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([stubAgent('claude', '不该来')]);

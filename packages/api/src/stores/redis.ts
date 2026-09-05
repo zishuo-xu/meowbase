@@ -139,6 +139,9 @@ export class RedisThreadStore implements ThreadStore {
       ...(raw.pendingHop
         ? { pendingHop: await this.hydratePendingHop(id, raw.pendingHop, raw.pendingHopId) }
         : {}),
+      ...(raw.pendingQueue
+        ? { pendingQueue: JSON.parse(raw.pendingQueue) as PendingHop[] }
+        : {}),
       ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
     };
@@ -190,6 +193,45 @@ export class RedisThreadStore implements ThreadStore {
     } else {
       await this.redis.hdel(threadKey(threadId), 'pendingHop', 'pendingHopId');
     }
+  }
+
+  async enqueuePendingHop(threadId: string, hop: PendingHop): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const queue = [...(thread.pendingQueue ?? []), hop];
+    await this.redis.hset(threadKey(threadId), 'pendingQueue', JSON.stringify(queue));
+  }
+
+  async promoteQueuedHop(threadId: string): Promise<boolean> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (thread.pendingHop) return false;
+    const next = thread.pendingQueue?.[0];
+    if (!next) return false;
+    const rest = thread.pendingQueue?.slice(1) ?? [];
+    if (rest.length > 0) {
+      await this.redis.hset(threadKey(threadId), {
+        pendingHop: JSON.stringify(next),
+        pendingHopId: next.id,
+        pendingQueue: JSON.stringify(rest),
+      });
+    } else {
+      await this.redis
+        .multi()
+        .hset(threadKey(threadId), {
+          pendingHop: JSON.stringify(next),
+          pendingHopId: next.id,
+        })
+        .hdel(threadKey(threadId), 'pendingQueue')
+        .exec();
+    }
+    return true;
+  }
+
+  async clearPendingQueue(threadId: string): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    await this.redis.hdel(threadKey(threadId), 'pendingQueue');
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

@@ -94,6 +94,7 @@ export {
   formatAbortedBallNote,
   formatA2AHandoffPrompt,
   formatA2ARelayNote,
+  formatQueuedHandoffNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
   formatExitNudgeNote,

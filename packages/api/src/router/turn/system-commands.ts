@@ -104,6 +104,7 @@ export async function handleSystemCommand(input: {
     turnLog('freeze', { thread: threadId });
     killHoldCommand(threadId);
     await context.stores.threads.setPendingHop(threadId, null);
+    await context.stores.threads.clearPendingQueue(threadId);
     return context.stores.messages.append({
       threadId,
       role: 'system',

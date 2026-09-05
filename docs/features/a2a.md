@@ -40,7 +40,7 @@
 
 ## 不做什么
 
-- 不建 mailbox / InvocationQueue / `hold_ball`
+- 不建 mailbox / InvocationQueue / `hold_ball`（线程内交棒排队见 [pending-handoff-queue.md](pending-handoff-queue.md)）
 - 不 MCP `targetCats` 派球
 - 不把墨墨的 CLI session 喂给闪闪
 - 不跨线程自动读对方对话（证据召回是只读片段，见 [memory-evidence.md](memory-evidence.md)）

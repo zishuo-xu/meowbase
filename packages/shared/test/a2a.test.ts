@@ -5,6 +5,7 @@ import {
   findInlineEscalateTokens,
   formatA2AHandoffPrompt,
   formatA2ARelayNote,
+  formatQueuedHandoffNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
   isVoidHandoff,
@@ -297,6 +298,16 @@ describe('findInlineEscalateTokens', () => {
   it('句中 @人 记为 inline,行首升级不算', () => {
     expect(findInlineEscalateTokens('请 @人 拍板')).toEqual(['人']);
     expect(findInlineEscalateTokens('@人 这个方案做不做')).toEqual([]);
+  });
+});
+
+describe('formatQueuedHandoffNote', () => {
+  it('第二棒入队时说明排在后面,不说得人来接', () => {
+    const note = formatQueuedHandoffNote('团团', '闪闪');
+    expect(note).toContain('团团');
+    expect(note).toContain('闪闪');
+    expect(note).toContain('排在后面');
+    expect(note).not.toContain('得人来接');
   });
 });
 

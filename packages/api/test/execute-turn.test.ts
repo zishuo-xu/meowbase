@@ -1449,7 +1449,7 @@ describe('executeTurn 多角色协作', () => {
     expect(final.content).toBe('团团写好了');
   });
 
-  it('多 @ 都交棒:只跟第一个,后一个落 notice', async () => {
+  it('多 @ 都交棒:第一个留槽,后一个入队,notice 说排在后面', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([
       {
@@ -1480,16 +1480,102 @@ describe('executeTurn 多角色协作', () => {
       content: '@claude\n@opencode\n各写各的',
       context: { stores, registry },
     });
-    const pending = (await stores.threads.get(thread.id))?.pendingHop;
-    expect(pending?.from).toBe('claude');
-    expect(pending?.to).toBe('gemini');
-    expect(pending?.task).toContain('请审查加法');
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop?.from).toBe('claude');
+    expect(after?.pendingHop?.to).toBe('gemini');
+    expect(after?.pendingHop?.task).toContain('请审查加法');
+    expect(after?.pendingQueue).toHaveLength(1);
+    expect(after?.pendingQueue?.[0]?.from).toBe('opencode');
+    expect(after?.pendingQueue?.[0]?.task).toContain('请审查乘法');
     const notice = (await stores.messages.list(thread.id)).find(
-      (m) => m.role === 'system' && m.systemKind === 'notice' && m.content.includes('一次只跟一棒'),
+      (m) => m.role === 'system' && m.systemKind === 'notice' && m.content.includes('排在后面'),
     );
     expect(notice?.content).toContain('团团');
     expect(notice?.content).toContain('闪闪');
-    expect(notice?.content).toContain('得人来接');
+    expect(notice?.content).not.toContain('得人来接');
+  });
+
+  it('多 @ 都交棒后 followPendingChain 会把队里那棒也跑完', async () => {
+    const stores = createMemoryStores();
+    const geminiTasks: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return {
+            sessionId: 's1',
+            content: `${KEPT_HANDOFF_BODY}\n加法写完了。\n@gemini 请审查加法`,
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          return {
+            sessionId: 's2',
+            content: `${KEPT_HANDOFF_BODY}\n乘法写完了。\n@gemini 请审查乘法`,
+            status: 'completed',
+          };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn(input) {
+          geminiTasks.push(input.prompt);
+          return { sessionId: 's3', content: '## 结论\n通过', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const ctx = { stores, registry };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@claude\n@opencode\n各写各的',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
+    expect(geminiTasks.some((p) => p.includes('请审查加法'))).toBe(true);
+    expect(geminiTasks.some((p) => p.includes('请审查乘法'))).toBe(true);
+    const done = await stores.threads.get(thread.id);
+    expect(done?.pendingHop).toBeUndefined();
+    expect(done?.pendingQueue ?? []).toEqual([]);
+  });
+
+  it('星星罐子清槽也清队', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([stubAgent('claude', '不该被叫到')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.threads.setPendingHop(thread.id, {
+      id: 'hop-a',
+      to: 'gemini',
+      from: 'claude',
+      task: '请审查加法',
+      goal: '写 add.ts',
+      previousOutput: '加法写完了',
+      visited: ['claude'],
+      firstAgent: 'claude',
+      hop: 1,
+    });
+    await stores.threads.enqueuePendingHop(thread.id, {
+      id: 'hop-b',
+      to: 'gemini',
+      from: 'opencode',
+      task: '请审查乘法',
+      goal: '写 mul.ts',
+      previousOutput: '乘法写完了',
+      visited: ['opencode'],
+      firstAgent: 'opencode',
+      hop: 1,
+    });
+    await executeTurn({
+      threadId: thread.id,
+      content: '星星罐子',
+      context: { stores, registry },
+    });
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop).toBeUndefined();
+    expect(after?.pendingQueue ?? []).toEqual([]);
   });
 
   it('绑仓多 @ 各提交:两份 commit subject 各自对得上', async () => {

@@ -197,6 +197,11 @@ export function formatA2ARelayNote(input: {
     .join('\n');
 }
 
+/** 槽里已有棒时,后来这一棒入队,当前棒跑完接着跑。 */
+export function formatQueuedHandoffNote(fromName: string, toName: string): string {
+  return `${fromName} 交给 ${toName} 的这一棒排在后面,当前棒跑完接着跑。`;
+}
+
 /** 有 pending 时:没点名叫别人就续跑下一跳;行首 @人 或点名另一只则不续。 */
 export function shouldResumePending(
   content: string,

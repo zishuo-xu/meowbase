@@ -257,6 +257,7 @@ export default function Home() {
                     sending,
                     (id) => agentName(id, agents),
                     (id) => agents.find((a) => a.id === id)?.role,
+                    activeThread?.pendingQueue?.length ?? 0,
                   ).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>

@@ -28,6 +28,8 @@ export interface Thread {
   sessions: Partial<Record<AgentId, string>>;
   /** 交棒后本轮先结束时记下的下一跳 */
   pendingHop?: PendingHop;
+  /** 槽里已有棒时,后来交的棒按 FIFO 排在后面 */
+  pendingQueue?: PendingHop[];
   /** 绑了真实仓库时:父仓路径、基准分支、本线程分支 */
   repo?: ThreadRepo;
   createdAt: string;
