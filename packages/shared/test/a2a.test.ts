@@ -6,6 +6,7 @@ import {
   formatA2AHandoffPrompt,
   formatA2ARelayNote,
   formatQueuedHandoffNote,
+  formatInboundQueuedNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
   isVoidHandoff,
@@ -308,6 +309,14 @@ describe('formatQueuedHandoffNote', () => {
     expect(note).toContain('闪闪');
     expect(note).toContain('排在后面');
     expect(note).not.toContain('得人来接');
+  });
+});
+
+describe('formatInboundQueuedNote', () => {
+  it('人话入队时说明当前棒跑完再送', () => {
+    const note = formatInboundQueuedNote();
+    expect(note).toContain('已排队');
+    expect(note).toContain('当前棒跑完再送');
   });
 });
 

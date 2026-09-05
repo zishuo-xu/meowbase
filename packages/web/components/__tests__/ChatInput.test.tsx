@@ -61,16 +61,14 @@ describe('ChatInput', () => {
     expect(onAbort).toHaveBeenCalled();
   });
 
-  it('sending 时回车不提交', () => {
+  it('sending 时仍可排队发送,按钮写排队', () => {
     const onSend = vi.fn();
     render(<ChatInput sending onSend={onSend} />);
     const input = screen.getByPlaceholderText(/@墨墨/);
-    fireEvent.change(input, { target: { value: '@claude 你好' } });
+    fireEvent.change(input, { target: { value: '补一句' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onSend).not.toHaveBeenCalled();
-    expect((screen.getByRole('button', { name: '发送中' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect(onSend).toHaveBeenCalledWith('补一句');
+    expect(screen.getByRole('button', { name: '排队' })).toBeTruthy();
   });
 
   it('insert 把 #ev_ 写进输入框', () => {

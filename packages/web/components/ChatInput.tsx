@@ -95,7 +95,7 @@ export function ChatInput({
 
   const submit = () => {
     const trimmed = value.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed) return;
     onSend(trimmed);
     setValue('');
     setMenuOpen(false);
@@ -186,7 +186,6 @@ export function ChatInput({
               }
             }}
             rows={2}
-            disabled={sending}
             placeholder="@墨墨 干活吧…(不写 @ 会续上一只 / 行首 @名字 换猫 · ⇧↵换行)"
             className="min-w-0 flex-1 resize-none rounded-2xl border border-[var(--border)] bg-white px-3.5 py-2.5 text-sm shadow-inner outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-60"
           />
@@ -198,15 +197,13 @@ export function ChatInput({
             >
               中止
             </button>
-          ) : (
-            <button
-              onClick={submit}
-              disabled={sending}
-              className="shrink-0 rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
-            >
-              {sending ? '发送中' : '发送'}
-            </button>
-          )}
+          ) : null}
+          <button
+            onClick={submit}
+            className="shrink-0 rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--accent-strong)]"
+          >
+            {sending ? '排队' : '发送'}
+          </button>
         </div>
         <p className="mt-1 truncate px-1 text-[10px] leading-4 text-[var(--ink-soft)]">
           Enter 发送 · Shift+Enter 换行

@@ -179,6 +179,24 @@ describe.skipIf(!redis)('Redis 存储', () => {
     await threads.delete(thread.id);
   });
 
+  it('enqueueInbound / shiftInbound / clearInboundQueue 过 Redis', async () => {
+    const threads = createThreadStore(redis!);
+    const thread = await threads.create({
+      title: `redis-inbound-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    const first = await threads.enqueueInbound(thread.id, '先补这句');
+    await threads.enqueueInbound(thread.id, '再补那句');
+    expect((await threads.get(thread.id))?.inboundQueue?.map((m) => m.content)).toEqual([
+      '先补这句',
+      '再补那句',
+    ]);
+    expect((await threads.shiftInbound(thread.id))?.id).toBe(first.id);
+    await threads.clearInboundQueue(thread.id);
+    expect((await threads.get(thread.id))?.inboundQueue ?? []).toEqual([]);
+    await threads.delete(thread.id);
+  });
+
   it('线程 repo 绑定写入并回读', async () => {
     const threads = createThreadStore(redis!);
     const title = `redis-repo-${Date.now()}`;

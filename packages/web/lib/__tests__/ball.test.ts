@@ -217,6 +217,19 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
   });
 
+  it('人话队非空时顶栏同一行跟还有 N 句在等', () => {
+    expect(
+      describeBall(
+        [{ role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } }],
+        false,
+        nameOf,
+        roleOf,
+        0,
+        1,
+      ),
+    ).toEqual({ text: '球在闪闪手上 · 还有 1 句在等', tone: 'cat', agentId: 'gemini' });
+  });
+
   it('升级后即使有句中@提示,顶栏仍是球在人手里', () => {
     expect(
       describeBall(

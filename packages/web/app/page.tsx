@@ -134,7 +134,7 @@ export default function Home() {
 
   const send = useCallback(
     async (content: string) => {
-      if (!activeId || sending) return;
+      if (!activeId) return;
       setSending(true);
       const optimistic: MessageDto = {
         id: `local-${Date.now()}`,
@@ -173,7 +173,7 @@ export default function Home() {
         setSending(false);
       }
     },
-    [activeId, sending, refreshThreads],
+    [activeId, refreshThreads],
   );
 
   const sendCommand = useCallback(
@@ -258,6 +258,7 @@ export default function Home() {
                     (id) => agentName(id, agents),
                     (id) => agents.find((a) => a.id === id)?.role,
                     activeThread?.pendingQueue?.length ?? 0,
+                    activeThread?.inboundQueue?.length ?? 0,
                   ).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>

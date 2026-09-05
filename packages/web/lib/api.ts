@@ -45,6 +45,7 @@ export interface ThreadDto {
   sessions: Record<string, string>;
   pendingHop?: { id: string; to: string; from: string };
   pendingQueue?: { id: string; to: string; from: string }[];
+  inboundQueue?: { id: string; content: string }[];
   repo?: ThreadRepoDto;
   createdAt: string;
 }

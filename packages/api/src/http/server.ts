@@ -8,9 +8,14 @@ import type { AgentId, AuditAction, AuditActor, HoldCommandRule } from '@meowbas
 import {
   defaultAllowedRepoRoots,
   filterEvidenceByRecallScope,
+  formatInboundQueuedNote,
   toEvidenceScopeThread,
   isAllowedRequestOrigin,
   isRepoPathAllowed,
+  parseApproveCommand,
+  parseConfirmCommand,
+  parseFreezeCommand,
+  parseRejectCommand,
   resolveAllowedOrigins,
 } from '@meowbase/shared';
 import type { AgentRegistry } from '../providers/types.js';
@@ -575,6 +580,27 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     runner.stop();
   });
 
+  async function drainInbound(threadId: string): Promise<void> {
+    if (runningTurns.has(threadId)) return;
+    const thread = await stores.threads.get(threadId);
+    if (thread?.pendingHop || (thread?.pendingQueue?.length ?? 0) > 0) return;
+    const next = await stores.threads.shiftInbound(threadId);
+    if (!next) return;
+    const prepared = createTurnContext(threadId);
+    try {
+      await executeTurn({
+        threadId,
+        content: next.content,
+        context: prepared.context,
+      });
+      await runner.run(threadId, prepared);
+      await drainInbound(threadId);
+    } catch (err) {
+      prepared.release();
+      throw err;
+    }
+  }
+
   app.post('/api/threads/:threadId/cancel', async (request, reply) => {
     const { threadId } = request.params as { threadId: string };
     const running = runningTurns.get(threadId);
@@ -590,6 +616,28 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     if (!content) {
       return reply.code(400).send({ error: 'content 不能为空' });
     }
+    const immediate =
+      parseFreezeCommand(content) ||
+      Boolean(parseApproveCommand(content)) ||
+      Boolean(parseRejectCommand(content)) ||
+      Boolean(parseConfirmCommand(content));
+    if (immediate) runningTurns.get(threadId)?.abort();
+    const thread = await stores.threads.get(threadId);
+    const busy =
+      runningTurns.has(threadId) ||
+      Boolean(thread?.pendingHop) ||
+      (thread?.pendingQueue?.length ?? 0) > 0;
+    if (!immediate && busy) {
+      const queued = await stores.threads.enqueueInbound(threadId, content);
+      const notice = await stores.messages.append({
+        threadId,
+        role: 'system',
+        content: formatInboundQueuedNote(),
+        status: 'completed',
+        systemKind: 'notice',
+      });
+      return reply.code(202).send({ ...notice, inboundQueue: [queued] });
+    }
     const prepared = createTurnContext(threadId);
     try {
       const message = await executeTurn({
@@ -597,7 +645,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         content,
         context: prepared.context,
       });
-      void runner.run(threadId, prepared);
+      void runner.run(threadId, prepared).then(() => drainInbound(threadId));
       return reply.code(200).send(message);
     } catch (err) {
       prepared.release();

@@ -12,6 +12,7 @@ import type {
   ApprovalCard,
   AuditRow,
   EvidenceEntry,
+  InboundMessage,
   Message,
   PendingHop,
   Thread,
@@ -142,6 +143,9 @@ export class RedisThreadStore implements ThreadStore {
       ...(raw.pendingQueue
         ? { pendingQueue: JSON.parse(raw.pendingQueue) as PendingHop[] }
         : {}),
+      ...(raw.inboundQueue
+        ? { inboundQueue: JSON.parse(raw.inboundQueue) as InboundMessage[] }
+        : {}),
       ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
     };
@@ -232,6 +236,35 @@ export class RedisThreadStore implements ThreadStore {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     await this.redis.hdel(threadKey(threadId), 'pendingQueue');
+  }
+
+  async enqueueInbound(threadId: string, content: string): Promise<InboundMessage> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const item: InboundMessage = { id: randomUUID(), content };
+    const queue = [...(thread.inboundQueue ?? []), item];
+    await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(queue));
+    return item;
+  }
+
+  async shiftInbound(threadId: string): Promise<InboundMessage | null> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const next = thread.inboundQueue?.[0];
+    if (!next) return null;
+    const rest = thread.inboundQueue?.slice(1) ?? [];
+    if (rest.length > 0) {
+      await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(rest));
+    } else {
+      await this.redis.hdel(threadKey(threadId), 'inboundQueue');
+    }
+    return next;
+  }
+
+  async clearInboundQueue(threadId: string): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    await this.redis.hdel(threadKey(threadId), 'inboundQueue');
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

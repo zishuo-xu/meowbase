@@ -96,6 +96,20 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       await store.clearPendingQueue(threadId);
       emit(threadId);
     },
+    enqueueInbound: async (threadId, content) => {
+      const item = await store.enqueueInbound(threadId, content);
+      emit(threadId);
+      return item;
+    },
+    shiftInbound: async (threadId) => {
+      const item = await store.shiftInbound(threadId);
+      if (item) emit(threadId);
+      return item;
+    },
+    clearInboundQueue: async (threadId) => {
+      await store.clearInboundQueue(threadId);
+      emit(threadId);
+    },
     clearPendingHopIfSame: async (threadId, hopId) => {
       const cleared = await store.clearPendingHopIfSame(threadId, hopId);
       if (cleared) emit(threadId);

@@ -11,6 +11,7 @@ import type {
   ApprovalCard,
   AuditRow,
   EvidenceEntry,
+  InboundMessage,
   Message,
   PendingHop,
   Skill,
@@ -140,6 +141,31 @@ export class InMemoryThreadStore implements ThreadStore {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     delete thread.pendingQueue;
+  }
+
+  async enqueueInbound(threadId: string, content: string): Promise<InboundMessage> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const item: InboundMessage = { id: randomUUID(), content };
+    thread.inboundQueue = [...(thread.inboundQueue ?? []), item];
+    return item;
+  }
+
+  async shiftInbound(threadId: string): Promise<InboundMessage | null> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const next = thread.inboundQueue?.[0];
+    if (!next) return null;
+    const rest = thread.inboundQueue?.slice(1) ?? [];
+    if (rest.length > 0) thread.inboundQueue = rest;
+    else delete thread.inboundQueue;
+    return next;
+  }
+
+  async clearInboundQueue(threadId: string): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    delete thread.inboundQueue;
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

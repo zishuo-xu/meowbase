@@ -7,6 +7,7 @@ import type {
   AuditRow,
   EvidenceEntry,
   EvidenceKind,
+  InboundMessage,
   Message,
   PendingHop,
   Skill,
@@ -40,6 +41,12 @@ export interface ThreadStore {
   promoteQueuedHop(threadId: string): Promise<boolean>;
   /** 整队清掉,槽不动。 */
   clearPendingQueue(threadId: string): Promise<void>;
+  /** 人话排进队尾。 */
+  enqueueInbound(threadId: string, content: string): Promise<InboundMessage>;
+  /** 取出队头;空则 null。 */
+  shiftInbound(threadId: string): Promise<InboundMessage | null>;
+  /** 人话队整队清掉。 */
+  clearInboundQueue(threadId: string): Promise<void>;
   /** 只清自己那一棒:跑的过程中猫又交棒时槽里已是下一棒,不能无条件清。 */
   clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean>;
   /** 抢下这一棒的主人:抢到才跑,防止两个跑者跑同一 hop。 */

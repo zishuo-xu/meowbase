@@ -146,6 +146,60 @@ describe('HTTP 集成', () => {
     expect(message.error).toBe('已中止');
   });
 
+  it('忙时人话入队不打断,跑完再送;星星罐子仍立刻拉闸', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '插话排队', primaryAgentId: 'claude' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+    const hanging = fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '@gemini 挂住' }),
+    });
+    let queued = false;
+    for (let i = 0; i < 30; i++) {
+      const res = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: '先别停,补一句' }),
+      });
+      if (res.status === 202) {
+        const body = (await res.json()) as { content?: string; inboundQueue?: { content: string }[] };
+        expect(body.content).toContain('已排队');
+        queued = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(queued).toBe(true);
+    const listed = (
+      (await (await fetch(`${baseUrl}/api/threads`)).json()) as {
+        id: string;
+        inboundQueue?: { content: string }[];
+      }[]
+    ).find((t) => t.id === thread.id);
+    expect(listed?.inboundQueue?.some((m) => m.content === '先别停,补一句')).toBe(true);
+
+    const freeze = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '星星罐子' }),
+    });
+    expect(freeze.status).toBe(200);
+    const freezeBody = (await freeze.json()) as { content?: string };
+    expect(freezeBody.content).toContain('已拉闸');
+    await hanging;
+    const after = (
+      (await (await fetch(`${baseUrl}/api/threads`)).json()) as {
+        id: string;
+        inboundQueue?: unknown[];
+      }[]
+    ).find((t) => t.id === thread.id);
+    expect(after?.inboundQueue ?? []).toEqual([]);
+  });
+
   it('DELETE /api/threads/:id 删线程', async () => {
     const createRes = await fetch(`${baseUrl}/api/threads`, {
       method: 'POST',

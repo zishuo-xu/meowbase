@@ -18,9 +18,16 @@ export interface BallMessage {
 }
 
 /** 线程顶常驻:球在谁手上。只读消息,不改路由。 */
-function withQueuedHint(view: BallView, queuedCount?: number): BallView {
-  if (!queuedCount || queuedCount <= 0) return view;
-  return { ...view, text: `${view.text} · 后面还有 ${queuedCount} 棒` };
+function withQueuedHint(
+  view: BallView,
+  queuedCount?: number,
+  inboundCount?: number,
+): BallView {
+  const bits: string[] = [];
+  if (queuedCount && queuedCount > 0) bits.push(`后面还有 ${queuedCount} 棒`);
+  if (inboundCount && inboundCount > 0) bits.push(`还有 ${inboundCount} 句在等`);
+  if (bits.length === 0) return view;
+  return { ...view, text: `${view.text} · ${bits.join(' · ')}` };
 }
 
 export function describeBall(
@@ -29,6 +36,7 @@ export function describeBall(
   nameOf: (agentId?: string) => string,
   roleOf?: (agentId?: string) => string | undefined,
   queuedCount?: number,
+  inboundCount?: number,
 ): BallView {
   if (sending) {
     const streaming = [...messages]
@@ -42,9 +50,10 @@ export function describeBall(
           agentId: streaming.agentId,
         },
         queuedCount,
+        inboundCount,
       );
     }
-    return withQueuedHint({ text: '球已抛出，猫们正在接…', tone: 'busy' }, queuedCount);
+    return withQueuedHint({ text: '球已抛出，猫们正在接…', tone: 'busy' }, queuedCount, inboundCount);
   }
 
   // 对齐 clowder:句中 @ 的系统提示不算出口,从后往前找最后有意义的一条
@@ -55,15 +64,15 @@ export function describeBall(
     if (last.role === 'system' && last.systemKind === 'pr-opened') continue;
     if (last.role === 'system' && last.systemKind === 'pr-review') continue;
     if (last.role === 'system' && last.systemKind === 'git-overstep') {
-      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && last.systemKind === 'pr-merged') {
-      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'user' && last.content.trim().startsWith('#')) continue;
 
     if (last.role === 'system' && isDroppedBallNote(last)) {
-      return withQueuedHint({ text: last.content.replace(/^⚠️\s*/, ''), tone: 'ground' }, queuedCount);
+      return withQueuedHint({ text: last.content.replace(/^⚠️\s*/, ''), tone: 'ground' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isRelayBallNote(last)) {
       const toId = last.systemMeta?.to;
@@ -71,34 +80,36 @@ export function describeBall(
       return withQueuedHint(
         { text: to ? `球在${to}手上` : '接力中', tone: 'cat', ...(toId ? { agentId: toId } : {}) },
         queuedCount,
+        inboundCount,
       );
     }
     if (last.role === 'system' && isAppliedApprovalMessage(last)) {
-      return withQueuedHint({ text: '已落地，等人开口', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '已落地，等人开口', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isApprovalFailedMessage(last)) {
-      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isPendingApprovalMessage(last)) {
-      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isFreezeBallMessage(last)) {
-      return withQueuedHint({ text: '已拉闸，等人开口', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '已拉闸，等人开口', tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isEscalatedBallMessage(last)) {
-      return withQueuedHint({ text: last.content.replace(/^📋\s*/, ''), tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: last.content.replace(/^📋\s*/, ''), tone: 'human' }, queuedCount, inboundCount);
     }
     if (last.role === 'system' && isHoldBallMessage(last)) {
       return withQueuedHint(
         { text: last.content.replace(/^⏳\s*/, '').replace(/。人开口即取消。$/, ''), tone: 'cat' },
         queuedCount,
+        inboundCount,
       );
     }
     if (last.role === 'assistant' && last.agentId) {
       if (last.status !== 'streaming' && isReviewerRole(roleOf?.(last.agentId))) {
         const verdict = parseReviewCloseout(last.content);
         if (verdict === 'pass') {
-          return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+          return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
         }
         if (verdict === 'revise') {
           const writerId = findWriterId(messages, last.agentId, roleOf);
@@ -106,6 +117,7 @@ export function describeBall(
             return withQueuedHint(
               { text: `球在${nameOf(writerId)}手上`, tone: 'cat', agentId: writerId },
               queuedCount,
+              inboundCount,
             );
           }
         }
@@ -117,13 +129,14 @@ export function describeBall(
           agentId: last.agentId,
         },
         queuedCount,
+        inboundCount,
       );
     }
     if (last.role === 'user') {
-      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount);
+      return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }
   }
-  return withQueuedHint({ text: '等人开口', tone: 'human' }, queuedCount);
+  return withQueuedHint({ text: '等人开口', tone: 'human' }, queuedCount, inboundCount);
 }
 
 type Kinded = Pick<BallMessage, 'content' | 'systemKind'>;

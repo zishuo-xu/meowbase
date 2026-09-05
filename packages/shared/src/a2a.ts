@@ -202,6 +202,11 @@ export function formatQueuedHandoffNote(fromName: string, toName: string): strin
   return `${fromName} 交给 ${toName} 的这一棒排在后面,当前棒跑完接着跑。`;
 }
 
+/** 人在忙时插话:不打断当前棒,跑完再送。 */
+export function formatInboundQueuedNote(): string {
+  return '已排队,当前棒跑完再送。';
+}
+
 /** 有 pending 时:没点名叫别人就续跑下一跳;行首 @人 或点名另一只则不续。 */
 export function shouldResumePending(
   content: string,

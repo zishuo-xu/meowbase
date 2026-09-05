@@ -2,6 +2,12 @@ export type AgentId = 'claude' | 'gemini' | 'opencode';
 
 export const AGENT_IDS: readonly AgentId[] = ['claude', 'gemini', 'opencode'];
 
+/** 人在忙时插的话,当前棒跑完再送。 */
+export interface InboundMessage {
+  id: string;
+  content: string;
+}
+
 /** 已交棒、下一跳还没跑。线程内最多一条。 */
 export interface PendingHop {
   /** 这一棒的身份:跑完只清自己,重跑用它认消息 */
@@ -30,6 +36,8 @@ export interface Thread {
   pendingHop?: PendingHop;
   /** 槽里已有棒时,后来交的棒按 FIFO 排在后面 */
   pendingQueue?: PendingHop[];
+  /** 猫还在跑时人插的话,FIFO,当前棒跑完再送 */
+  inboundQueue?: InboundMessage[];
   /** 绑了真实仓库时:父仓路径、基准分支、本线程分支 */
   repo?: ThreadRepo;
   createdAt: string;

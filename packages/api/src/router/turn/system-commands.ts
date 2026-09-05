@@ -105,6 +105,7 @@ export async function handleSystemCommand(input: {
     killHoldCommand(threadId);
     await context.stores.threads.setPendingHop(threadId, null);
     await context.stores.threads.clearPendingQueue(threadId);
+    await context.stores.threads.clearInboundQueue(threadId);
     return context.stores.messages.append({
       threadId,
       role: 'system',
