@@ -42,7 +42,7 @@ import {
   broadcastThreadSync,
 } from './broadcast-sync.js';
 import { executeTurn, type TurnContext } from '../router/execute-turn.js';
-import type { PrLookup } from '../services/pr.js';
+import type { PrLookup, PrReviewList } from '../services/pr.js';
 import {
   createPendingRunner,
   HOP_LEASE_RENEW_MS,
@@ -91,6 +91,8 @@ export interface ApiDeps {
   allowedOrigins?: readonly string[];
   /** PR 只读查询;不传则每跳走默认 gh。记分板注入假源。 */
   lookupPr?: PrLookup;
+  /** PR 评论只读查询;不传则每跳走默认 gh。测试注入假源。 */
+  listPrReviews?: PrReviewList;
 }
 
 interface LiveConfig {
@@ -547,6 +549,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       holdCommands: deps.holdCommands,
       holdCommandEnv: deps.holdCommandEnv,
       ...(deps.lookupPr ? { lookupPr: deps.lookupPr } : {}),
+      ...(deps.listPrReviews ? { listPrReviews: deps.listPrReviews } : {}),
     };
     return {
       context,

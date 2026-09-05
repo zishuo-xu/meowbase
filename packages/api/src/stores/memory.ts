@@ -98,6 +98,12 @@ export class InMemoryThreadStore implements ThreadStore {
     thread.repo = { ...thread.repo, lastApprovedSha: sha };
   }
 
+  async setSeenPrCommentIds(threadId: string, ids: string[]): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread?.repo) return;
+    thread.repo = { ...thread.repo, seenPrCommentIds: ids };
+  }
+
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);

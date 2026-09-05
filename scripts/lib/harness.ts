@@ -32,7 +32,13 @@ export interface MessageRow {
   content: string;
   status: string;
   systemKind?: string;
-  systemMeta?: { from?: string; to?: string; verdict?: 'pass' | 'revise' | 'incomplete' };
+  systemMeta?: {
+    from?: string;
+    to?: string;
+    verdict?: 'pass' | 'revise' | 'incomplete';
+    prNumber?: number;
+    prUrl?: string;
+  };
   error?: string;
 }
 

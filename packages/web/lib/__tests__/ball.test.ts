@@ -479,6 +479,23 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在墨墨手上', tone: 'cat', agentId: 'claude' });
   });
 
+  it('pr-review 不参与球权,顶栏仍显示它之前那条(评论正文带「接力:」也不误判)', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'assistant', agentId: 'claude', content: '开了 PR', status: 'completed' },
+          {
+            role: 'system',
+            content: '💬 PR #12 新评论:「这一棒接力:墨墨 → 闪闪 漏了测试」',
+            systemKind: 'pr-review',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在墨墨手上', tone: 'cat', agentId: 'claude' });
+  });
+
   it('pr-merged 顶栏球在人手里', () => {
     expect(
       describeBall(

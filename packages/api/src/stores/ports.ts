@@ -28,6 +28,8 @@ export interface ThreadStore {
   }): Promise<Thread>;
   /** 批准落地成功后记下 HEAD,下一张卡从这里开始 diff */
   setLastApprovedSha(threadId: string, sha: string): Promise<void>;
+  /** PR 评论回流的指纹;只在消息落库成功后更新 */
+  setSeenPrCommentIds(threadId: string, ids: string[]): Promise<void>;
   get(id: string): Promise<Thread | null>;
   list(): Promise<Thread[]>;
   setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void>;

@@ -107,6 +107,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。开了远程时自己那根的提交/推送只落 `git-move`,接力继续;本地模式(`allowRemote` 缺失即 false)下自己那根远端跟踪引用变了也落 `git-overstep`(不该推送) |
 | PR 合了就停 | **开了远程的**绑仓线程每跳后自己查这个分支的 PR(不读猫正文)。状态变成 MERGED 则落参与球权的 `pr-merged`、清掉 pending、不建审批卡。查不到落「查不到 PR 状态(原因)」、不停接力,不许落成「没有 PR」。第一次看见 OPEN 只落 `pr-opened`(不参与球权)。本地模式一次 `gh` 都不跑 |
 | 合了之后作废还开着的卡 | `pr-merged` 停接力时，把本线程还开着的审批卡改成终态 `voided` 并写清原因（PR #N 已合并）。`#approve` 对失效卡当场拒，不走到提交。`git-overstep` / PR `CLOSED` 不作废 |
+| PR 评论回流 | 绑仓开远程的线程,每跳后 PR 是 OPEN 就查一次评论(`gh api` 拉 issues/comments + pulls/reviews):新评论落 `pr-review` 系统消息(不参与球权),指纹在消息 append 成功后逐条记;作者是人(`User`)则 settle 时给写手猫起一跳去处理,bot 写的只落消息不叫醒。四条叫醒护栏:交接中的棒不覆盖、等跑的命令不取消、持球不叫醒、叫醒过本轮不建卡。merged/closed 后不再查 |
 
 ## 开发约定
 
@@ -120,7 +121,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - 提交规范:`feat/fix/refactor/test/docs/chore` 前缀
 - **新增系统消息必须带 `systemKind`**:append 的入参是判别联合,`role: 'system'` 不给 kind 编译不过。前端球权/时间线读 kind 而不是匹配文案,所以打错标签会改顶栏行为;不参与球权的用 `notice`(见 [system-message-kind.md](docs/features/system-message-kind.md))
 - **审计不用手写**:平台的决定在 store 边界自动落一行流水(`stores/audit-log.ts` 装饰器),业务代码不写 `audit.append`;不经过 store 的租约事件在 `pending-runner.ts` 显式补,半截重跑在 `resumePendingTurn`(见 [audit-trail.md](docs/features/audit-trail.md))。store 已经负责的 kind(`STORE_OWNED_SYSTEM_KINDS`,现为 `approval-applied`)消息侧不再重复派生,回执从 `GET /messages` 能拿到;`approval-failed` 只有消息没有 store 动作,仍从消息落。没有 `pendingHop` 不落租约行。
-- 测试:`pnpm test`(shared 191 + api 314 + web 186 = 691);api 那 314 里有 12 个是 Redis 套件,本地 Redis 在跑才 passed,连不上则 `describe.skipIf` 真跳过(输出 302 passed + 12 skipped,总数仍是 314)。**报告数不等于 `it(` 声明数**——api 有 3 个用例是参数化生成的,声明数 311、报告 314,别按 grep 结果改这里
+- 测试:`pnpm test`(shared 202 + api 333 + web 187 = 722);api 那 333 里有 12 个是 Redis 套件,本地 Redis 在跑才 passed,连不上则 `describe.skipIf` 真跳过(输出 321 passed + 12 skipped,总数仍是 333)。**报告数不等于 `it(` 声明数**——有参数化生成的用例,别按 grep 结果改这里
 - 新增 agent CLI 适配器:实现 `AgentService` 接口 + 注册进 `createAgentRegistry`(见 `providers/gemini.ts`)
 - 新增技能:在 `skills/` 加 md + manifest 条目,无需改代码
 

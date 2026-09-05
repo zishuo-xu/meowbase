@@ -55,3 +55,5 @@
 | [demo-path-in-ci.md](demo-path-in-ci.md) | 已落地 | 演示路径进 CI:人打字那一层也要有人管 |
 | [remote-opt-in.md](remote-opt-in.md) | 已落地 | 本地是默认,碰远程要显式开 |
 | [memory-scope.md](memory-scope.md) | 已落地 | 记忆按仓库划界,注入带出处 |
+| [risk-routed-reviewer.md](risk-routed-reviewer.md) | 已落地 | 按风险面选审查官 |
+| [pr-review-reflow.md](pr-review-reflow.md) | 已落地 | PR 上的评论流回线程 |

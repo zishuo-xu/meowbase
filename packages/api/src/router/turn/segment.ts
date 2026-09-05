@@ -47,9 +47,15 @@ import {
   formatPrLookupFailedNote,
   formatPrMergedNote,
   formatPrOpenedNote,
+  formatPrReviewNote,
   isPrMerged,
+  listPrReviews,
   lookupPr,
+  selectUnseenPrReviews,
   type PrMergeStop,
+  type PrReviewItem,
+  type PrReviewListResult,
+  type PrReviewRef,
   type PrSnapshot,
 } from '../../services/pr.js';
 import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
@@ -106,6 +112,7 @@ async function recordPrState(input: {
   context: TurnContext;
   writeQueue: WriteQueue;
   agentName: string;
+  onOpenPr?: (pr: PrSnapshot) => Promise<void>;
 }): Promise<PrMergeStop | undefined> {
   if (!input.thread.repo) return undefined;
   if (!input.thread.repo.allowRemote) return undefined;
@@ -158,6 +165,8 @@ async function recordPrState(input: {
       note: formatPrMergedNote({ number: pr.number, url: pr.url }),
     };
   }
+  // OPEN 才查评论:CLOSED 不查;merged 已由上面的分支收敛
+  if (pr.state === 'OPEN' && input.onOpenPr) await input.onOpenPr(pr);
   if (samePr('pr-opened', pr)) return undefined;
   await input.writeQueue(() =>
     input.context.stores.messages.append({
@@ -179,6 +188,67 @@ async function recordPrState(input: {
     }),
   );
   return undefined;
+}
+
+/** PR 评论回流:投新评论进时间线,指纹只在 append 成功后推进 */
+async function syncPrReviews(input: {
+  thread: ThreadRuntime;
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  pr: PrSnapshot;
+}): Promise<PrReviewItem[]> {
+  if (input.pr.state !== 'OPEN') return []; // 双保险:onOpenPr 只在 OPEN 时挂
+  const list = input.context.listPrReviews ?? listPrReviews;
+  let result: PrReviewListResult;
+  try {
+    result = await list({ workdir: input.thread.workdir, number: input.pr.number });
+  } catch (err) {
+    result = { ok: false as const, reason: clip(String(err), 80) };
+  }
+  if (!result.ok) {
+    const reason = result.reason;
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrLookupFailedNote(reason),
+        status: 'completed',
+        systemKind: 'notice',
+      }),
+    );
+    return [];
+  }
+  // 现查指纹:turn 开始时的 thread 是死快照(redis 的 get 每次新建对象),
+  // 同一 turn 多段共享它,读快照会重投
+  const seen =
+    (await input.context.stores.threads.get(input.thread.id))?.repo?.seenPrCommentIds ?? [];
+  const fresh = selectUnseenPrReviews(result.items, seen);
+  if (fresh.length === 0) return [];
+  const delivered: string[] = [];
+  const persisted = [...seen];
+  for (const item of fresh) {
+    // append 成功才记指纹;抛错就让异常冒上去中断(writeQueue 串行),之前投成功的不丢
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrReviewNote({
+          author: item.author,
+          body: item.body,
+          number: input.pr.number,
+          url: item.htmlUrl ?? input.pr.url,
+        }),
+        status: 'completed',
+        systemKind: 'pr-review',
+        systemMeta: { prNumber: input.pr.number, prUrl: input.pr.url },
+      }),
+    );
+    delivered.push(item.id);
+    persisted.push(item.id);
+    // 每条投成功立即推进指纹:中途抛错,已投的下轮也不会重投
+    await input.context.stores.threads.setSeenPrCommentIds(input.thread.id, [...persisted]);
+  }
+  return fresh.filter((i) => delivered.includes(i.id));
 }
 
 async function rememberHoldCommand(input: {
@@ -243,6 +313,7 @@ export async function runSegment(
   } | undefined;
   const oversteps: GitOverstep[] = [];
   let mergedPr: PrMergeStop | undefined;
+  const prReviews: PrReviewRef[] = [];
   if (resume) {
     for (const id of resume.visited) visited.add(id);
   }
@@ -310,6 +381,12 @@ export async function runSegment(
         context,
         writeQueue,
         agentName,
+        onOpenPr: async (pr) => {
+          const delivered = await syncPrReviews({ thread, context, writeQueue, pr });
+          for (const item of delivered) {
+            prReviews.push({ item, prNumber: pr.number, prUrl: pr.url });
+          }
+        },
       });
       if (foundMerge) mergedPr = foundMerge;
       return found.length > 0 || Boolean(foundMerge);
@@ -581,5 +658,5 @@ export async function runSegment(
       );
     }
   }
-  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr };
+  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr, prReviews };
 }

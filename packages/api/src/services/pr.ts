@@ -183,3 +183,153 @@ export function createMergedPrLookup(): PrLookup {
     };
   };
 }
+
+export function createOpenPrLookup(): PrLookup {
+  return async ({ workdir }) => {
+    let headRefOid = 'a'.repeat(40);
+    try {
+      const { stdout } = await exec('git', ['rev-parse', 'HEAD'], { cwd: workdir });
+      const sha = stdout.trim();
+      if (/^[0-9a-f]{40}$/i.test(sha)) headRefOid = sha;
+    } catch {
+      // 记分板假源:读不到 HEAD 就用占位 sha
+    }
+    return {
+      ok: true,
+      pr: {
+        number: 42,
+        state: 'OPEN',
+        url: 'https://github.com/example/repo/pull/42',
+        headRefOid,
+      },
+    };
+  };
+}
+
+export type PrReviewAuthorType = 'User' | 'Bot' | 'Other';
+
+export interface PrReviewItem {
+  id: string;
+  author: string;
+  authorType: PrReviewAuthorType;
+  body: string;
+  htmlUrl?: string;
+  submittedAt?: string;
+}
+
+export interface PrReviewRef {
+  item: PrReviewItem;
+  prNumber: number;
+  prUrl: string;
+}
+
+export type PrReviewListResult =
+  | { ok: true; items: PrReviewItem[] }
+  | { ok: false; reason: string };
+
+export type PrReviewList = (input: { workdir: string; number: number }) => Promise<PrReviewListResult>;
+
+function toAuthorType(raw: unknown): PrReviewAuthorType {
+  return raw === 'User' || raw === 'Bot' ? raw : 'Other';
+}
+
+export function parsePrReviewJson(rawComments: string, rawReviews: string): PrReviewItem[] | null {
+  try {
+    const comments = JSON.parse(rawComments) as unknown;
+    const reviews = JSON.parse(rawReviews) as unknown;
+    if (!Array.isArray(comments) || !Array.isArray(reviews)) return null;
+    const out: PrReviewItem[] = [];
+    for (const item of comments) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.id !== 'number' || typeof row.body !== 'string') continue;
+      const user = (row.user ?? {}) as Record<string, unknown>;
+      out.push({
+        id: `c${row.id}`,
+        author: typeof user.login === 'string' ? user.login : 'unknown',
+        authorType: toAuthorType(user.type),
+        body: row.body,
+        ...(typeof row.html_url === 'string' ? { htmlUrl: row.html_url } : {}),
+        ...(typeof row.created_at === 'string' ? { submittedAt: row.created_at } : {}),
+      });
+    }
+    for (const item of reviews) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.id !== 'number' || typeof row.body !== 'string') continue;
+      if (row.body.trim().length === 0) continue; // approve 的 review 常是空 body
+      const user = (row.user ?? {}) as Record<string, unknown>;
+      out.push({
+        id: `r${row.id}`,
+        author: typeof user.login === 'string' ? user.login : 'unknown',
+        authorType: toAuthorType(user.type),
+        body: row.body,
+        ...(typeof row.html_url === 'string' ? { htmlUrl: row.html_url } : {}),
+        ...(typeof row.submitted_at === 'string' ? { submittedAt: row.submitted_at } : {}),
+      });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export function selectUnseenPrReviews(
+  items: readonly PrReviewItem[],
+  seenIds: readonly string[],
+): PrReviewItem[] {
+  const seen = new Set(seenIds);
+  return items.filter((item) => !seen.has(item.id));
+}
+
+export function formatPrReviewNote(input: {
+  author: string;
+  body: string;
+  number: number;
+  url: string;
+}): string {
+  return `💬 PR #${input.number} 来了新评论(${input.author}):${input.body} ${input.url}`;
+}
+
+export function formatPrReviewWakeTask(input: {
+  comments: readonly PrReviewItem[];
+  number: number;
+  url: string;
+}): string {
+  const lines = input.comments.map((c) => `- ${c.author}:${c.body}`);
+  return `PR #${input.number}(${input.url})来了 ${input.comments.length} 条新评论,请逐条处理:\n${lines.join('\n')}`;
+}
+
+export function createFixedPrReviewList(kind: 'user' | 'bot'): PrReviewList {
+  return async () => ({
+    ok: true,
+    items: [
+      {
+        id: 'c9001',
+        author: kind === 'user' ? 'reviewer-hr' : 'codecov-bot',
+        authorType: kind === 'user' ? 'User' : 'Bot',
+        body: '这里的边界条件没处理,除零要炸',
+        htmlUrl: 'https://github.com/example/repo/pull/42#issuecomment-9001',
+        submittedAt: '2026-09-05T00:00:00Z',
+      },
+    ],
+  });
+}
+
+export async function listPrReviews(input: { workdir: string; number: number; ghBin?: string }): Promise<PrReviewListResult> {
+  const bin = input.ghBin ?? 'gh';
+  try {
+    const { stdout: nwo } = await exec(bin, ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'], { cwd: input.workdir, timeout: GH_TIMEOUT_MS });
+    const repo = nwo.trim();
+    if (!repo) return { ok: false, reason: '拿不到仓库名' };
+    const [{ stdout: rawComments }, { stdout: rawReviews }] = await Promise.all([
+      exec(bin, ['api', `repos/${repo}/issues/${input.number}/comments`], { cwd: input.workdir, timeout: GH_TIMEOUT_MS }),
+      exec(bin, ['api', `repos/${repo}/pulls/${input.number}/reviews`], { cwd: input.workdir, timeout: GH_TIMEOUT_MS }),
+    ]);
+    const items = parsePrReviewJson(rawComments, rawReviews);
+    if (!items) return { ok: false, reason: '返回不是 JSON' };
+    return { ok: true, items };
+  } catch (err) {
+    return { ok: false, reason: classifyPrLookupError(err) };
+  }
+}

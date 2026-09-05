@@ -32,7 +32,7 @@
 | 20 | 跨猫互审与人批落地 | 部分对齐(差云端第二层 review) | [F031](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F031-review-two-layer-process.md) | [approval](features/approval.md)、[review-conclusion](features/review-conclusion.md) | 审查是猫推理、落地是人拍板——互审是内建管线,不是聊天里求人 |
 | 21 | 按风险面选审查官 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [risk-routed-reviewer](features/risk-routed-reviewer.md) | 强制力跟风险走——审查官按 diff 命中的风险面选,任何情况不许自审 |
 | 22 | 验证闸(没证据不算通过) | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [verification-gate](features/verification-gate.md) | 没证据不算通过——闸只管卡上结论和自动落地,不管顶栏文案 |
-| 23 | GitHub PR 自动化 | 部分对齐(差 review 回流、CI 追踪、冲突检测) | [F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md)、[F133](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F133-cicd-tracking.md) | [pr-open](features/pr-open.md)、[approval-void](features/approval-void.md) | 猫能自己开 PR,合了平台自己停——但 PR 上的 review comment 还不会流回来叫醒猫 |
+| 23 | GitHub PR 自动化 | 部分对齐(差 CI 追踪、冲突检测) | [F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md)、[F133](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F133-cicd-tracking.md) | [pr-open](features/pr-open.md)、[approval-void](features/approval-void.md)、[pr-review-reflow](features/pr-review-reflow.md) | 猫能自己开 PR,合了平台自己停,PR 上人写的 review comment 会流回线程叫醒写手猫——bot 写的只落时间线,不叫人 |
 | 24 | 统一审批中心 | 缺失 | [F246](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F246-approval-hub.md) | | 审批卡散在各条线程里——我缺一个「全局待批」的聚合视图 |
 | 25 | 操作审计流水 | 部分对齐(差 CLI 原始日志取证层) | [F013](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F013-audit-log-v2.md) | [audit-trail](features/audit-trail.md) | 业务代码不写审计调用——让 store 边界自动记账,不靠人记得 |
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
@@ -58,7 +58,7 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **F140 review 回流 + CI 追踪**(补第 23 行)——「合了就停」的自然续章,讲「事件该回流到哪只猫」;轮询只读不花钱;预计 3–4 刀(comment 回流 / CI 状态 / 冲突检测 / 叫醒策略,inline comment 抓不到的坑先写进薄设计)。
+1. **F140 CI 追踪 + 冲突检测**(补第 23 行)——review 回流已落地,剩 CI 绿不绿、冲突检测;轮询只读不花钱;预计 2–3 刀(CI 状态 / 冲突检测,inline comment 抓不到的坑先写进薄设计)。
 2. **预算闸**(补第 27 行的 budget 半)——账本数据已经在 `Message.usage` 里,只差 `executeTurn` 的准入判断;「平台会不会拒绝」从「中」补厚的关键;预计 1–2 刀。
 3. **技能/工具使用度量**(补第 19 行)——计数 + 看板,fake 可测、不花钱;厚薄表唯一「薄」的那条道;预计 2 刀。
 4. **邮箱/统一队列形态**(补第 29 行)——租约、收尸、at-least-once 的地基已经打好,叙事是「从一条槽到一个队列」;预计 4–6 刀。

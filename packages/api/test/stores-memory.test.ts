@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createMemoryStores } from '../src/stores/factories.js';
 
@@ -44,6 +47,20 @@ describe('内存存储', () => {
     expect(thread.repo?.lastApprovedSha).toBeUndefined();
     await threads.setLastApprovedSha(thread.id, 'abc123def456');
     expect((await threads.get(thread.id))?.repo?.lastApprovedSha).toBe('abc123def456');
+  });
+
+  it('seenPrCommentIds 写入后 get 能 round-trip', async () => {
+    const stores = createMemoryStores();
+    const repoPath = mkdtempSync(join(tmpdir(), 'meow-test-'));
+    const thread = await stores.threads.create({
+      title: 't', primaryAgentId: 'claude',
+      repo: { path: repoPath, baseBranch: 'main', allowRemote: true },
+    });
+    await stores.threads.setSeenPrCommentIds(thread.id, ['c9001', 'r42']);
+    const got = await stores.threads.get(thread.id);
+    expect(got?.repo?.seenPrCommentIds).toEqual(['c9001', 'r42']);
+    // 不覆盖其他 repo 字段
+    expect(got?.repo?.allowRemote).toBe(true);
   });
 
   it('rename 改标题', async () => {

@@ -74,6 +74,10 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       await store.setLastApprovedSha(threadId, sha);
       emit(threadId);
     },
+    setSeenPrCommentIds: async (threadId, ids) => {
+      await store.setSeenPrCommentIds(threadId, ids);
+      emit(threadId);
+    },
     setSession: (threadId, agentId, sessionId) => store.setSession(threadId, agentId, sessionId),
     setPendingHop: async (threadId, hop) => {
       await store.setPendingHop(threadId, hop);

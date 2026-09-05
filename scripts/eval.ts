@@ -50,6 +50,7 @@ const sameTreeMoBin = resolve(root, 'scripts/fixtures/fake-same-tree-mo.mjs');
 const sameTreeTuanBin = resolve(root, 'scripts/fixtures/fake-same-tree-tuan.mjs');
 const scopeLearnBin = resolve(root, 'scripts/fixtures/fake-scope-learn.mjs');
 const safetyWriterBin = resolve(root, 'scripts/fixtures/fake-safety-writer.mjs');
+const prReviewWriterBin = resolve(root, 'scripts/fixtures/fake-pr-review-writer.mjs');
 
 interface Scenario {
   id: string;
@@ -704,6 +705,102 @@ async function runVoidAfterMerge(workdirBase: string): Promise<boolean> {
   }
 }
 
+/**
+ * true = 人写的评论叫醒写手:落 pr-review、pending-runner 把写手叫起来跑第二跳、
+ * 叫醒那跳的输入里带评论正文、同一评论不重投、审计有 pr-review 行。
+ * 写手 fake 第一轮不交棒(交棒中的棒不许被叫醒覆盖,见 pr-review-flow 测试),链停在自己这轮。
+ */
+async function runPrReviewUser(workdirBase: string): Promise<boolean> {
+  const dump = join(
+    workdirBase,
+    `pr-review-wake-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+  );
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: prReviewWriterBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_REVIEW_FAKE: 'user', FAKE_PROMPT_DUMP: dump },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写 hello.txt');
+      const rows = await waitFor('人写的评论:叫醒那一跳跑完', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const woke = assistantOf(messages, 'claude').some(
+          (m) => m.status === 'completed' && m.content.includes('已处理 PR 评论'),
+        );
+        return woke ? messages : undefined;
+      });
+      const reviewNotes = rows.filter(
+        (m) => m.role === 'system' && m.systemKind === 'pr-review',
+      );
+      if (reviewNotes.length !== 1) return false;
+      if (!reviewNotes[0]?.content.includes('reviewer-hr')) return false;
+      if (reviewNotes[0]?.systemMeta?.prNumber !== 42) return false;
+      const writerDone = assistantOf(rows, 'claude').filter((m) => m.status === 'completed');
+      if (writerDone.length < 2) return false;
+      // 叫醒那一跳的输入里确实带评论正文(fake 把每跳 prompt 追加落盘)
+      if (!existsSync(dump)) return false;
+      const prompts = readFileSync(dump, 'utf8');
+      if (!prompts.includes('除零要炸')) return false;
+      if (!prompts.includes('PR #42')) return false;
+      const audit = await getAudit(api.baseUrl, bound.threadId);
+      if (!audit.some((item) => item.action === 'pr-review')) return false;
+      // 再发一条人消息:同一评论不该重投第二条 pr-review
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 再看一眼');
+      await waitFor('再发一条后当轮跑完', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const later = assistantOf(messages, 'claude').filter((m) => m.status === 'completed');
+        return later.length > writerDone.length ? messages : undefined;
+      });
+      const after = await getMessages(api.baseUrl, bound.threadId);
+      const afterNotes = after.filter(
+        (m) => m.role === 'system' && m.systemKind === 'pr-review',
+      );
+      if (afterNotes.length !== 1) return false;
+      return true;
+    },
+  );
+}
+
+/** true = bot 评论只落消息不叫醒:pr-review 在,没有叫醒那一跳,链停后无 pending。
+ * 写手用不交棒的 fake:链停在自己这轮,叫醒过滤(authorType === 'User')才走得到;
+ * 用交棒的 fake 会被 waiting 护栏先挡住,这行就量不到 bot 免打扰这道关(踩坑 27)。 */
+async function runPrReviewBot(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: prReviewWriterBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_REVIEW_FAKE: 'bot' },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写 hello.txt');
+      const rows = await waitFor('bot 的评论:链落定', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        // 不交棒的 fake 会被补问一次,第二条 completed 出现才算这轮跑完
+        const writerDone = assistantOf(messages, 'claude').filter(
+          (m) => m.status === 'completed',
+        );
+        const settled = hasKind(messages, 'approval-pending') || hasKind(messages, 'approval-applied');
+        return writerDone.length >= 2 || settled ? messages : undefined;
+      });
+      const reviewNotes = rows.filter(
+        (m) => m.role === 'system' && m.systemKind === 'pr-review',
+      );
+      if (reviewNotes.length !== 1) return false;
+      if (!reviewNotes[0]?.content.includes('codecov-bot')) return false;
+      // 「已处理 PR 评论」只在 fake 看见评论正文(被叫醒)时才写出,条数断言量不到这道关
+      const woke = assistantOf(rows, 'claude').some(
+        (m) => m.status === 'completed' && m.content.includes('已处理 PR 评论'),
+      );
+      if (woke) return false;
+      if ((await getThread(api.baseUrl, bound.threadId)).pendingHop) return false;
+      return true;
+    },
+  );
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -828,6 +925,20 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '风险面选官:handoffTo 指向团团时,安全面改动仍由声明了 safety 的闪闪审',
     run: runSafetyReview,
+  },
+  {
+    id: 'pr-review-user',
+    name: 'PR 上来了人写的 review',
+    expectedCatch: 1,
+    expectNote: '评论回流关:落 pr-review、叫醒写手跑第二跳且输入带评论正文、同一评论不重投',
+    run: runPrReviewUser,
+  },
+  {
+    id: 'pr-review-bot',
+    name: 'PR 上来了 bot 的评论',
+    expectedCatch: 1,
+    expectNote: 'bot 免打扰关:只落 pr-review 消息,不叫醒、链停后无 pending',
+    run: runPrReviewBot,
   },
 ];
 

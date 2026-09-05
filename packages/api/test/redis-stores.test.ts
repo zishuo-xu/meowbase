@@ -165,6 +165,21 @@ describe.skipIf(!redis)('Redis 存储', () => {
     await threads.delete(thread.id);
   });
 
+  it('seenPrCommentIds 写入后回读,不覆盖其他 repo 字段', async () => {
+    const threads = createThreadStore(redis!);
+    const thread = await threads.create({
+      title: `redis-seenpr-${Date.now()}`,
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'develop', allowRemote: true },
+    });
+    await threads.setSeenPrCommentIds(thread.id, ['c9001', 'r42']);
+    const got = await threads.get(thread.id);
+    expect(got?.repo?.seenPrCommentIds).toEqual(['c9001', 'r42']);
+    expect(got?.repo?.allowRemote).toBe(true);
+    expect(got?.repo?.baseBranch).toBe('develop');
+    await threads.delete(thread.id);
+  });
+
   it('消息追加与 patch', async () => {
     const threads = createThreadStore(redis!);
     const messages = createMessageStore(redis!);
