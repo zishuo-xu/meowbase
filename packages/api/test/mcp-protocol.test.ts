@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { COLLAB_TOOLS, handleMcpRequest, mcpCliArgs } from '../src/mcp/protocol.js';
+import { COLLAB_TOOLS, formatMcpProvision, handleMcpRequest, mcpCliArgs } from '../src/mcp/protocol.js';
 
 describe('MCP protocol', () => {
   it('initialize 和 tools/list 列出搜消息和列线程', async () => {
@@ -36,5 +36,19 @@ describe('MCP protocol', () => {
     expect(mcpCliArgs('claude', 'node mcp.js')[0]).toBe('--mcp-config');
     expect(mcpCliArgs('gemini', 'node mcp.js')[0]).toBe('--allowed-mcp-server-names');
     expect(mcpCliArgs('opencode', 'node mcp.js')).toEqual([]);
+  });
+
+  it('可携带片段形状对得上 claude --mcp-config', () => {
+    const provision = formatMcpProvision({
+      command: 'node mcp.js',
+      apiUrl: 'http://127.0.0.1:3200/',
+    });
+    expect(provision.claude.mcpServers.meowbase).toEqual({ command: 'node mcp.js', args: [] });
+    expect(JSON.parse(mcpCliArgs('claude', provision.command)[1] ?? '{}')).toEqual(provision.claude);
+    expect(provision.gemini.allowedMcpServerNames).toEqual(['meowbase']);
+    expect(provision.env).toEqual({
+      MEOW_MCP_COMMAND: 'node mcp.js',
+      MEOW_API_URL: 'http://127.0.0.1:3200',
+    });
   });
 });

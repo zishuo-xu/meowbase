@@ -30,7 +30,7 @@ HTTP 工具面人能 curl,猫的 CLI 挂不上。对照他们:协作工具是必
 
 ## 不做（本篇）
 
-- 跨项目配置同步、npm 包装发布
+- 跨项目配置同步(见 [mcp-provision.md](mcp-provision.md))、npm 包装发布
 - 完整 MCP SDK、资源/提示模板
 - 让猫经 MCP 发消息或改路由
 

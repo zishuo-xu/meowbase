@@ -71,6 +71,7 @@ import { verifyModelConnection } from '../providers/verify-model.js';
 import { loadEvidenceRecall, loadToolUsage, loadUsage } from '../services/usage.js';
 import { readHopTranscript } from '../services/hop-transcript.js';
 import { loadCollabMessages, loadCollabThreads } from '../services/collab.js';
+import { formatMcpProvision } from '../mcp/protocol.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -620,6 +621,13 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       systemMeta: { fromThreadId: from.id },
     });
   });
+
+  app.get('/api/mcp/provision', async () =>
+    formatMcpProvision({
+      command: process.env.MEOW_MCP_COMMAND?.trim() || 'pnpm --filter @meowbase/api mcp',
+      apiUrl: process.env.MEOW_API_URL?.trim() || 'http://127.0.0.1:3200',
+    }),
+  );
 
   app.get('/api/collab/threads', async () => loadCollabThreads(stores));
 

@@ -99,3 +99,24 @@ export function mcpCliArgs(binKind: 'claude' | 'gemini' | 'opencode', command: s
   if (binKind === 'gemini') return ['--allowed-mcp-server-names', 'meowbase'];
   return [];
 }
+
+export interface McpProvision {
+  command: string;
+  apiUrl: string;
+  claude: { mcpServers: { meowbase: { command: string; args: string[] } } };
+  gemini: { allowedMcpServerNames: string[] };
+  env: { MEOW_MCP_COMMAND: string; MEOW_API_URL: string };
+}
+
+/** 换项目能粘贴的 MCP 片段。不写别人的仓。 */
+export function formatMcpProvision(input: { command: string; apiUrl: string }): McpProvision {
+  const command = input.command.trim();
+  const apiUrl = input.apiUrl.trim().replace(/\/+$/, '') || 'http://127.0.0.1:3200';
+  return {
+    command,
+    apiUrl,
+    claude: { mcpServers: { meowbase: { command, args: [] } } },
+    gemini: { allowedMcpServerNames: ['meowbase'] },
+    env: { MEOW_MCP_COMMAND: command, MEOW_API_URL: apiUrl },
+  };
+}

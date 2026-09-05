@@ -164,6 +164,23 @@ describe('GET /api/usage/tools', () => {
   });
 });
 
+describe('GET /api/mcp/provision', () => {
+  it('返回可粘贴的 mcpServers 片段', async () => {
+    const res = await fetch(`${baseUrl}/api/mcp/provision`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      command: string;
+      claude: { mcpServers: { meowbase: { command: string; args: string[] } } };
+      gemini: { allowedMcpServerNames: string[] };
+      env: { MEOW_MCP_COMMAND: string; MEOW_API_URL: string };
+    };
+    expect(body.command.length).toBeGreaterThan(0);
+    expect(body.claude.mcpServers.meowbase.command).toBe(body.command);
+    expect(body.gemini.allowedMcpServerNames).toEqual(['meowbase']);
+    expect(body.env.MEOW_API_URL).toContain('http');
+  });
+});
+
 describe('GET /api/collab', () => {
   it('空 q 返回空数组;关键词命中摘录', async () => {
     await stores.messages.append({

@@ -38,6 +38,14 @@ vi.mock('@/lib/api', () => ({
     cancelTurn: vi.fn(),
     fetchUsage: vi.fn(),
     fetchToolUsage: vi.fn(),
+    fetchMemoryRecall: vi.fn(),
+    fetchMcpProvision: vi.fn().mockResolvedValue({
+      command: 'node mcp.js',
+      apiUrl: 'http://127.0.0.1:3200',
+      claude: { mcpServers: { meowbase: { command: 'node mcp.js', args: [] } } },
+      gemini: { allowedMcpServerNames: ['meowbase'] },
+      env: { MEOW_MCP_COMMAND: 'node mcp.js', MEOW_API_URL: 'http://127.0.0.1:3200' },
+    }),
     steerQueue: vi.fn(),
   },
 }));

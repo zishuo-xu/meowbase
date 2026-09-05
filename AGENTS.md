@@ -111,7 +111,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 排队改序与急件 | 面板可上移/下移到任意位置。人话以 `!` / `急` 开头入队时插到队头并标急。不 abort 当前棒 |
 | 家规告示牌 | 平台按球权派生阶段写在线程上,猫每跳读到同一段,人在顶栏看见。牌子不是命令,不替猫决定下一站 |
 | 待批中心 | Hub「待批」页列出所有还没落地的卡。批准/打回走 `#approve` / `#reject`;去看打开那条线程 |
-| 协作工具 | 只读:`GET /api/collab/messages?q=` 搜正文,`GET /api/collab/threads` 列线程。空查询不扫全库。不改路由。stdio MCP:`pnpm --filter @meowbase/api mcp`;`MEOW_MCP=0` 不挂 CLI |
+| 协作工具 | 只读:`GET /api/collab/messages?q=` 搜正文,`GET /api/collab/threads` 列线程。空查询不扫全库。不改路由。stdio MCP:`pnpm --filter @meowbase/api mcp`;`MEOW_MCP=0` 不挂 CLI。换项目:`GET /api/mcp/provision` 导出可粘贴的 mcpServers |
 | 跨线程传话 | `POST /api/threads/:id/cross-post` 把一句寄到另一条线程,落 `cross-post` 系统消息,写明来自哪条。不叫猫、不参与球权、不落助手气泡。同源或目标不存在拒。同名猫在另一条线程说的话不当本线程自己 |
 | 记忆召回度量 | 跳完成记下塞进提示词的证据 id;猫正文点 `#ev_` 算引用。`GET /api/usage/memory` / Hub「记忆」页。不靠猫自评 |
 | 思考与计划 | 思考原文里行首「计划:」拆成 `plan`,气泡单独一块。不碰对用户说的话 |

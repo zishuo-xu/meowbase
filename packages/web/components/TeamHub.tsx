@@ -221,6 +221,7 @@ export function TeamHub({
   const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
   const [memoryRecall, setMemoryRecall] = useState<MemoryRecallDto | null>(null);
   const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
+  const [mcpSnippet, setMcpSnippet] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -240,6 +241,22 @@ export function TeamHub({
       Object.fromEntries(config.agents.map((agent) => [agent.id, config.agentBudgets?.[agent.id] != null ? String(config.agentBudgets[agent.id]) : ''])),
     );
   }, [open, focusAgentId, config]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void api
+      .fetchMcpProvision()
+      .then((row) => {
+        if (!cancelled) setMcpSnippet(JSON.stringify(row.claude, null, 2));
+      })
+      .catch(() => {
+        if (!cancelled) setMcpSnippet('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -848,6 +865,15 @@ export function TeamHub({
                   <li>list_threads · GET /api/collab/threads</li>
                   <li>cross-post · POST /api/threads/:id/cross-post</li>
                 </ul>
+                <div className="mt-3 text-xs font-bold text-[var(--ink-soft)]">可携带</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  换项目把这段贴进 claude --mcp-config。不改别人的仓。
+                </p>
+                {mcpSnippet ? (
+                  <pre className="mt-2 overflow-x-auto rounded-xl bg-white/80 p-2 text-[11px] leading-snug">
+                    {mcpSnippet}
+                  </pre>
+                ) : null}
               </div>
             </section>
           ) : pane === 'models' ? (

@@ -279,4 +279,12 @@ export const api = {
     request<ToolUsageDto>(threadId ? `/api/usage/tools?threadId=${threadId}` : '/api/usage/tools'),
   fetchMemoryRecall: (threadId?: string) =>
     request<MemoryRecallDto>(threadId ? `/api/usage/memory?threadId=${threadId}` : '/api/usage/memory'),
+  fetchMcpProvision: () =>
+    request<{
+      command: string;
+      apiUrl: string;
+      claude: { mcpServers: { meowbase: { command: string; args: string[] } } };
+      gemini: { allowedMcpServerNames: string[] };
+      env: { MEOW_MCP_COMMAND: string; MEOW_API_URL: string };
+    }>('/api/mcp/provision'),
 };

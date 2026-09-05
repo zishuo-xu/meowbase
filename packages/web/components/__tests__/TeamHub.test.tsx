@@ -16,6 +16,13 @@ vi.mock('@/lib/api', () => ({
       total: { injections: 0, citations: 0 },
     }),
     listApprovals: vi.fn().mockResolvedValue([]),
+    fetchMcpProvision: vi.fn().mockResolvedValue({
+      command: 'node mcp.js',
+      apiUrl: 'http://127.0.0.1:3200',
+      claude: { mcpServers: { meowbase: { command: 'node mcp.js', args: [] } } },
+      gemini: { allowedMcpServerNames: ['meowbase'] },
+      env: { MEOW_MCP_COMMAND: 'node mcp.js', MEOW_API_URL: 'http://127.0.0.1:3200' },
+    }),
   },
 }));
 
@@ -112,6 +119,14 @@ describe('TeamHub', () => {
       items: [],
       total: { injections: 0, citations: 0 },
     });
+    vi.mocked(api.fetchMcpProvision).mockReset();
+    vi.mocked(api.fetchMcpProvision).mockResolvedValue({
+      command: 'node mcp.js',
+      apiUrl: 'http://127.0.0.1:3200',
+      claude: { mcpServers: { meowbase: { command: 'node mcp.js', args: [] } } },
+      gemini: { allowedMcpServerNames: ['meowbase'] },
+      env: { MEOW_MCP_COMMAND: 'node mcp.js', MEOW_API_URL: 'http://127.0.0.1:3200' },
+    });
     vi.mocked(api.listApprovals).mockReset();
     vi.mocked(api.listApprovals).mockResolvedValue([]);
   });
@@ -182,7 +197,7 @@ describe('TeamHub', () => {
     );
   });
 
-  it('能力页只读列出谁写谁审谁跑', () => {
+  it('能力页只读列出谁写谁审谁跑', async () => {
     render(
       <TeamHub
         open
@@ -200,6 +215,8 @@ describe('TeamHub', () => {
     expect(screen.getByText(/search_messages/)).toBeTruthy();
     expect(screen.getByText(/list_threads/)).toBeTruthy();
     expect(screen.getByText(/cross-post/)).toBeTruthy();
+    expect(await screen.findByText('可携带')).toBeTruthy();
+    expect(screen.getByText(/mcpServers/)).toBeTruthy();
     expect(screen.getByText(/CLI opencode/)).toBeTruthy();
   });
 
