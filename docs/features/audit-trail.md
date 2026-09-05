@@ -59,3 +59,4 @@
 - 不经过 store 的五处：`router/pending-runner.ts`（`lease-claim` / `lease-steal` / `lease-release` / `hop-skip-stale`）、`router/execute-turn.ts`（`hop-rerun`）
 - 只读接口 `GET /api/audit`：`packages/api/src/http/server.ts`
 - 单测：`packages/api/test/audit-store.test.ts`、`audit-log.test.ts`、`audit-http.test.ts`（含接线那条钉子）、`audit-trail.test.ts`（动作顺序）
+- CLI 原始行取证见 [hop-transcript.md](hop-transcript.md)

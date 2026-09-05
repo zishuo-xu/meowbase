@@ -9,6 +9,8 @@ export interface AgentTurnInput {
   onIncrement?: (delta: string) => void;
   onActivity?: (activity: ToolActivity) => void;
   onThinking?: (delta: string) => void;
+  /** CLI stdout 每一行,取证用;写失败不能影响这一跳 */
+  onRawLine?: (line: string) => void;
   signal?: AbortSignal;
 }
 

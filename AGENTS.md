@@ -175,6 +175,6 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 - **加一个技能**:`skills/prompts/x.md` + `skills/manifest.json` 加条目(triggers 触发词)
 - **改 agent / 模型**:Hub 里改名册/模型并保存(`PATCH /api/config`)立即生效;或手改仓库根 `meowbase.config.json`(名字、别名、bin、model、A2A 链深,以及每只猫的 `handoffTo` / `handoff`)后重启 API。`PATCH /api/profiles/:agentId {"autoApprove":true}` 开自动批准
 - **加审批场景**:参考 executeTurn 审批块,复用 ApprovalStore
-- **查一条线程都发生过什么**:`curl "localhost:3200/api/audit?threadId=t_xxx"`(倒序;可加 `actor` / `action` / `since` / `limit`)。球停在哪一跳、谁交给谁、哪张卡被批过、重启后哪一棒被强抢重跑,都在这里,不用翻终端
+- **查一条线程都发生过什么**:`curl "localhost:3200/api/audit?threadId=t_xxx"`(倒序;可加 `actor` / `action` / `since` / `limit`)。球停在哪一跳、谁交给谁、哪张卡被批过、重启后哪一棒被强抢重跑,都在这里,不用翻终端。某一跳的 CLI 原始行:`GET /api/hops/:hopId?threadId=`
 - **看花了多少**:Hub 侧栏「账本」,或 `curl "localhost:3200/api/usage?threadId=t_xxx"`(不给 threadId 就是全部)。只算猫跑完的助手消息,模型探测的花费在探测结果里当场显示、不计入;gemini 不报成本,那格是「无成本数据」不是 `$0`
 - **真实模型演示**:不带 CLAUDE_BIN/GEMINI_BIN/OPENCODE_BIN 启动 api;步骤和期望见 [docs/DEMO.md](docs/DEMO.md)。费用按 token 计(一次完整流程约 $0.2-0.4)。点名/交棒规则见上面协议表

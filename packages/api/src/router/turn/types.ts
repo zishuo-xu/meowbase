@@ -74,6 +74,8 @@ export interface TurnContext {
   budgetUsd?: number;
   /** 已确认证据的纸本目录;缺省不写文件 */
   memoryDir?: string;
+  /** CLI 原始行归档目录;缺省不写 */
+  hopTranscriptDir?: string;
 }
 
 export interface SegmentRunResult {

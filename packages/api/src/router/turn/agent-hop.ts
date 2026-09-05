@@ -4,6 +4,7 @@ import type { AgentTurnOutput } from '../../providers/types.js';
 import { finalizeActivities, upsertToolActivity } from '../../providers/tool-activity.js';
 import { sweepStrayFiles } from '../../services/git.js';
 import { clip, turnLog } from '../../services/turn-log.js';
+import { appendHopTranscript } from '../../services/hop-transcript.js';
 import type { ThreadRuntime, TurnContext, WriteQueue } from './types.js';
 
 export async function runAgentTurn(
@@ -57,6 +58,15 @@ export async function runAgentTurn(
       const latest = activities.find((a) => a.id === activity.id) ?? activity;
       context.onActivity?.(thread.id, assistantMessage.id, latest, currentAgent);
     },
+    ...(hopId && context.hopTranscriptDir
+      ? {
+          onRawLine: (line: string) => {
+            void appendHopTranscript(context.hopTranscriptDir!, thread.id, hopId, line).catch(() => {
+              // 取证失败不挡这一跳
+            });
+          },
+        }
+      : {}),
   });
 
   if (output.sessionId && thread.sessions[currentAgent] !== output.sessionId) {

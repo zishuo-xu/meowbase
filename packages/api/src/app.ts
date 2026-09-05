@@ -66,6 +66,8 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
   mkdirSync(workdirBase, { recursive: true });
   const memoryDir = resolve(opts.repoRoot, process.env.MEMORY_DIR ?? 'memory');
   mkdirSync(memoryDir, { recursive: true });
+  const hopTranscriptDir = resolve(opts.repoRoot, process.env.HOP_TRANSCRIPT_DIR ?? 'audit/hops');
+  mkdirSync(hopTranscriptDir, { recursive: true });
 
   const redis = createRedisClient(config.redisUrl);
   await assertStorageReady(redis);
@@ -90,6 +92,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     holdCommandEnv: config.holdCommandEnv,
     ...(config.budgetUsd != null ? { budgetUsd: config.budgetUsd } : {}),
     memoryDir,
+    hopTranscriptDir,
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
     allowedOrigins: resolveAllowedOrigins(process.env),
     lookupPr: opts.lookupPr ?? ((input) => lookupPr(input)),

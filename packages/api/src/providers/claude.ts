@@ -55,6 +55,7 @@ export class ClaudeAdapter implements AgentService {
         while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
           const line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
+          input.onRawLine?.(line);
           const delta = accumulator.push(line);
           emitParsedLine(input, delta, accumulator.takeActivities(), accumulator.takeThinking());
         }

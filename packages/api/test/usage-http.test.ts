@@ -163,3 +163,29 @@ describe('GET /api/collab', () => {
     expect(list.some((row) => row.id === threadA)).toBe(true);
   });
 });
+
+describe('GET /api/hops/:hopId', () => {
+  it('配了归档目录就能读回原始行', async () => {
+    const { appendHopTranscript } = await import('../src/services/hop-transcript.js');
+    const dir = mkdtempSync(join(tmpdir(), 'meow-hop-http-'));
+    await appendHopTranscript(dir, threadA, 'hop-x', '{"type":"assistant"}');
+    const app = await buildServer({
+      stores,
+      registry: createAgentRegistry([]),
+      workdirBase,
+      agents: DEFAULT_AGENTS,
+      defaultAgentId: 'claude',
+      hopTranscriptDir: dir,
+    });
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+    const missing = await fetch(`${url}/api/hops/hop-x`);
+    expect(missing.status).toBe(404);
+    const res = await fetch(`${url}/api/hops/hop-x?threadId=${threadA}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { lines: Array<{ line: string }> };
+    expect(body.lines.map((r) => r.line)).toEqual(['{"type":"assistant"}']);
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

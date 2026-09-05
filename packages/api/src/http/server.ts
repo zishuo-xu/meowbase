@@ -66,6 +66,7 @@ import {
 } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
 import { loadToolUsage, loadUsage } from '../services/usage.js';
+import { readHopTranscript } from '../services/hop-transcript.js';
 import { loadCollabMessages, loadCollabThreads } from '../services/collab.js';
 
 declare module 'fastify' {
@@ -107,6 +108,8 @@ export interface ApiDeps {
   budgetUsd?: number;
   /** 已确认证据的纸本目录;缺省不写文件 */
   memoryDir?: string;
+  /** CLI 原始行归档目录;缺省不写 */
+  hopTranscriptDir?: string;
 }
 
 interface LiveConfig {
@@ -538,6 +541,17 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     });
   });
 
+  app.get('/api/hops/:hopId', async (request, reply) => {
+    const { hopId } = request.params as { hopId: string };
+    const { threadId } = request.query as { threadId?: string };
+    if (!deps.hopTranscriptDir || !threadId) {
+      return reply.code(404).send({ error: '没有这一跳的原始记录' });
+    }
+    const rows = await readHopTranscript(deps.hopTranscriptDir, threadId, hopId);
+    if (rows.length === 0) return reply.code(404).send({ error: '没有这一跳的原始记录' });
+    return { hopId, threadId, lines: rows };
+  });
+
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };
     return stores.messages.list(threadId);
@@ -591,6 +605,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ...(deps.lookupPrMergeable ? { lookupPrMergeable: deps.lookupPrMergeable } : {}),
       ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
       ...(deps.memoryDir ? { memoryDir: deps.memoryDir } : {}),
+      ...(deps.hopTranscriptDir ? { hopTranscriptDir: deps.hopTranscriptDir } : {}),
     };
     return {
       context,

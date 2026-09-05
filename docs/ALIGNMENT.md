@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 17 / 分母 31 = 55%**(每次相关改动同轮更新;第 15 行从部分对齐改为已对齐)
+**当前对齐率:已对齐 18 / 分母 31 = 58%**(每次相关改动同轮更新;第 25 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -34,7 +34,7 @@
 | 22 | 验证闸(没证据不算通过) | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [verification-gate](features/verification-gate.md) | 没证据不算通过——闸只管卡上结论和自动落地,不管顶栏文案 |
 | 23 | GitHub PR 自动化 | 已对齐 | [F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md)、[F133](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F133-cicd-tracking.md) | [pr-open](features/pr-open.md)、[approval-void](features/approval-void.md)、[pr-review-reflow](features/pr-review-reflow.md)、[pr-ci-tracking](features/pr-ci-tracking.md)、[pr-conflict](features/pr-conflict.md) | 猫能自己开 PR,合了平台自己停;人写的 review、CI 红灯、合不进去都会流回线程叫醒写手——绿只记、bot 评论不叫人 |
 | 24 | 统一审批中心 | 缺失 | [F246](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F246-approval-hub.md) | | 审批卡散在各条线程里——我缺一个「全局待批」的聚合视图 |
-| 25 | 操作审计流水 | 部分对齐(差 CLI 原始日志取证层) | [F013](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F013-audit-log-v2.md) | [audit-trail](features/audit-trail.md) | 业务代码不写审计调用——让 store 边界自动记账,不靠人记得 |
+| 25 | 操作审计流水 | 已对齐 | [F013](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F013-audit-log-v2.md) | [audit-trail](features/audit-trail.md)、[hop-transcript](features/hop-transcript.md) | 追责流水记决定,原始行按跳另存——两层分开,解析错了还能对证 |
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
 | 27 | 额度池看板与预算闸 | 部分对齐(差按猫拆池、热改上限的 Hub 表单) | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md) | 账本能看,花超了拒跑——闸只认报上来的真实花费,没配上限不拦 |
 | 28 | 消息分层可观测 | 部分对齐(差 thinking/plan 可观测层、遥测层) | [F045](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F045-ndjson-observability.md) | [system-message-kind](features/system-message-kind.md)、[live-sync](features/live-sync.md) | 平台知道的事件类型我打在消息字段里——改文案再也不会让顶栏静默失灵 |
@@ -58,6 +58,5 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
-2. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
-3. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。
+1. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
+2. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。

@@ -19,6 +19,7 @@ import type {
 } from '@meowbase/shared';
 import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
 import { overlayProfile, refreshSopBoard } from './context.js';
+import { randomUUID } from 'node:crypto';
 import { landApprovedCard } from './land-approval.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runAgentTurn } from './agent-hop.js';
@@ -103,7 +104,7 @@ export async function runReviewFixThenCard(input: {
         reviewPrompt(latestDiff, thread.workdir),
         reviewerPrompt,
         writeQueue,
-        undefined,
+        randomUUID(),
         reviewSkill ? [reviewSkill.id] : undefined,
       );
       return reviewHop.content || '(审查无输出)';
@@ -156,7 +157,7 @@ export async function runReviewFixThenCard(input: {
           sop: await refreshSopBoard(context, threadId, team),
         }),
         writeQueue,
-        undefined,
+        randomUUID(),
         fixSkills.map((skill) => skill.id),
       );
       await gitAddAll(thread.workdir);
