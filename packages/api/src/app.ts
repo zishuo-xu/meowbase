@@ -84,6 +84,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     models: config.models,
     holdCommands: config.holdCommands,
     holdCommandEnv: config.holdCommandEnv,
+    ...(config.budgetUsd != null ? { budgetUsd: config.budgetUsd } : {}),
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
     allowedOrigins: resolveAllowedOrigins(process.env),
     lookupPr: opts.lookupPr ?? ((input) => lookupPr(input)),

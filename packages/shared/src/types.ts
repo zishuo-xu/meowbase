@@ -89,6 +89,8 @@ export type SystemKind =
   | 'pr-ci'
   /** PR 冲突回流:不参与球权,合不进去才叫醒写手 */
   | 'pr-conflict'
+  /** 预算闸:花超了拒跑,不参与球权 */
+  | 'budget'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';

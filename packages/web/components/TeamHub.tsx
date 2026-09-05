@@ -374,6 +374,9 @@ export function TeamHub({
                 <div className="text-xs font-bold text-[var(--ink-soft)]">账本</div>
                 <p className="mt-1 text-xs text-[var(--ink-soft)]">
                   只算猫已经跑完的用量。模型探测的花费在探测结果里当场显示，不计入。没报成本的格子写「无成本数据」，不估。
+                  {config.budgetUsd != null
+                    ? ` 上限 $${config.budgetUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}。花超了不再叫猫。`
+                    : ''}
                 </p>
               </div>
               <div className="flex gap-2">

@@ -578,6 +578,44 @@ describe('executeTurn 消息协议与注入', () => {
     expect(final.content).toContain('星星罐子');
   });
 
+  it('花超了拒跑,不调 agent;星星罐子仍能走', async () => {
+    const stores = createMemoryStores();
+    let agentCalled = false;
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          agentCalled = true;
+          return { sessionId: 's1', content: '不该来', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: 'claude',
+      content: '上一跳',
+      status: 'completed',
+      usage: { costUsd: 1 },
+    });
+    const blocked = await executeTurn({
+      threadId: thread.id,
+      content: '@claude 再干一票',
+      context: { stores, registry, budgetUsd: 1 },
+    });
+    expect(agentCalled).toBe(false);
+    expect(blocked.systemKind).toBe('budget');
+    expect(blocked.content).toContain('预算用完');
+
+    const freeze = await executeTurn({
+      threadId: thread.id,
+      content: '星星罐子',
+      context: { stores, registry, budgetUsd: 1 },
+    });
+    expect(freeze.systemKind).toBe('freeze');
+  });
+
   it('新会话和 resume 都注入身份与交接规则', async () => {
     const stores = createMemoryStores();
     const prompts: (string | undefined)[] = [];

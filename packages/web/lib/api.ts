@@ -126,6 +126,7 @@ export interface AppConfigDto {
   defaultAgentId: string;
   agents: AgentConfigDto[];
   models?: ModelPresetDto[];
+  budgetUsd?: number;
 }
 
 export interface TokenUsageDto {

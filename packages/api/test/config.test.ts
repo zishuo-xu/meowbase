@@ -121,6 +121,30 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(agentSpec(cfg, 'claude').handoff).toEqual(['写完交 {to}']);
   });
 
+  it('读取预算上限,非法当没配;Hub 落盘不冲掉文件里的上限', () => {
+    expect(loadConfig({}).budgetUsd).toBeUndefined();
+    expect(loadConfig({ MEOW_BUDGET_USD: '1.5' }).budgetUsd).toBe(1.5);
+    expect(loadConfig({ MEOW_BUDGET_USD: '0' }).budgetUsd).toBeUndefined();
+    expect(loadConfig({ MEOW_BUDGET_USD: 'nope' }).budgetUsd).toBeUndefined();
+
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-budget-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(path, JSON.stringify({ budgetUsd: 2 }));
+    expect(loadConfig({}, { configPath: path }).budgetUsd).toBe(2);
+    expect(loadConfig({ MEOW_BUDGET_USD: '3' }, { configPath: path }).budgetUsd).toBe(3);
+
+    writeTeamFile(path, {
+      a2aMaxDepth: 3,
+      defaultAgentId: 'claude',
+      agents: DEFAULT_AGENTS.map((a) => ({
+        ...a,
+        aliases: [...a.aliases],
+        expertise: [...a.expertise],
+      })),
+    });
+    expect(loadConfig({}, { configPath: path }).budgetUsd).toBe(2);
+  });
+
   it('文件里的 holdCommands 覆盖默认白名单', () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-hold-'));
     const path = join(dir, 'meowbase.config.json');

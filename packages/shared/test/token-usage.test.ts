@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeTokenUsage, totalTokensOf } from '../src/token-usage.js';
+import { formatBudgetGateNote, isOverBudget, mergeTokenUsage, totalTokensOf } from '../src/token-usage.js';
 
 describe('mergeTokenUsage', () => {
   it('空值时直接返回 incoming', () => {
@@ -62,5 +62,22 @@ describe('totalTokensOf', () => {
 
   it('只有 input 时等于 input', () => {
     expect(totalTokensOf({ inputTokens: 42 })).toBe(42);
+  });
+});
+
+describe('isOverBudget', () => {
+  it('spent 达到 cap 才拦,没配或非法不拦', () => {
+    expect(isOverBudget(1, 1)).toBe(true);
+    expect(isOverBudget(1.01, 1)).toBe(true);
+    expect(isOverBudget(0.99, 1)).toBe(false);
+    expect(isOverBudget(1, undefined)).toBe(false);
+    expect(isOverBudget(1, 0)).toBe(false);
+    expect(isOverBudget(1, -2)).toBe(false);
+    expect(isOverBudget(Number.NaN, 1)).toBe(false);
+  });
+
+  it('拒跑文案带已花和上限', () => {
+    expect(formatBudgetGateNote({ spentUsd: 0.001, capUsd: 0.001 })).toContain('已花 $0.0010');
+    expect(formatBudgetGateNote({ spentUsd: 0.001, capUsd: 0.001 })).toContain('上限 $0.0010');
   });
 });

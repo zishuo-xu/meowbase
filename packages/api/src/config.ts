@@ -77,6 +77,8 @@ export interface Config {
   holdCommands: HoldCommandRule[];
   /** 子进程额外放行的环境变量名 */
   holdCommandEnv: string[];
+  /** 全平台真实花费上限(美元);缺省不拦 */
+  budgetUsd?: number;
 }
 
 export const DEFAULT_A2A_MAX_DEPTH = 3;
@@ -165,6 +167,7 @@ interface TeamFile {
   agents?: Array<Partial<AgentSpec> & { id: string }>;
   holdCommands?: unknown;
   holdCommandEnv?: unknown;
+  budgetUsd?: unknown;
 }
 
 function parseA2AMaxDepth(raw: string | number | undefined): number {
@@ -521,6 +524,7 @@ export function writeTeamFile(
     })),
     ...(existing.holdCommands !== undefined ? { holdCommands: existing.holdCommands } : {}),
     ...(existing.holdCommandEnv !== undefined ? { holdCommandEnv: existing.holdCommandEnv } : {}),
+    ...(existing.budgetUsd !== undefined ? { budgetUsd: existing.budgetUsd } : {}),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
 }
@@ -740,6 +744,7 @@ export function loadConfig(
 
   const defaultAgentId =
     (file.defaultAgentId && isAgentId(file.defaultAgentId) && file.defaultAgentId) || 'claude';
+  const budgetUsd = parseBudgetUsd(env.MEOW_BUDGET_USD ?? file.budgetUsd);
 
   return {
     port: Number(env.PORT ?? 3200),
@@ -753,7 +758,14 @@ export function loadConfig(
     models,
     holdCommands: parseHoldCommandAllowlist(file.holdCommands) ?? [...DEFAULT_HOLD_COMMAND_ALLOWLIST],
     holdCommandEnv: parseHoldCommandEnv(file.holdCommandEnv),
+    ...(budgetUsd != null ? { budgetUsd } : {}),
   };
+}
+
+function parseBudgetUsd(raw: unknown): number | undefined {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return n;
 }
 
 function parseHoldCommandEnv(raw: unknown): string[] {

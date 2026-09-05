@@ -2,7 +2,7 @@
 
 - 状态:`已落地`
 - 对照 clowder:公开能力表里有一条 **Quota Board — Real-time token usage and cost tracking per agent**，旁边那条 Capability 还写了 *context budget*。语义是:每只猫花了多少、还剩多少预算，人一眼能看见。
-- 靠拢:拿「按猫看用量和花费」这一条。差在「real-time」和「budget」:本刀只做**打开就算、`sync` 时刷新**的读侧聚合，不做实时推送，也不做配额上限／熔断——那要动 `executeTurn` 的准入判断，是另一刀。
+- 靠拢:拿「按猫看用量和花费」这一条。差在「real-time」:本篇只做**打开就算、`sync` 时刷新**的读侧聚合，不做实时推送。配额上限／熔断见 [budget-gate.md](budget-gate.md)。
 
 ## 门（各一句）
 
@@ -29,7 +29,7 @@
 
 ## 不做（本篇）
 
-- **配额上限 / 预算熔断 / context budget**：那要在 `executeTurn` 里加准入判断（超了不许跑、或降级），是行为改动，另开一篇。本刀只看不管。
+- **配额上限 / 预算熔断 / context budget**：已另篇 [budget-gate.md](budget-gate.md)。
 - **按价格表估算成本**：见上，宁可空着。真要做，价格得进配置并标明生效日期。
 - **实时推送用量**：他们是 real-time board，我们先靠 `sync` 刷新。差距写在这里，不假装做到了。
 - **增量计数器**：现在是每次读的时候扫消息算一遍。线程多了会慢，但这个规模够用；真要快再加 Redis 计数器，那时才需要考虑「计数器和消息谁是真相」。

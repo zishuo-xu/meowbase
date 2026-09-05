@@ -588,6 +588,24 @@ describe('TeamHub', () => {
     expect(within(ledger).getByText('团团')).toBeTruthy();
   });
 
+  it('配了预算时账本显示已花和上限', async () => {
+    vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
+    render(
+      <TeamHub
+        open
+        config={{ ...config, budgetUsd: 1 }}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    expect(within(ledger).getByText(/上限/)).toBeTruthy();
+    expect(within(ledger).getByText(/\$1/)).toBeTruthy();
+  });
+
   it('没有 costUsd 时显示无成本数据而不是 $0', async () => {
     vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
     render(

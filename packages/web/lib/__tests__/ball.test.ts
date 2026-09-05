@@ -215,6 +215,19 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
   });
 
+  it('budget 不改球权,仍看接力条', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } },
+          { role: 'system', content: '⚠️ 预算用完', systemKind: 'budget' },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
+  });
+
   it('空线程等人开口', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });

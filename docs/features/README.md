@@ -57,3 +57,9 @@
 | [memory-scope.md](memory-scope.md) | 已落地 | 记忆按仓库划界,注入带出处 |
 | [risk-routed-reviewer.md](risk-routed-reviewer.md) | 已落地 | 按风险面选审查官 |
 | [pr-review-reflow.md](pr-review-reflow.md) | 已落地 | PR 上的评论流回线程 |
+| [pr-ci-tracking.md](pr-ci-tracking.md) | 已落地 | PR 上的 CI 变绿变红流回线程 |
+| [pr-conflict.md](pr-conflict.md) | 已落地 | PR 合不进去时流回线程 |
+| [pending-handoff-queue.md](pending-handoff-queue.md) | 已落地 | 交棒排队,跑完接下一条 |
+| [user-message-queue.md](user-message-queue.md) | 已落地 | 人插话先排队,不打断正在跑的猫 |
+| [queue-panel.md](queue-panel.md) | 已落地 | 顶栏点开就能看见排队 |
+| [budget-gate.md](budget-gate.md) | 已落地 | 花超了就拒跑 |

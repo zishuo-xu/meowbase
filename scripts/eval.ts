@@ -899,6 +899,42 @@ async function runPrConflict(workdirBase: string): Promise<boolean> {
   );
 }
 
+async function runBudgetGate(workdirBase: string): Promise<boolean> {
+  return withApi(
+    {
+      workdirBase,
+      writerBin: evalWriterBin,
+      extraEnv: { MEOW_BUDGET_USD: '0.001' },
+    },
+    async (api) => {
+      const threadId = await createThread(api.baseUrl, `eval-budget-${Date.now()}`);
+      try {
+        await postMessage(api.baseUrl, threadId, '@墨墨 写 hello.txt');
+        await waitFor('预算闸:第一跳跑完', async () => {
+          const messages = await getMessages(api.baseUrl, threadId);
+          const writer = assistantOf(messages, 'claude').some((m) => m.status === 'completed');
+          return writer ? messages : undefined;
+        });
+        await postMessage(api.baseUrl, threadId, '@墨墨 再干一票');
+        const rows = await waitFor('预算闸:第二跳被拒', async () => {
+          const messages = await getMessages(api.baseUrl, threadId);
+          return hasKind(messages, 'budget') ? messages : undefined;
+        });
+        if (!rows.some((m) => m.systemKind === 'budget' && m.content.includes('预算用完'))) {
+          return false;
+        }
+        const writerHops = assistantOf(rows, 'claude').filter((m) => m.status === 'completed');
+        if (writerHops.length !== 1) return false;
+        const audit = await getAudit(api.baseUrl, threadId);
+        if (!audit.some((item) => item.action === 'budget')) return false;
+        return true;
+      } finally {
+        await deleteThread(api.baseUrl, threadId);
+      }
+    },
+  );
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -1058,6 +1094,13 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: '冲突关:落 pr-conflict、叫醒写手且输入带合不进去',
     run: runPrConflict,
+  },
+  {
+    id: 'budget-gate',
+    name: '花超了还叫猫',
+    expectedCatch: 1,
+    expectNote: '预算闸:第二跳不叫猫,落 budget',
+    run: runBudgetGate,
   },
 ];
 

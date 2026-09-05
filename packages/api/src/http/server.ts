@@ -102,6 +102,8 @@ export interface ApiDeps {
   listPrChecks?: PrCheckList;
   /** PR mergeable 只读查询;不传则每跳走默认 gh。测试注入假源。 */
   lookupPrMergeable?: PrMergeableLookup;
+  /** 全平台真实花费上限(美元);缺省不拦 */
+  budgetUsd?: number;
 }
 
 interface LiveConfig {
@@ -199,6 +201,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       defaultAgentId: live.defaultAgentId,
       models: live.models.map(publicModelPreset),
       agents,
+      ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
     };
   }
 
@@ -561,6 +564,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ...(deps.listPrReviews ? { listPrReviews: deps.listPrReviews } : {}),
       ...(deps.listPrChecks ? { listPrChecks: deps.listPrChecks } : {}),
       ...(deps.lookupPrMergeable ? { lookupPrMergeable: deps.lookupPrMergeable } : {}),
+      ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
     };
     return {
       context,

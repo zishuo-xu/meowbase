@@ -2,9 +2,11 @@ import { resolve } from 'node:path';
 import { killHoldCommand } from '../services/hold-command.js';
 import {
   displayName,
+  formatBudgetGateNote,
   formatEscalatedBallNote,
   formatQueuedHandoffNote,
   formatHopInterruptedNote,
+  isOverBudget,
   isPlaceholderTitle,
   shouldResumePending,
   parseEvidenceRefs,
@@ -24,6 +26,7 @@ import type {
   PendingHop,
 } from '@meowbase/shared';
 import { clip, turnLog } from '../services/turn-log.js';
+import { loadUsage } from '../services/usage.js';
 import { safeAppendAudit } from '../stores/audit-log.js';
 import {
   MAX_A2A_DEPTH,
@@ -69,6 +72,21 @@ export async function executeTurn(input: {
     workdir: thread.workdir,
   });
   if (handled) return handled;
+
+  const spentUsd = (await loadUsage(context.stores)).total.costUsd ?? 0;
+  if (isOverBudget(spentUsd, context.budgetUsd)) {
+    turnLog('budget gate', { thread: threadId, cap: context.budgetUsd });
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: formatBudgetGateNote({
+        spentUsd,
+        capUsd: context.budgetUsd ?? 0,
+      }),
+      status: 'completed',
+      systemKind: 'budget',
+    });
+  }
 
   const learn = parseLearnCommand(content);
   const refIds = parseEvidenceRefs(content);

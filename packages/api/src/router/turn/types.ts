@@ -70,6 +70,8 @@ export interface TurnContext {
   listPrChecks?: PrCheckList;
   /** PR mergeable 只读查询;不传则用默认 gh。测试换成假源。 */
   lookupPrMergeable?: PrMergeableLookup;
+  /** 全平台真实花费上限(美元);缺省或 ≤0 不拦 */
+  budgetUsd?: number;
 }
 
 export interface SegmentRunResult {
