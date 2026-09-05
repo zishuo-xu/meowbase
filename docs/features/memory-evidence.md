@@ -57,3 +57,4 @@
 - 召回：`packages/shared/src/evidence-recall.ts`
 - 拼装：`packages/shared/src/system-prompt.ts`
 - 管线：`executeTurn` 里 `#learn` / `#confirm` / 注入
+- 确认后的纸本见 [memory-files.md](memory-files.md)

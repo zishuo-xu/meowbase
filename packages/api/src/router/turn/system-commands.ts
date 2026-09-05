@@ -7,6 +7,7 @@ import {
 } from '@meowbase/shared';
 import type { Message } from '@meowbase/shared';
 import { clip, turnLog } from '../../services/turn-log.js';
+import { materializeEvidenceFile } from '../../services/evidence-files.js';
 import { killHoldCommand } from '../../services/hold-command.js';
 import { formatApproveVoidedReply } from '../../services/pr.js';
 import { landApprovedCard } from './land-approval.js';
@@ -24,9 +25,24 @@ export async function handleSystemCommand(input: {
   if (confirm) {
     turnLog('confirm', { thread: threadId, id: confirm.id });
     const entry = await context.stores.evidence.confirm(confirm.id);
-    const reply = entry
-      ? `✅ 已沉淀:${entry.title}`
-      : `⚠️ 找不到可确认的证据:${confirm.id}`;
+    if (!entry) {
+      return context.stores.messages.append({
+        threadId,
+        role: 'system',
+        content: `⚠️ 找不到可确认的证据:${confirm.id}`,
+        status: 'completed',
+        systemKind: 'notice',
+      });
+    }
+    let reply = `✅ 已沉淀:${entry.title}`;
+    if (context.memoryDir) {
+      try {
+        await materializeEvidenceFile(context.memoryDir, entry);
+      } catch (err) {
+        turnLog('memory file fail', { thread: threadId, id: entry.id, error: clip(String(err), 120) });
+        reply = `${reply}(没写成文件)`;
+      }
+    }
     return context.stores.messages.append({
       threadId,
       role: 'system',

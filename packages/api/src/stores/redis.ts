@@ -278,7 +278,7 @@ export class RedisThreadStore implements ThreadStore {
 
   async shiftInbound(threadId: string): Promise<InboundMessage | null> {
     const thread = await this.hydrate(threadId);
-    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    if (!thread) return null;
     const next = thread.inboundQueue?.[0];
     if (!next) return null;
     const rest = thread.inboundQueue?.slice(1) ?? [];
@@ -547,6 +547,23 @@ export class RedisEvidenceStore implements EvidenceStore {
     const confirmedAt = new Date().toISOString();
     await this.redis.hset(evidenceKey(id), { status: 'confirmed', confirmedAt });
     return this.hydrate(id);
+  }
+
+  async upsertConfirmed(entry: EvidenceEntry): Promise<void> {
+    await this.redis
+      .multi()
+      .hset(evidenceKey(entry.id), {
+        id: entry.id,
+        threadId: entry.threadId,
+        kind: entry.kind,
+        title: entry.title,
+        content: entry.content,
+        status: 'confirmed',
+        createdAt: entry.createdAt,
+        ...(entry.confirmedAt ? { confirmedAt: entry.confirmedAt } : {}),
+      })
+      .sadd('evidence:index', entry.id)
+      .exec();
   }
 
   async get(id: string): Promise<EvidenceEntry | null> {

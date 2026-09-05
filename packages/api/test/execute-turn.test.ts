@@ -5,7 +5,7 @@ import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 import { executeTurn, followPendingChain, MAX_REVIEW_FIX_ROUNDS } from '../src/router/execute-turn.js';
 import { cloneAgentSpec, DEFAULT_AGENTS } from '../src/config.js';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -397,6 +397,30 @@ describe('executeTurn 消息协议与注入', () => {
     expect(final.role).toBe('system');
     expect(final.content).toContain('✅ 已沉淀:好结论');
     expect((await stores.evidence.get(draft.id))?.status).toBe('confirmed');
+  });
+
+  it('#confirm 配了 memoryDir 就写成文件;清空索引后能重建', async () => {
+    const stores = createMemoryStores();
+    const dir = mkdtempSync(join(tmpdir(), 'meow-memory-'));
+    const registry = createAgentRegistry([stubAgent('claude', 'x')]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const draft = await stores.evidence.createDraft({
+      threadId: thread.id, kind: 'fact', title: '好结论', content: '内容',
+    });
+    await executeTurn({
+      threadId: thread.id,
+      content: `#confirm ${draft.id}`,
+      context: { stores, registry, memoryDir: dir },
+    });
+    const md = readFileSync(join(dir, `${draft.id}.md`), 'utf8');
+    expect(md).toContain('好结论');
+    expect(md).toContain('内容');
+    const empty = createMemoryStores();
+    const { rebuildEvidenceFromFiles } = await import('../src/services/evidence-files.js');
+    expect(await rebuildEvidenceFromFiles(dir, empty.evidence)).toBe(1);
+    expect((await empty.evidence.get(draft.id))?.status).toBe('confirmed');
+    expect((await empty.evidence.get(draft.id))?.title).toBe('好结论');
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('#confirm 无效 id:回执警告', async () => {

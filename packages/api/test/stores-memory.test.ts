@@ -195,6 +195,7 @@ describe('内存存储', () => {
     await threads.clearInboundQueue(thread.id);
     expect((await threads.get(thread.id))?.inboundQueue ?? []).toEqual([]);
     expect(await threads.shiftInbound(thread.id)).toBeNull();
+    expect(await threads.shiftInbound('no-such-thread')).toBeNull();
   });
 
   it('steerInbound / steerPendingHop 把指定条挪到队头,找不到 false', async () => {

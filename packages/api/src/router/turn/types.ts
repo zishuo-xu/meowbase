@@ -72,6 +72,8 @@ export interface TurnContext {
   lookupPrMergeable?: PrMergeableLookup;
   /** 全平台真实花费上限(美元);缺省或 ≤0 不拦 */
   budgetUsd?: number;
+  /** 已确认证据的纸本目录;缺省不写文件 */
+  memoryDir?: string;
 }
 
 export interface SegmentRunResult {

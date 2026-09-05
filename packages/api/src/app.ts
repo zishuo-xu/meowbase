@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import { rebuildEvidenceFromFiles } from './services/evidence-files.js';
 import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -63,12 +64,15 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
   const skillsDir = resolve(opts.repoRoot, config.skillsDir);
   const workdirBase = opts.workdirBase ?? resolve(opts.repoRoot, config.workdirBase);
   mkdirSync(workdirBase, { recursive: true });
+  const memoryDir = resolve(opts.repoRoot, process.env.MEMORY_DIR ?? 'memory');
+  mkdirSync(memoryDir, { recursive: true });
 
   const redis = createRedisClient(config.redisUrl);
   await assertStorageReady(redis);
 
   const stores = createRedisStores(redis, skillsDir);
   await ensureSeededProfiles(stores.profiles);
+  await rebuildEvidenceFromFiles(memoryDir, stores.evidence);
 
   const registry = createAgentRegistry(
     config.agents.map((spec) => createAdapter(spec, config.agentTimeoutMs)),
@@ -85,6 +89,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     holdCommands: config.holdCommands,
     holdCommandEnv: config.holdCommandEnv,
     ...(config.budgetUsd != null ? { budgetUsd: config.budgetUsd } : {}),
+    memoryDir,
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),
     allowedOrigins: resolveAllowedOrigins(process.env),
     lookupPr: opts.lookupPr ?? ((input) => lookupPr(input)),

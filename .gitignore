@@ -9,5 +9,6 @@ meowbase.secrets.json
 *.log
 .DS_Store
 work/
+memory/
 output/
 .playwright-cli/

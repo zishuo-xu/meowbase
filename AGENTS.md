@@ -72,7 +72,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 句中 `@闪闪` /「不要 `@闪闪`」 | 不当目标,不路由 |
 | 一个 `@` 都不写 | 按顺序兜:最近 1 小时内你点过的那只 → 最后开口的猫 → 线程主猫(`resolveTurnTargets`) |
 | `#learn 标题` | 本轮猫跑完后出证据 draft(仍会叫猫,不是纯系统命令) |
-| `#confirm ev_xxx` | 确认证据,不叫猫(`handleSystemCommand`) |
+| `#confirm ev_xxx` | 确认证据,不叫猫(`handleSystemCommand`)。成功后写成 `memory/ev_xxx.md`;索引清空后扫文件能重建 |
 | `#ev_xxx` | 引用已确认证据注入当轮上下文。**不受仓库划界限制** —— 人点名 id 就是显式跨界,想借别的项目那条决定就借得到;划界只管上面那条不用手打的自动召回 |
 | 「之前 / 我们约定 / 讨论过」+ 关键词 | 从已确认证据匹配注入,不必手打 `#ev_`。按仓划界:绑了仓只看同一仓的线程;空沙箱只看本线程自己的 |
 | 整行 `星星罐子` | 停棒拉闸,不调猫(`handleSystemCommand`) |

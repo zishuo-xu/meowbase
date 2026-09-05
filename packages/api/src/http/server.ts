@@ -105,6 +105,8 @@ export interface ApiDeps {
   lookupPrMergeable?: PrMergeableLookup;
   /** 全平台真实花费上限(美元);缺省不拦 */
   budgetUsd?: number;
+  /** 已确认证据的纸本目录;缺省不写文件 */
+  memoryDir?: string;
 }
 
 interface LiveConfig {
@@ -588,6 +590,7 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ...(deps.listPrChecks ? { listPrChecks: deps.listPrChecks } : {}),
       ...(deps.lookupPrMergeable ? { lookupPrMergeable: deps.lookupPrMergeable } : {}),
       ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
+      ...(deps.memoryDir ? { memoryDir: deps.memoryDir } : {}),
     };
     return {
       context,
@@ -616,7 +619,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   async function drainInbound(threadId: string): Promise<void> {
     if (runningTurns.has(threadId)) return;
     const thread = await stores.threads.get(threadId);
-    if (thread?.pendingHop || (thread?.pendingQueue?.length ?? 0) > 0) return;
+    if (!thread) return;
+    if (thread.pendingHop || (thread.pendingQueue?.length ?? 0) > 0) return;
     const next = await stores.threads.shiftInbound(threadId);
     if (!next) return;
     const prepared = createTurnContext(threadId);

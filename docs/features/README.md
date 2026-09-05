@@ -67,3 +67,4 @@
 | [queue-steer.md](queue-steer.md) | 已落地 | 排队里提到前面 |
 | [sop-board.md](sop-board.md) | 已落地 | 家规写成告示牌 |
 | [collab-tools.md](collab-tools.md) | 已落地 | 协作工具:搜消息、列线程 |
+| [memory-files.md](memory-files.md) | 已落地 | 确认了就写成文件 |

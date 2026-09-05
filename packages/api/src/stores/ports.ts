@@ -131,6 +131,8 @@ export interface EvidenceStore {
   confirm(id: string): Promise<EvidenceEntry | null>;
   get(id: string): Promise<EvidenceEntry | null>;
   list(threadId?: string): Promise<EvidenceEntry[]>;
+  /** 用文件里的确认条目覆盖索引。文件是真相。 */
+  upsertConfirmed(entry: EvidenceEntry): Promise<void>;
 }
 
 export interface SkillStore {

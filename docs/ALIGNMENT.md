@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 16 / 分母 31 = 52%**(每次相关改动同轮更新;第 31 行从缺失改为部分对齐,已对齐数不变)
+**当前对齐率:已对齐 17 / 分母 31 = 55%**(每次相关改动同轮更新;第 15 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -24,7 +24,7 @@
 | 12 | 每猫独立 CLI 会话 | 已对齐 | [F053](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F053-gemini-resume-session-parity.md) | [providers](features/providers.md)、[a2a](features/a2a.md) | 身份和工具记忆不串台——每只猫自己的 session,下次各自 resume |
 | 13 | 配置可见与运行时修改 | 已对齐 | [F001](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F001-config-visibility.md)、[F004](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F004-runtime-config.md) | [hub-capability](features/hub-capability.md)、[AGENTS.md 常见操作](../AGENTS.md) | Hub 点保存改内存再落盘立即生效——改配置和跑代码不能是两套真相 |
 | 14 | 跨线程传话溯源 | 缺失 | [F052](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F052-cross-thread-identity-isolation.md) | | 跨线程传话我没做——要做就得先解决「同名猫自引用过滤」的身份坑 |
-| 15 | 记忆写入治理 | 部分对齐(差物化到 .md 真相源、索引为可重建编译产物) | [F102](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F102-memory-adapter-refactor.md) | [memory-evidence](features/memory-evidence.md) | 记忆入库必须人点头——模型喜欢把猜测写成决定,人一签下一线程才敢用 |
+| 15 | 记忆写入治理 | 已对齐 | [F102](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F102-memory-adapter-refactor.md) | [memory-evidence](features/memory-evidence.md)、[memory-files](features/memory-files.md) | 记忆入库必须人点头,确认后写成 .md——文件是真相,索引可以扔掉再编 |
 | 16 | 记忆划界、出处与联邦检索 | 部分对齐(差联邦检索、Collection 治理、生命周期) | [F186](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F186-library-memory-architecture.md) | [memory-scope](features/memory-scope.md) | 记忆按仓划界、注入带出处——猫看得出这条约定来自哪个项目、什么时候确认的 |
 | 17 | 记忆召回度量 | 缺失 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | | 我不知道猫召回的记忆用没用上——要量就用真实行为信号,不用自评 |
 | 18 | 技能按需注入 | 已对齐 | [F038](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F038-skills-discovery.md) | [skills](features/skills.md) | 技能是被喊到才出现的说明书——不常驻上下文,省 token 也避免永远用审查口吻写代码 |
@@ -58,7 +58,6 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
-2. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
-3. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
-4. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。
+1. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
+2. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
+3. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。
