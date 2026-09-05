@@ -188,6 +188,21 @@ describe('api', () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/usage$/), undefined);
   });
 
+  it('steerQueue 打 /queue/steer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, pendingQueue: [], inboundQueue: [] }),
+      }),
+    );
+    await api.steerQueue('t1', { kind: 'inbound', id: 'm2' });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/threads/t1/queue/steer'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('fetchToolUsage 打 /api/usage/tools', async () => {
     vi.stubGlobal(
       'fetch',

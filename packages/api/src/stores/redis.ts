@@ -29,6 +29,15 @@ import type {
 } from './ports.js';
 import { AUDIT_GLOBAL_CAP, filterAuditRows } from './ports.js';
 
+function moveToFront<T>(list: T[] | undefined, match: (item: T) => boolean): T[] | null {
+  if (!list || list.length === 0) return null;
+  const index = list.findIndex(match);
+  if (index < 0) return null;
+  if (index === 0) return [...list];
+  const item = list[index]!;
+  return [item, ...list.slice(0, index), ...list.slice(index + 1)];
+}
+
 function threadKey(id: string): string {
   return `thread:${id}`;
 }
@@ -283,6 +292,24 @@ export class RedisThreadStore implements ThreadStore {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
     await this.redis.hdel(threadKey(threadId), 'inboundQueue');
+  }
+
+  async steerInbound(threadId: string, id: string): Promise<boolean> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const steered = moveToFront(thread.inboundQueue, (item) => item.id === id);
+    if (!steered) return false;
+    await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(steered));
+    return true;
+  }
+
+  async steerPendingHop(threadId: string, hopId: string): Promise<boolean> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    const steered = moveToFront(thread.pendingQueue, (item) => item.id === hopId);
+    if (!steered) return false;
+    await this.redis.hset(threadKey(threadId), 'pendingQueue', JSON.stringify(steered));
+    return true;
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

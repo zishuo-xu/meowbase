@@ -106,6 +106,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 第二棒入队 | 槽里已有棒时后来交的棒进 `pendingQueue`;当前棒跑完 `followPendingChain` 把队头填回槽再跑。星星罐子 / 越界 / PR 合了 / 人发了不续跑的新消息:清槽也清队 |
 | 人插话先排队 | 猫还在跑或槽/交棒队非空时,普通正文进 `inboundQueue`,回 202,不打断当前棒。跑完再 `executeTurn`。星星罐子 / `#approve` / `#reject` / `#confirm` 立刻走;拉闸清人话队 |
 | 顶栏看见排队 | 交棒队或人话队非空时,球权行下面可点开列出谁交给谁、人还等着哪几句。不改路由 |
+| 排队提到前面 | 面板非队头条目可「提到前面」:只改该队顺序,不 abort 当前棒,不碰槽里那一跳 |
 | 预算闸 | 配了 `MEOW_BUDGET_USD` / `budgetUsd` 时,全平台已报真实花费达到上限则普通任务不叫猫,落 `budget`。批准 / 拉闸 / 确认证据仍立刻走。没配不拦。不按价格表估算 |
 | 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);自己那根 HEAD 前进 / 自己那根远端跟踪引用变了(含 force)则落 `git-move`(不参与球权)。空沙箱跳过 |
 | 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。开了远程时自己那根的提交/推送只落 `git-move`,接力继续;本地模式(`allowRemote` 缺失即 false)下自己那根远端跟踪引用变了也落 `git-overstep`(不该推送) |

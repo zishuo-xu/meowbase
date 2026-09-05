@@ -275,6 +275,10 @@ export default function Home() {
                 nameOf={(id) => agentName(id, agents)}
                 open={queueOpen}
                 onToggle={() => setQueueOpen((v) => !v)}
+                onSteer={(input) => {
+                  if (!activeId) return;
+                  void api.steerQueue(activeId, input).then(() => refreshThreads());
+                }}
               />
             ) : null}
           </div>

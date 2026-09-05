@@ -624,6 +624,29 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
     return { ok: true };
   });
 
+  app.post('/api/threads/:threadId/queue/steer', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const body = request.body as { kind?: string; id?: string } | null;
+    const kind = body?.kind;
+    const id = body?.id?.trim();
+    if ((kind !== 'inbound' && kind !== 'hop') || !id) {
+      return reply.code(400).send({ error: 'kind 必须是 inbound 或 hop,且要有 id' });
+    }
+    const thread = await stores.threads.get(threadId);
+    if (!thread) return reply.code(404).send({ error: '线程不存在' });
+    const ok =
+      kind === 'inbound'
+        ? await stores.threads.steerInbound(threadId, id)
+        : await stores.threads.steerPendingHop(threadId, id);
+    if (!ok) return reply.code(404).send({ error: '队里没有这一条' });
+    const next = await stores.threads.get(threadId);
+    return {
+      ok: true,
+      pendingQueue: next?.pendingQueue ?? [],
+      inboundQueue: next?.inboundQueue ?? [],
+    };
+  });
+
   app.post('/api/threads/:threadId/messages', async (request, reply) => {
     const { threadId } = request.params as { threadId: string };
     const body = request.body as { content?: string } | null;

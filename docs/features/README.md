@@ -64,3 +64,4 @@
 | [queue-panel.md](queue-panel.md) | 已落地 | 顶栏点开就能看见排队 |
 | [budget-gate.md](budget-gate.md) | 已落地 | 花超了就拒跑 |
 | [skill-usage.md](skill-usage.md) | 已落地 | 技能和工具用过几次 |
+| [queue-steer.md](queue-steer.md) | 已落地 | 排队里提到前面 |

@@ -200,6 +200,63 @@ describe('HTTP 集成', () => {
     expect(after?.inboundQueue ?? []).toEqual([]);
   });
 
+  it('steer 把人话挪到队头,找不到 404,不 abort 当前棒', async () => {
+    const createRes = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '插队', primaryAgentId: 'claude' }),
+    });
+    const thread = (await createRes.json()) as { id: string };
+    const hanging = fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '@gemini 挂住' }),
+    });
+    const queuedIds: string[] = [];
+    for (const text of ['先补这句', '再补那句']) {
+      let ok = false;
+      for (let i = 0; i < 30; i++) {
+        const res = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ content: text }),
+        });
+        if (res.status === 202) {
+          const body = (await res.json()) as { inboundQueue?: { id: string }[] };
+          const id = body.inboundQueue?.[0]?.id;
+          if (id) queuedIds.push(id);
+          ok = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      expect(ok).toBe(true);
+    }
+    expect(queuedIds).toHaveLength(2);
+    const missing = await fetch(`${baseUrl}/api/threads/${thread.id}/queue/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'inbound', id: 'nope' }),
+    });
+    expect(missing.status).toBe(404);
+    const steered = await fetch(`${baseUrl}/api/threads/${thread.id}/queue/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'inbound', id: queuedIds[1] }),
+    });
+    expect(steered.status).toBe(200);
+    const body = (await steered.json()) as { inboundQueue?: { id: string }[] };
+    expect(body.inboundQueue?.map((m) => m.id)).toEqual([queuedIds[1], queuedIds[0]]);
+    const freeze = await fetch(`${baseUrl}/api/threads/${thread.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '星星罐子' }),
+    });
+    expect(freeze.status).toBe(200);
+    const hangBody = (await (await hanging).json()) as { status?: string };
+    expect(hangBody.status).toBe('terminated');
+  });
+
   it('DELETE /api/threads/:id 删线程', async () => {
     const createRes = await fetch(`${baseUrl}/api/threads`, {
       method: 'POST',

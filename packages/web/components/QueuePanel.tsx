@@ -31,12 +31,14 @@ export function QueuePanel({
   nameOf,
   open,
   onToggle,
+  onSteer,
 }: {
   pendingQueue?: QueueHop[];
   inboundQueue?: QueueInbound[];
   nameOf: (agentId?: string) => string;
   open?: boolean;
   onToggle?: () => void;
+  onSteer?: (input: { kind: 'hop' | 'inbound'; id: string }) => void;
 }) {
   const hopCount = pendingQueue.length;
   const inboundCount = inboundQueue.length;
@@ -61,13 +63,24 @@ export function QueuePanel({
             <section>
               <p className="text-[10px] font-bold tracking-wide text-[var(--ink-soft)]">下一棒</p>
               <ol className="mt-1 space-y-1">
-                {pendingQueue.map((hop) => (
-                  <li key={hop.id} className="text-[11px] leading-4 text-[var(--ink)]">
-                    <span className="font-medium">
-                      {nameOf(hop.from)} → {nameOf(hop.to)}
+                {pendingQueue.map((hop, index) => (
+                  <li key={hop.id} className="flex items-start justify-between gap-2 text-[11px] leading-4 text-[var(--ink)]">
+                    <span className="min-w-0">
+                      <span className="font-medium">
+                        {nameOf(hop.from)} → {nameOf(hop.to)}
+                      </span>
+                      {hop.task ? (
+                        <span className="mt-0.5 block text-[var(--ink-soft)]">{clip(hop.task)}</span>
+                      ) : null}
                     </span>
-                    {hop.task ? (
-                      <span className="mt-0.5 block text-[var(--ink-soft)]">{clip(hop.task)}</span>
+                    {onSteer && index > 0 ? (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                        onClick={() => onSteer({ kind: 'hop', id: hop.id })}
+                      >
+                        提到前面
+                      </button>
                     ) : null}
                   </li>
                 ))}
@@ -78,9 +91,18 @@ export function QueuePanel({
             <section>
               <p className="text-[10px] font-bold tracking-wide text-[var(--ink-soft)]">人说的</p>
               <ol className="mt-1 space-y-1">
-                {inboundQueue.map((item) => (
-                  <li key={item.id} className="text-[11px] leading-4 text-[var(--ink)]">
-                    {clip(item.content)}
+                {inboundQueue.map((item, index) => (
+                  <li key={item.id} className="flex items-start justify-between gap-2 text-[11px] leading-4 text-[var(--ink)]">
+                    <span className="min-w-0">{clip(item.content)}</span>
+                    {onSteer && index > 0 ? (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                        onClick={() => onSteer({ kind: 'inbound', id: item.id })}
+                      >
+                        提到前面
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ol>

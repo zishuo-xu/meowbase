@@ -41,6 +41,30 @@ describe('QueuePanel', () => {
     expect(screen.getByRole('button', { name: /后面还有 1 棒/ })).toBeTruthy();
   });
 
+  it('非队头显示提到前面,点了回调 id', () => {
+    const onSteer = vi.fn();
+    render(
+      <QueuePanel
+        pendingQueue={[
+          { id: 'h1', from: 'claude', to: 'gemini', task: '请审查加法' },
+          { id: 'h2', from: 'opencode', to: 'gemini', task: '请审查乘法' },
+        ]}
+        inboundQueue={[
+          { id: 'm1', content: '先补这句' },
+          { id: 'm2', content: '再补那句' },
+        ]}
+        nameOf={(id) => (id === 'claude' ? '墨墨' : id === 'gemini' ? '闪闪' : '团团')}
+        onSteer={onSteer}
+      />,
+    );
+    const buttons = screen.getAllByRole('button', { name: '提到前面' });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[0]!);
+    expect(onSteer).toHaveBeenCalledWith({ kind: 'hop', id: 'h2' });
+    fireEvent.click(buttons[1]!);
+    expect(onSteer).toHaveBeenCalledWith({ kind: 'inbound', id: 'm2' });
+  });
+
   it('点触发器回调 onToggle', () => {
     const onToggle = vi.fn();
     render(

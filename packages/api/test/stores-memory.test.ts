@@ -197,6 +197,48 @@ describe('内存存储', () => {
     expect(await threads.shiftInbound(thread.id)).toBeNull();
   });
 
+  it('steerInbound / steerPendingHop 把指定条挪到队头,找不到 false', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'steer', primaryAgentId: 'claude' });
+    const first = await threads.enqueueInbound(thread.id, '先补这句');
+    const second = await threads.enqueueInbound(thread.id, '再补那句');
+    expect(await threads.steerInbound(thread.id, second.id)).toBe(true);
+    expect((await threads.get(thread.id))?.inboundQueue?.map((m) => m.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    expect((await threads.shiftInbound(thread.id))?.id).toBe(second.id);
+    expect(await threads.steerInbound(thread.id, 'nope')).toBe(false);
+
+    const hopA = {
+      id: 'hop-a',
+      to: 'gemini' as const,
+      from: 'claude' as const,
+      task: '请审查加法',
+      goal: '写 add.ts',
+      previousOutput: '加法写完了',
+      visited: ['claude' as const],
+      firstAgent: 'claude' as const,
+      hop: 1,
+    };
+    const hopB = {
+      id: 'hop-b',
+      to: 'gemini' as const,
+      from: 'opencode' as const,
+      task: '请审查乘法',
+      goal: '写 mul.ts',
+      previousOutput: '乘法写完了',
+      visited: ['opencode' as const],
+      firstAgent: 'opencode' as const,
+      hop: 1,
+    };
+    await threads.enqueuePendingHop(thread.id, hopA);
+    await threads.enqueuePendingHop(thread.id, hopB);
+    expect(await threads.steerPendingHop(thread.id, 'hop-b')).toBe(true);
+    expect((await threads.get(thread.id))?.pendingQueue?.map((h) => h.id)).toEqual(['hop-b', 'hop-a']);
+    expect(await threads.steerPendingHop(thread.id, 'missing')).toBe(false);
+  });
+
   it('pending hop 租约:抢占互斥,非主人不能续/放,过期可被抢走', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: 'lease', primaryAgentId: 'claude' });

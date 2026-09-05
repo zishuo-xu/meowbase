@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 15 / 分母 31 = 48%**(每次相关改动同轮更新;第 19 行从缺失改为已对齐)
+**当前对齐率:已对齐 15 / 分母 31 = 48%**(每次相关改动同轮更新;第 29 行插队落地,已对齐数不变)
 
 ## 分母(核心清单)
 
@@ -38,7 +38,7 @@
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
 | 27 | 额度池看板与预算闸 | 部分对齐(差按猫拆池、热改上限的 Hub 表单) | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md) | 账本能看,花超了拒跑——闸只认报上来的真实花费,没配上限不拦 |
 | 28 | 消息分层可观测 | 部分对齐(差 thinking/plan 可观测层、遥测层) | [F045](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F045-ndjson-observability.md) | [system-message-kind](features/system-message-kind.md)、[live-sync](features/live-sync.md) | 平台知道的事件类型我打在消息字段里——改文案再也不会让顶栏静默失灵 |
-| 29 | 邮箱/统一消息队列 | 部分对齐(差优先级、steer 插队、跨来源统一出队) | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见排着什么;优先级和插队还没做 |
+| 29 | 邮箱/统一消息队列 | 部分对齐(差拖拽改序、urgent 自动置顶、跨来源统一出队) | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[queue-steer](features/queue-steer.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见,也能把某一条提到前面;拖拽和 urgent 还没做 |
 | 30 | SOP 流程守护 | 缺失 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md)、[F073](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F073-sop-auto-guardian.md)、[F083](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F083-design-gate-sop.md) | | 我的家规写在 AGENTS.md 给人读——SOP 外化是 README 明写的形态缺口,下一步把接力棒外化成猫也读的共享结构 |
 | 31 | MCP 协作工具与配置编排 | 缺失 | [F043](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F043-mcp-unification.md)、[F145](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F145-mcp-portable-provisioning.md)、[F249](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F249-multi-project-mcp-sync-management.md)、[F286](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F286-mcp-surface-lifecycle-governance.md) | | 猫的协作现在全靠平台拼 prompt——结构化工具通道是 README 明写的形态缺口,还没开的那扇门 |
 
@@ -58,8 +58,8 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **邮箱加厚**(补第 29 行剩下的半)——交棒排队和人插话排队已落地;下一层是优先级 / steer 插队,预计 2–4 刀。
-2. **SOP 外化**(补第 30 行)——AGENTS.md 和踩坑清单是现成素材,把 workflow 共享结构 + 压缩后恢复胶囊做薄;预计 3–4 刀。
-3. **MCP 最小形态**(补第 31 行)——先做协作工具补全一层(搜消息/列线程),配置编排后议;预计 3–5 刀。
-4. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
-5. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
+1. **SOP 外化**(补第 30 行)——AGENTS.md 和踩坑清单是现成素材,把 workflow 共享结构 + 压缩后恢复胶囊做薄;预计 3–4 刀。
+2. **MCP 最小形态**(补第 31 行)——先做协作工具补全一层(搜消息/列线程),配置编排后议;预计 3–5 刀。
+3. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
+4. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
+5. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。

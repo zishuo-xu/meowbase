@@ -197,6 +197,48 @@ describe.skipIf(!redis)('Redis 存储', () => {
     await threads.delete(thread.id);
   });
 
+  it('steerInbound / steerPendingHop 过 Redis', async () => {
+    const threads = createThreadStore(redis!);
+    const thread = await threads.create({
+      title: `redis-steer-${Date.now()}`,
+      primaryAgentId: 'claude',
+    });
+    const first = await threads.enqueueInbound(thread.id, '先补这句');
+    const second = await threads.enqueueInbound(thread.id, '再补那句');
+    expect(await threads.steerInbound(thread.id, second.id)).toBe(true);
+    expect((await threads.get(thread.id))?.inboundQueue?.map((m) => m.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    const hopA = {
+      id: 'hop-a',
+      to: 'gemini' as const,
+      from: 'claude' as const,
+      task: '请审查加法',
+      goal: '写 add.ts',
+      previousOutput: '加法写完了',
+      visited: ['claude' as const],
+      firstAgent: 'claude' as const,
+      hop: 1,
+    };
+    const hopB = {
+      id: 'hop-b',
+      to: 'gemini' as const,
+      from: 'opencode' as const,
+      task: '请审查乘法',
+      goal: '写 mul.ts',
+      previousOutput: '乘法写完了',
+      visited: ['opencode' as const],
+      firstAgent: 'opencode' as const,
+      hop: 1,
+    };
+    await threads.enqueuePendingHop(thread.id, hopA);
+    await threads.enqueuePendingHop(thread.id, hopB);
+    expect(await threads.steerPendingHop(thread.id, hopB.id)).toBe(true);
+    expect((await threads.get(thread.id))?.pendingQueue?.map((h) => h.id)).toEqual([hopB.id, hopA.id]);
+    await threads.delete(thread.id);
+  });
+
   it('线程 repo 绑定写入并回读', async () => {
     const threads = createThreadStore(redis!);
     const title = `redis-repo-${Date.now()}`;

@@ -237,6 +237,16 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ content }),
     }),
+  steerQueue: (threadId: string, body: { kind: 'inbound' | 'hop'; id: string }) =>
+    request<{
+      ok: boolean;
+      pendingQueue: ThreadDto['pendingQueue'];
+      inboundQueue: ThreadDto['inboundQueue'];
+    }>(`/api/threads/${threadId}/queue/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   cancelTurn: (threadId: string) =>
     request<{ ok: boolean }>(`/api/threads/${threadId}/cancel`, { method: 'POST' }),
   fetchUsage: (threadId?: string) =>
