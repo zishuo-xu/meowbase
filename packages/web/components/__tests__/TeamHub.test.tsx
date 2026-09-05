@@ -139,6 +139,9 @@ describe('TeamHub', () => {
     expect(screen.getByText('谁写、谁审、谁跑。只读名册，不改路由。')).toBeTruthy();
     expect(screen.getByText(/CLI claude/)).toBeTruthy();
     expect(screen.getByText(/CLI gemini/)).toBeTruthy();
+    expect(screen.getByText('协作工具')).toBeTruthy();
+    expect(screen.getByText(/GET \/api\/collab\/messages/)).toBeTruthy();
+    expect(screen.getByText(/GET \/api\/collab\/threads/)).toBeTruthy();
     expect(screen.getByText(/CLI opencode/)).toBeTruthy();
   });
 

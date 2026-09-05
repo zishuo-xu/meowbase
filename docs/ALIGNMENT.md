@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 16 / 分母 31 = 52%**(每次相关改动同轮更新;第 30 行从缺失改为已对齐)
+**当前对齐率:已对齐 16 / 分母 31 = 52%**(每次相关改动同轮更新;第 31 行从缺失改为部分对齐,已对齐数不变)
 
 ## 分母(核心清单)
 
@@ -40,7 +40,7 @@
 | 28 | 消息分层可观测 | 部分对齐(差 thinking/plan 可观测层、遥测层) | [F045](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F045-ndjson-observability.md) | [system-message-kind](features/system-message-kind.md)、[live-sync](features/live-sync.md) | 平台知道的事件类型我打在消息字段里——改文案再也不会让顶栏静默失灵 |
 | 29 | 邮箱/统一消息队列 | 部分对齐(差拖拽改序、urgent 自动置顶、跨来源统一出队) | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[queue-steer](features/queue-steer.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见,也能把某一条提到前面;拖拽和 urgent 还没做 |
 | 30 | SOP 流程守护 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md)、[F073](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F073-sop-auto-guardian.md)、[F083](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F083-design-gate-sop.md) | [sop-board](features/sop-board.md) | 家规写成告示牌——阶段由平台从球权派生,猫每跳能读到、人在顶栏能看见;牌子不是控制器 |
-| 31 | MCP 协作工具与配置编排 | 缺失 | [F043](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F043-mcp-unification.md)、[F145](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F145-mcp-portable-provisioning.md)、[F249](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F249-multi-project-mcp-sync-management.md)、[F286](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F286-mcp-surface-lifecycle-governance.md) | | 猫的协作现在全靠平台拼 prompt——结构化工具通道是 README 明写的形态缺口,还没开的那扇门 |
+| 31 | MCP 协作工具与配置编排 | 部分对齐(差独立 MCP 进程、跨项目配置同步) | [F043](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F043-mcp-unification.md)、[F145](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F145-mcp-portable-provisioning.md)、[F249](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F249-multi-project-mcp-sync-management.md)、[F286](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F286-mcp-surface-lifecycle-governance.md) | [collab-tools](features/collab-tools.md) | 协作第一片是搜消息和列线程——工具面先走 HTTP,提示词告诉猫有这两把;独立 MCP 进程后议 |
 
 ## 有意不做(不计入分母)
 
@@ -58,7 +58,7 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **MCP 最小形态**(补第 31 行)——先做协作工具补全一层(搜消息/列线程),配置编排后议;预计 3–5 刀。
-2. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
-3. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
-4. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
+1. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
+2. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
+3. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
+4. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。

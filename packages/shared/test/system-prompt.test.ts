@@ -68,6 +68,8 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('出口检查');
     expect(prompt).toContain('本轮命令和结果');
     expect(prompt).toContain('不能写通过');
+    expect(prompt).toContain('/api/collab/messages');
+    expect(prompt).toContain('/api/collab/threads');
   });
 
   it('有告示牌时提示词含阶段且标明不是命令', () => {

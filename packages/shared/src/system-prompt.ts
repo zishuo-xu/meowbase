@@ -63,7 +63,8 @@ export function buildA2AProtocol(
     `分工纪律:要不要交接、交给谁,由你根据角色判断。\n` +
     workflowFor(selfAgentId, team) +
     `何时不要交接:简单问答、自我介绍、纯解释、已经在审别人的产出。\n` +
-    `怎么交(交接规则):必须另起一行,行首写 @名字 或 @id,空格后写具体任务。升给人则行首写 @人 或 @owner。句中的 @ 不会交接。不要 @ 自己。`
+    `怎么交(交接规则):必须另起一行,行首写 @名字 或 @id,空格后写具体任务。升给人则行首写 @人 或 @owner。句中的 @ 不会交接。不要 @ 自己。\n` +
+    `协作工具(只读,不要默背整条时间线):查历史 GET /api/collab/messages?q=关键词;列线程 GET /api/collab/threads。`
   );
 }
 

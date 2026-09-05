@@ -142,3 +142,24 @@ describe('GET /api/usage/tools', () => {
     expect(body.total).toEqual({ skillInjections: 1, toolCalls: 1 });
   });
 });
+
+describe('GET /api/collab', () => {
+  it('空 q 返回空数组;关键词命中摘录', async () => {
+    await stores.messages.append({
+      threadId: threadA,
+      role: 'assistant',
+      agentId: 'claude',
+      content: '仓A斑马纹约定',
+      status: 'completed',
+    });
+    const empty = await fetch(`${baseUrl}/api/collab/messages?q=`);
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual([]);
+    const hit = await fetch(`${baseUrl}/api/collab/messages?q=${encodeURIComponent('斑马')}`);
+    const body = (await hit.json()) as Array<{ excerpt: string; threadId: string }>;
+    expect(body.some((row) => row.excerpt.includes('斑马纹') && row.threadId === threadA)).toBe(true);
+    const threads = await fetch(`${baseUrl}/api/collab/threads`);
+    const list = (await threads.json()) as Array<{ id: string; title: string }>;
+    expect(list.some((row) => row.id === threadA)).toBe(true);
+  });
+});

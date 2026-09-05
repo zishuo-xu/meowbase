@@ -66,6 +66,7 @@ import {
 } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
 import { loadToolUsage, loadUsage } from '../services/usage.js';
+import { loadCollabMessages, loadCollabThreads } from '../services/collab.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -538,6 +539,23 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };
     return stores.messages.list(threadId);
+  });
+
+  app.get('/api/collab/threads', async () => loadCollabThreads(stores));
+
+  app.get('/api/collab/messages', async (request, reply) => {
+    const query = request.query as { q?: string; agentId?: string; threadId?: string; limit?: string };
+    const agentRaw = query.agentId?.trim();
+    if (agentRaw && !isAgentId(agentRaw)) return reply.code(400).send({ error: 'agentId 无效' });
+    const agentId = agentRaw && isAgentId(agentRaw) ? agentRaw : undefined;
+    const limitRaw = query.limit ? Number(query.limit) : undefined;
+    const limit = limitRaw != null && Number.isFinite(limitRaw) ? limitRaw : undefined;
+    return loadCollabMessages(stores, {
+      query: query.q ?? '',
+      ...(agentId ? { agentId } : {}),
+      ...(query.threadId ? { threadId: query.threadId } : {}),
+      ...(limit != null ? { limit } : {}),
+    });
   });
 
   const runningTurns = new Map<string, AbortController>();

@@ -582,6 +582,16 @@ export function TeamHub({
                   </li>
                 ))}
               </ul>
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">协作工具</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  只读。搜消息、列线程。不改路由。
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li>搜消息 · GET /api/collab/messages?q=</li>
+                  <li>列线程 · GET /api/collab/threads</li>
+                </ul>
+              </div>
             </section>
           ) : pane === 'models' ? (
             <section className="space-y-3">
