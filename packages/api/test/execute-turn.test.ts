@@ -1182,6 +1182,57 @@ describe('executeTurn 审批流', () => {
     expect(cardMsg?.content).toContain('已自动批准');
   });
 
+  it('开了远程的绑仓线程,本地通过也不自动落地', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'meowbase-second-repo-'));
+    const work = mkdtempSync(join(tmpdir(), 'meowbase-second-work-'));
+    try {
+      await exec('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+      await exec('git', ['config', 'user.name', 'tester'], { cwd: repo });
+      await exec('git', ['config', 'user.email', 't@t.local'], { cwd: repo });
+      writeFileSync(join(repo, 'README.md'), 'hello\n');
+      await exec('git', ['add', '-A'], { cwd: repo });
+      await exec('git', ['commit', '-q', '-m', 'init'], { cwd: repo });
+
+      const stores = createMemoryStores();
+      const registry = createAgentRegistry([
+        stubAgent('claude', '完成'),
+        {
+          agentId: 'opencode',
+          async runTurn() {
+            return {
+              sessionId: 's',
+              content: '已实际运行 add(2,3),返回 5\n审查通过',
+              status: 'completed',
+            };
+          },
+        },
+      ]);
+      await stores.profiles.create({
+        agentId: 'claude', name: '墨墨', personality: 'x', role: '写手', expertise: [],
+        autoApprove: true,
+      });
+      const thread = await stores.threads.create({
+        title: 't',
+        primaryAgentId: 'claude',
+        workdirBase: work,
+        repo: { path: repo, baseBranch: 'main', allowRemote: true },
+      });
+      await gitWorktreeAdd(repo, thread.workdir, thread.repo!.branch, 'main');
+      writeFileSync(join(thread.workdir, 'auto.txt'), 'v1');
+
+      await executeTurn({ threadId: thread.id, content: '写个文件', context: { stores, registry } });
+      const card = (await stores.approvals.list(thread.id))[0];
+      expect(card?.status).toBe('reviewing');
+      const cardMsg = (await stores.messages.list(thread.id)).find((m) => m.content.includes('审批卡片'));
+      expect(cardMsg?.content).toContain('第二层');
+      expect(cardMsg?.content).not.toContain('已自动批准');
+      expect(cardMsg?.systemKind).toBe('approval-pending');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(work, { recursive: true, force: true });
+    }
+  });
+
   it('写了通过但没有验证证据,不算通过也不能自动落地', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([

@@ -104,6 +104,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 建审批卡并拉审查 | 本轮有 `git diff`、没有「下一跳还没跑的 pending」、没有持球(`settleTurn`)。只聊天不改文件不建卡 |
 | 按风险面选审查官 | 建卡拉审查时先 `classifyDiffRisk`(路径表:安全面=白名单/仓根校验,契约面=协议表/shared 协议解析;同时命中 safety 优先)。非 default 面优先选名册里声明了 `reviewRisk` 含该面的猫;没有或不可用则退回 `handoffTo` 现状逻辑。铁律不变:任何情况不许自审。链尾复用(chainReviewer)优先于风险面选官 |
 | 验证闸 | 只管卡上 `verdict` 和不许 `autoApprove`。不管顶栏文案(顶栏读审查正文关键词) |
+| 出仓第二层 | 绑仓且 `allowRemote` 时,本地审查通过也不自动落地,等人 `#approve` 或走现有 PR 回流。空沙箱 / 本地绑仓仍可 autoApprove |
 | 命令白名单 | 只跑猫 `等跑` 里白名单形状;元字符拒、不在表里拒。命令字符串来自猫的回复 |
 | 重启后捡棒 | 开机扫 pending,见踩坑第 1 条 |
 | 第二棒入队 | 槽里已有棒时后来交的棒进 `pendingQueue`;当前棒跑完 `followPendingChain` 把队头填回槽再跑。星星罐子 / 越界 / PR 合了 / 人发了不续跑的新消息:清槽也清队 |

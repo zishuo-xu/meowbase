@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowsAutoApprove,
+  needsSecondLayerReview,
   gateReviewVerdict,
   hasExplicitReviewVerdict,
   parseReviewVerdict,
@@ -107,5 +108,13 @@ describe('allowsAutoApprove', () => {
     expect(allowsAutoApprove('审查通过', true)).toBe(false);
     expect(allowsAutoApprove('## 结论\n需修改', true)).toBe(false);
     expect(allowsAutoApprove('(审查无输出)', true)).toBe(false);
+  });
+});
+
+describe('needsSecondLayerReview', () => {
+  it('只有显式开了远程才要仓外第二层', () => {
+    expect(needsSecondLayerReview(true)).toBe(true);
+    expect(needsSecondLayerReview(false)).toBe(false);
+    expect(needsSecondLayerReview(undefined)).toBe(false);
   });
 });

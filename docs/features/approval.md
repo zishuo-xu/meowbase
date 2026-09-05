@@ -50,7 +50,7 @@
 - **30 秒**：写手改沙箱，平台出卡，另一只猫审，人批才 commit。互审是内建管线，不是聊天里求人。`selectReviewer` 只看 `handoffTo`，不看 bin / 模型。
 - **追问「和 CI 有何不同」**：CI 是规则；这里是另一家模型看同一份 diff。人仍是合并权。
 - **踩坑**：claude 必须 `bypassPermissions` 才能在 headless 跑命令；否则自检卡在审批，审查也无证据。
-- **若继续往 clowder 靠**：他们按风险选审查车道。我们先保持「有 diff 就审」，加严可以后挂在状态机上。
+- **若继续往 clowder 靠**：他们按风险选审查车道。出仓第二层见 [second-layer-review.md](second-layer-review.md)。
 
 ## 代码入口
 

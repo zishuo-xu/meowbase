@@ -99,6 +99,7 @@ export {
   allowsAutoApprove,
   gateReviewVerdict,
   hasExplicitReviewVerdict,
+  needsSecondLayerReview,
   parseReviewVerdict,
 } from './review-verdict.js';
 export { hasVerificationEvidence, hasVerificationLimit } from './verification.js';

@@ -1,5 +1,6 @@
 import {
   allowsAutoApprove,
+  needsSecondLayerReview,
   buildSystemPrompt,
   classifyDiffRisk,
   displayName,
@@ -182,7 +183,10 @@ export async function runReviewFixThenCard(input: {
     .map((m) => m.content);
   const gated = gateReviewVerdict(reviewComment, writerTexts);
   const writerProfile = await context.stores.profiles.get(writerAgentId);
-  const wantAuto = allowsAutoApprove(reviewComment, writerProfile?.autoApprove, writerTexts);
+  const secondLayer = needsSecondLayerReview(thread.repo?.allowRemote);
+  const wantAuto =
+    !secondLayer &&
+    allowsAutoApprove(reviewComment, writerProfile?.autoApprove, writerTexts);
   let autoApplied = false;
   let landFail: string | undefined;
   if (wantAuto) {
@@ -216,7 +220,9 @@ export async function runReviewFixThenCard(input: {
         ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n互审后仍需修改，请你决定是否落地。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
         : incomplete
           ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n⚠️ 结论不算通过:没有本轮验证证据（命令+结果）。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
-          : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
+          : secondLayer
+            ? `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n本地已审过,开了远程等仓外第二层或人 #approve ${card.id}。\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`
+            : `📋 审批卡片 ${card.id}(写:${writerAgentId} → 审:${reviewerAgentId})\n改动:${latestDiff.stat}\n审查意见:${reviewComment}\n回复 #approve ${card.id} 批准 / #reject ${card.id} <理由> 打回`,
     status: 'completed',
     systemKind: autoApplied ? 'approval-applied' : 'approval-pending',
     systemMeta: { verdict: gated },

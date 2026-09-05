@@ -69,3 +69,8 @@ export function allowsAutoApprove(
   if (!autoApprove) return false;
   return gateReviewVerdict(text, evidenceTexts) === 'pass';
 }
+
+/** 开了远程才有仓外第二层;空沙箱和本地绑仓没有。 */
+export function needsSecondLayerReview(allowRemote?: boolean): boolean {
+  return allowRemote === true;
+}

@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 29 / 分母 31 = 94%**(每次相关改动同轮更新;第 16 行从部分对齐改为已对齐)
+**当前对齐率:已对齐 30 / 分母 31 = 97%**(每次相关改动同轮更新;第 20 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -29,7 +29,7 @@
 | 17 | 记忆召回度量 | 已对齐 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | [memory-recall](features/memory-recall.md) | 召回只量行为信号——注入是塞进提示词,引用是正文点了 #ev_,不靠猫自评 |
 | 18 | 技能按需注入 | 已对齐 | [F038](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F038-skills-discovery.md) | [skills](features/skills.md) | 技能是被喊到才出现的说明书——不常驻上下文,省 token 也避免永远用审查口吻写代码 |
 | 19 | 技能/工具使用度量 | 已对齐 | [F150](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F150-tool-usage-stats.md) | [skill-usage](features/skill-usage.md) | 技能按注入次数、工具按过程条数——打开再算,不另开计数器;不判断说明书有没有被照着做 |
-| 20 | 跨猫互审与人批落地 | 部分对齐(差云端第二层 review) | [F031](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F031-review-two-layer-process.md) | [approval](features/approval.md)、[review-conclusion](features/review-conclusion.md) | 审查是猫推理、落地是人拍板——互审是内建管线,不是聊天里求人 |
+| 20 | 跨猫互审与人批落地 | 已对齐 | [F031](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F031-review-two-layer-process.md) | [approval](features/approval.md)、[review-conclusion](features/review-conclusion.md)、[second-layer-review](features/second-layer-review.md) | 审查是猫推理、落地是人拍板;开了远程还有仓外第二层——本地通过不自动落地 |
 | 21 | 按风险面选审查官 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [risk-routed-reviewer](features/risk-routed-reviewer.md) | 强制力跟风险走——审查官按 diff 命中的风险面选,任何情况不许自审 |
 | 22 | 验证闸(没证据不算通过) | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [verification-gate](features/verification-gate.md) | 没证据不算通过——闸只管卡上结论和自动落地,不管顶栏文案 |
 | 23 | GitHub PR 自动化 | 已对齐 | [F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md)、[F133](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F133-cicd-tracking.md) | [pr-open](features/pr-open.md)、[approval-void](features/approval-void.md)、[pr-review-reflow](features/pr-review-reflow.md)、[pr-ci-tracking](features/pr-ci-tracking.md)、[pr-conflict](features/pr-conflict.md) | 猫能自己开 PR,合了平台自己停;人写的 review、CI 红灯、合不进去都会流回线程叫醒写手——绿只记、bot 评论不叫人 |
@@ -59,4 +59,3 @@
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
 1. **多 @ 编排剩余**(第 6 行)——并行 multi-mention 是有意裁剪,第二棒入队已落地;真要并行得先解决同一棵树同一个 git index。
-2. **云端第二层 review**(第 20 行)——互审管线已落地,差云端第二层。
