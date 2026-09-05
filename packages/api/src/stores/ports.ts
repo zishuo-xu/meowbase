@@ -49,7 +49,7 @@ export interface ThreadStore {
   promoteQueuedHop(threadId: string): Promise<boolean>;
   /** 整队清掉,槽不动。 */
   clearPendingQueue(threadId: string): Promise<void>;
-  /** 人话排进队尾。 */
+  /** 人话排进队尾;急件(! / 急 开头)插到队头。 */
   enqueueInbound(threadId: string, content: string): Promise<InboundMessage>;
   /** 取出队头;空则 null。 */
   shiftInbound(threadId: string): Promise<InboundMessage | null>;
@@ -57,10 +57,10 @@ export interface ThreadStore {
   clearInboundQueue(threadId: string): Promise<void>;
   /** 写入家规告示牌。 */
   setSopBoard(threadId: string, board: SopBoard): Promise<void>;
-  /** 把指定人话挪到队头。找不到 false。 */
-  steerInbound(threadId: string, id: string): Promise<boolean>;
-  /** 把指定交棒挪到队头。找不到 false。不碰槽里那一棒。 */
-  steerPendingHop(threadId: string, hopId: string): Promise<boolean>;
+  /** 改人话队序。beforeId 省略到队头,空到队尾。找不到 false。 */
+  steerInbound(threadId: string, id: string, beforeId?: string | null): Promise<boolean>;
+  /** 改交棒队序。beforeId 省略到队头,空到队尾。找不到 false。不碰槽里那一棒。 */
+  steerPendingHop(threadId: string, hopId: string, beforeId?: string | null): Promise<boolean>;
   /** 只清自己那一棒:跑的过程中猫又交棒时槽里已是下一棒,不能无条件清。 */
   clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean>;
   /** 抢下这一棒的主人:抢到才跑,防止两个跑者跑同一 hop。 */

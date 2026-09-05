@@ -10,6 +10,7 @@ export interface QueueHop {
 export interface QueueInbound {
   id: string;
   content: string;
+  urgent?: boolean;
 }
 
 function clip(text: string, max = 48): string {
@@ -38,7 +39,7 @@ export function QueuePanel({
   nameOf: (agentId?: string) => string;
   open?: boolean;
   onToggle?: () => void;
-  onSteer?: (input: { kind: 'hop' | 'inbound'; id: string }) => void;
+  onSteer?: (input: { kind: 'hop' | 'inbound'; id: string; beforeId?: string | null }) => void;
 }) {
   const hopCount = pendingQueue.length;
   const inboundCount = inboundQueue.length;
@@ -73,14 +74,33 @@ export function QueuePanel({
                         <span className="mt-0.5 block text-[var(--ink-soft)]">{clip(hop.task)}</span>
                       ) : null}
                     </span>
-                    {onSteer && index > 0 ? (
-                      <button
-                        type="button"
-                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
-                        onClick={() => onSteer({ kind: 'hop', id: hop.id })}
-                      >
-                        提到前面
-                      </button>
+                    {onSteer ? (
+                      <span className="flex shrink-0 gap-1">
+                        {index > 0 ? (
+                          <button
+                            type="button"
+                            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                            onClick={() => onSteer({ kind: 'hop', id: hop.id, beforeId: pendingQueue[index - 1]?.id })}
+                          >
+                            上移
+                          </button>
+                        ) : null}
+                        {index < hopCount - 1 ? (
+                          <button
+                            type="button"
+                            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                            onClick={() =>
+                              onSteer({
+                                kind: 'hop',
+                                id: hop.id,
+                                beforeId: pendingQueue[index + 2]?.id ?? null,
+                              })
+                            }
+                          >
+                            下移
+                          </button>
+                        ) : null}
+                      </span>
                     ) : null}
                   </li>
                 ))}
@@ -93,15 +113,39 @@ export function QueuePanel({
               <ol className="mt-1 space-y-1">
                 {inboundQueue.map((item, index) => (
                   <li key={item.id} className="flex items-start justify-between gap-2 text-[11px] leading-4 text-[var(--ink)]">
-                    <span className="min-w-0">{clip(item.content)}</span>
-                    {onSteer && index > 0 ? (
-                      <button
-                        type="button"
-                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
-                        onClick={() => onSteer({ kind: 'inbound', id: item.id })}
-                      >
-                        提到前面
-                      </button>
+                    <span className="min-w-0">
+                      {item.urgent ? <span className="mr-1 font-bold text-[var(--accent-strong)]">急</span> : null}
+                      {clip(item.content)}
+                    </span>
+                    {onSteer ? (
+                      <span className="flex shrink-0 gap-1">
+                        {index > 0 ? (
+                          <button
+                            type="button"
+                            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                            onClick={() =>
+                              onSteer({ kind: 'inbound', id: item.id, beforeId: inboundQueue[index - 1]?.id })
+                            }
+                          >
+                            上移
+                          </button>
+                        ) : null}
+                        {index < inboundCount - 1 ? (
+                          <button
+                            type="button"
+                            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-strong)] hover:bg-white/80"
+                            onClick={() =>
+                              onSteer({
+                                kind: 'inbound',
+                                id: item.id,
+                                beforeId: inboundQueue[index + 2]?.id ?? null,
+                              })
+                            }
+                          >
+                            下移
+                          </button>
+                        ) : null}
+                      </span>
                     ) : null}
                   </li>
                 ))}

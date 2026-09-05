@@ -28,7 +28,7 @@
 
 ## 不做（本篇）
 
-- 拖拽改任意位置、urgent 自动置顶
+- 拖拽改任意位置、urgent 自动置顶(见 [queue-reorder.md](queue-reorder.md))
 - 把队里的条目立刻跑起来(那会 abort 当前棒)
 - 两队合成一条、跨线程
 

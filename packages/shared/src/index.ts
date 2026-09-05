@@ -47,6 +47,7 @@ export {
   USER_MENTION_MAX_AGE_MS,
 } from './mention-targets.js';
 export type { TurnTargetInput } from './mention-targets.js';
+export { isUrgentInbound, moveQueueItem } from './queue-order.js';
 export { formatBudgetGateNote, isOverBudget, mergeTokenUsage, totalTokensOf } from './token-usage.js';
 export {
   generateApprovalId,

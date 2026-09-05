@@ -45,7 +45,7 @@ export interface ThreadDto {
   sessions: Record<string, string>;
   pendingHop?: { id: string; to: string; from: string; task?: string };
   pendingQueue?: { id: string; to: string; from: string; task?: string }[];
-  inboundQueue?: { id: string; content: string }[];
+  inboundQueue?: { id: string; content: string; urgent?: boolean }[];
   sop?: { stage: 'idle' | 'doing' | 'reviewing' | 'waiting' | 'human'; holder?: string; note: string };
   repo?: ThreadRepoDto;
   createdAt: string;
@@ -248,7 +248,10 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ content }),
     }),
-  steerQueue: (threadId: string, body: { kind: 'inbound' | 'hop'; id: string }) =>
+  steerQueue: (
+    threadId: string,
+    body: { kind: 'inbound' | 'hop'; id: string; beforeId?: string | null },
+  ) =>
     request<{
       ok: boolean;
       pendingQueue: ThreadDto['pendingQueue'];

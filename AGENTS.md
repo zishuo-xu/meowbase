@@ -108,6 +108,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 人插话先排队 | 猫还在跑或槽/交棒队非空时,普通正文进 `inboundQueue`,回 202,不打断当前棒。跑完再 `executeTurn`。星星罐子 / `#approve` / `#reject` / `#confirm` 立刻走;拉闸清人话队 |
 | 顶栏看见排队 | 交棒队或人话队非空时,球权行下面可点开列出谁交给谁、人还等着哪几句。不改路由 |
 | 排队提到前面 | 面板非队头条目可「提到前面」:只改该队顺序,不 abort 当前棒,不碰槽里那一跳 |
+| 排队改序与急件 | 面板可上移/下移到任意位置。人话以 `!` / `急` 开头入队时插到队头并标急。不 abort 当前棒 |
 | 家规告示牌 | 平台按球权派生阶段写在线程上,猫每跳读到同一段,人在顶栏看见。牌子不是命令,不替猫决定下一站 |
 | 待批中心 | Hub「待批」页列出所有还没落地的卡。批准/打回走 `#approve` / `#reject`;去看打开那条线程 |
 | 协作工具 | 只读:`GET /api/collab/messages?q=` 搜正文,`GET /api/collab/threads` 列线程。空查询不扫全库。不改路由。stdio MCP:`pnpm --filter @meowbase/api mcp`;`MEOW_MCP=0` 不挂 CLI |

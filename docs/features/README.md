@@ -75,3 +75,4 @@
 | [cross-thread-post.md](cross-thread-post.md) | 已落地 | 跨线程传话带出处 |
 | [memory-recall.md](memory-recall.md) | 已落地 | 记忆召回度量 |
 | [group-mentions.md](group-mentions.md) | 已落地 | 群组 mention 展开 |
+| [queue-reorder.md](queue-reorder.md) | 已落地 | 排队改序与急件置顶 |

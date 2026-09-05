@@ -6,6 +6,8 @@ export const AGENT_IDS: readonly AgentId[] = ['claude', 'gemini', 'opencode'];
 export interface InboundMessage {
   id: string;
   content: string;
+  /** 行首 ! / 急 入队时置顶,仍在队里,不 abort 当前棒 */
+  urgent?: boolean;
 }
 
 export type SopStage = 'idle' | 'doing' | 'reviewing' | 'waiting' | 'human';

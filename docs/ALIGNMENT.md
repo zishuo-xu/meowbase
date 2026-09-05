@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 23 / 分母 31 = 74%**(每次相关改动同轮更新;第 4 行从部分对齐改为已对齐)
+**当前对齐率:已对齐 24 / 分母 31 = 77%**(每次相关改动同轮更新;第 29 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -38,7 +38,7 @@
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
 | 27 | 额度池看板与预算闸 | 部分对齐(差按猫拆池、热改上限的 Hub 表单) | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md) | 账本能看,花超了拒跑——闸只认报上来的真实花费,没配上限不拦 |
 | 28 | 消息分层可观测 | 部分对齐(差 thinking/plan 可观测层、遥测层) | [F045](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F045-ndjson-observability.md) | [system-message-kind](features/system-message-kind.md)、[live-sync](features/live-sync.md) | 平台知道的事件类型我打在消息字段里——改文案再也不会让顶栏静默失灵 |
-| 29 | 邮箱/统一消息队列 | 部分对齐(差拖拽改序、urgent 自动置顶、跨来源统一出队) | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[queue-steer](features/queue-steer.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见,也能把某一条提到前面;拖拽和 urgent 还没做 |
+| 29 | 邮箱/统一消息队列 | 已对齐 | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[queue-steer](features/queue-steer.md)、[queue-reorder](features/queue-reorder.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见,能上移下移,急件入队置顶;两队仍分开,不旁路打断当前棒 |
 | 30 | SOP 流程守护 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md)、[F073](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F073-sop-auto-guardian.md)、[F083](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F083-design-gate-sop.md) | [sop-board](features/sop-board.md) | 家规写成告示牌——阶段由平台从球权派生,猫每跳能读到、人在顶栏能看见;牌子不是控制器 |
 | 31 | MCP 协作工具与配置编排 | 部分对齐(差跨项目配置同步、完整 SDK) | [F043](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F043-mcp-unification.md)、[F145](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F145-mcp-portable-provisioning.md)、[F249](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F249-multi-project-mcp-sync-management.md)、[F286](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F286-mcp-surface-lifecycle-governance.md) | [collab-tools](features/collab-tools.md)、[mcp-stdio](features/mcp-stdio.md) | 协作工具是独立 stdio 进程——search_messages / list_threads 打现有 HTTP;claude 可挂上;跨项目同步后议 |
 
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **邮箱剩余**(补第 29 行差的那截)——拖拽改序和 urgent 自动置顶还没有;提到前面已经有了。
+1. **额度池看板剩余**(补第 27 行差的那截)——按猫拆池、热改上限的 Hub 表单还没有;花超了拒跑已经有了。

@@ -198,6 +198,19 @@ describe('内存存储', () => {
     expect(await threads.shiftInbound('no-such-thread')).toBeNull();
   });
 
+  it('急件入队插到队头并打标', async () => {
+    const { threads } = createMemoryStores();
+    const thread = await threads.create({ title: 'urgent', primaryAgentId: 'claude' });
+    const first = await threads.enqueueInbound(thread.id, '先补这句');
+    const urgent = await threads.enqueueInbound(thread.id, '!先看这个');
+    expect(urgent.urgent).toBe(true);
+    expect((await threads.get(thread.id))?.inboundQueue?.map((m) => m.id)).toEqual([
+      urgent.id,
+      first.id,
+    ]);
+    expect((await threads.shiftInbound(thread.id))?.id).toBe(urgent.id);
+  });
+
   it('steerInbound / steerPendingHop 把指定条挪到队头,找不到 false', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: 'steer', primaryAgentId: 'claude' });
@@ -210,6 +223,13 @@ describe('内存存储', () => {
     ]);
     expect((await threads.shiftInbound(thread.id))?.id).toBe(second.id);
     expect(await threads.steerInbound(thread.id, 'nope')).toBe(false);
+
+    const third = await threads.enqueueInbound(thread.id, '第三句');
+    const fourth = await threads.enqueueInbound(thread.id, '第四句');
+    expect(await threads.steerInbound(thread.id, fourth.id, third.id)).toBe(true);
+    const afterMove = (await threads.get(thread.id))?.inboundQueue ?? [];
+    const fourthAt = afterMove.findIndex((m) => m.id === fourth.id);
+    expect(afterMove[fourthAt + 1]?.id).toBe(third.id);
 
     const hopA = {
       id: 'hop-a',

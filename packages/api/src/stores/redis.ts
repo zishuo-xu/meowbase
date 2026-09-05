@@ -4,7 +4,9 @@ import { Redis } from 'ioredis';
 import {
   generateApprovalId,
   generateEvidenceId,
+  isUrgentInbound,
   isVoidableApprovalStatus,
+  moveQueueItem,
 } from '@meowbase/shared';
 import type {
   AgentId,
@@ -270,9 +272,11 @@ export class RedisThreadStore implements ThreadStore {
   async enqueueInbound(threadId: string, content: string): Promise<InboundMessage> {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const item: InboundMessage = { id: randomUUID(), content };
-    const queue = [...(thread.inboundQueue ?? []), item];
-    await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(queue));
+    const urgent = isUrgentInbound(content);
+    const item: InboundMessage = { id: randomUUID(), content, ...(urgent ? { urgent: true } : {}) };
+    const queue = thread.inboundQueue ?? [];
+    const next = urgent ? [item, ...queue] : [...queue, item];
+    await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(next));
     return item;
   }
 
@@ -296,19 +300,19 @@ export class RedisThreadStore implements ThreadStore {
     await this.redis.hdel(threadKey(threadId), 'inboundQueue');
   }
 
-  async steerInbound(threadId: string, id: string): Promise<boolean> {
+  async steerInbound(threadId: string, id: string, beforeId?: string | null): Promise<boolean> {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const steered = moveToFront(thread.inboundQueue, (item) => item.id === id);
+    const steered = moveQueueItem(thread.inboundQueue ?? [], id, beforeId);
     if (!steered) return false;
     await this.redis.hset(threadKey(threadId), 'inboundQueue', JSON.stringify(steered));
     return true;
   }
 
-  async steerPendingHop(threadId: string, hopId: string): Promise<boolean> {
+  async steerPendingHop(threadId: string, hopId: string, beforeId?: string | null): Promise<boolean> {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const steered = moveToFront(thread.pendingQueue, (item) => item.id === hopId);
+    const steered = moveQueueItem(thread.pendingQueue ?? [], hopId, beforeId);
     if (!steered) return false;
     await this.redis.hset(threadKey(threadId), 'pendingQueue', JSON.stringify(steered));
     return true;

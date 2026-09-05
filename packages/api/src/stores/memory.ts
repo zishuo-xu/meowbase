@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import {
   generateApprovalId,
   generateEvidenceId,
+  isUrgentInbound,
   isVoidableApprovalStatus,
+  moveQueueItem,
 } from '@meowbase/shared';
 import type {
   AgentId,
@@ -172,8 +174,10 @@ export class InMemoryThreadStore implements ThreadStore {
   async enqueueInbound(threadId: string, content: string): Promise<InboundMessage> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const item: InboundMessage = { id: randomUUID(), content };
-    thread.inboundQueue = [...(thread.inboundQueue ?? []), item];
+    const urgent = isUrgentInbound(content);
+    const item: InboundMessage = { id: randomUUID(), content, ...(urgent ? { urgent: true } : {}) };
+    const queue = thread.inboundQueue ?? [];
+    thread.inboundQueue = urgent ? [item, ...queue] : [...queue, item];
     return item;
   }
 
@@ -194,19 +198,19 @@ export class InMemoryThreadStore implements ThreadStore {
     delete thread.inboundQueue;
   }
 
-  async steerInbound(threadId: string, id: string): Promise<boolean> {
+  async steerInbound(threadId: string, id: string, beforeId?: string | null): Promise<boolean> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const steered = moveToFront(thread.inboundQueue, (item) => item.id === id);
+    const steered = moveQueueItem(thread.inboundQueue ?? [], id, beforeId);
     if (!steered) return false;
     thread.inboundQueue = steered;
     return true;
   }
 
-  async steerPendingHop(threadId: string, hopId: string): Promise<boolean> {
+  async steerPendingHop(threadId: string, hopId: string, beforeId?: string | null): Promise<boolean> {
     const thread = this.threads.get(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);
-    const steered = moveToFront(thread.pendingQueue, (item) => item.id === hopId);
+    const steered = moveQueueItem(thread.pendingQueue ?? [], hopId, beforeId);
     if (!steered) return false;
     thread.pendingQueue = steered;
     return true;
