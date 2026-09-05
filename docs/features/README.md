@@ -69,3 +69,4 @@
 | [collab-tools.md](collab-tools.md) | 已落地 | 协作工具:搜消息、列线程 |
 | [memory-files.md](memory-files.md) | 已落地 | 确认了就写成文件 |
 | [hop-transcript.md](hop-transcript.md) | 已落地 | 每一跳留一份原始记录 |
+| [approval-hub.md](approval-hub.md) | 已落地 | 待批卡聚到一页 |

@@ -11,6 +11,7 @@ vi.mock('@/lib/api', () => ({
       tools: [],
       total: { skillInjections: 0, toolCalls: 0 },
     }),
+    listApprovals: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -102,6 +103,53 @@ describe('TeamHub', () => {
       tools: [],
       total: { skillInjections: 0, toolCalls: 0 },
     });
+    vi.mocked(api.listApprovals).mockReset();
+    vi.mocked(api.listApprovals).mockResolvedValue([]);
+  });
+
+  it('待批页列出还没落地的卡,点批准和去看', async () => {
+    vi.mocked(api.listApprovals).mockResolvedValue([
+      {
+        id: 'ap_aaaaaaa1',
+        threadId: 't-a',
+        writerAgentId: 'claude',
+        reviewerAgentId: 'gemini',
+        status: 'reviewing',
+        diffStat: 'hello.txt | 1 +',
+        createdAt: '2026-09-06T00:00:00.000Z',
+      },
+      {
+        id: 'ap_bbbbbbb2',
+        threadId: 't-b',
+        writerAgentId: 'opencode',
+        reviewerAgentId: 'gemini',
+        status: 'applied',
+        diffStat: 'done.txt | 1 +',
+        createdAt: '2026-09-06T00:00:00.000Z',
+      },
+    ]);
+    const onApproveCard = vi.fn();
+    const onOpenThread = vi.fn();
+    render(
+      <TeamHub
+        open
+        config={config}
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onApproveCard={onApproveCard}
+        onOpenThread={onOpenThread}
+        threadTitleOf={(id) => (id === 't-a' ? '加法线程' : id)}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /待批/ }));
+    const board = await screen.findByRole('region', { name: '待批' });
+    expect(within(board).getByText('加法线程')).toBeTruthy();
+    expect(within(board).queryByText('done.txt | 1 +')).toBeNull();
+    fireEvent.click(within(board).getByRole('button', { name: '批准' }));
+    expect(onApproveCard).toHaveBeenCalledWith('ap_aaaaaaa1');
+    fireEvent.click(within(board).getByRole('button', { name: '去看' }));
+    expect(onOpenThread).toHaveBeenCalledWith('t-a');
   });
 
   it('列出三只猫并保存当前猫的改名', () => {

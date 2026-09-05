@@ -8,6 +8,10 @@ export function isPendingApprovalStatus(status: string | undefined): boolean {
 }
 
 /** 侧栏要标「待确认」的会话。 */
+export function pendingApprovals<T extends { status: string }>(cards: readonly T[]): T[] {
+  return cards.filter((card) => isPendingApprovalStatus(card.status));
+}
+
 export function pendingThreadIds(
   cards: readonly { threadId: string; status: string }[],
 ): string[] {

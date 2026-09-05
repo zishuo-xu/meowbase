@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, type AgentConfigDto, type AppConfigDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type ApprovalDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
+import { pendingApprovals } from '@/lib/approvals';
 import { totalTokensOf } from '@/lib/token-usage';
 import { CatAvatar } from './CatAvatar';
 
@@ -170,6 +171,10 @@ export function TeamHub({
   onSaveSettings,
   onSaveModels,
   onVerifyModel,
+  onOpenThread,
+  onApproveCard,
+  onRejectCard,
+  threadTitleOf,
 }: {
   open: boolean;
   config: AppConfigDto;
@@ -182,6 +187,10 @@ export function TeamHub({
   onSaveSettings: (patch: SettingsSavePayload) => void;
   onSaveModels?: (models: ModelPresetDto[]) => void;
   onVerifyModel?: (preset: VerifyModelPayload) => Promise<VerifyModelResult>;
+  onOpenThread?: (threadId: string) => void;
+  onApproveCard?: (id: string) => void;
+  onRejectCard?: (id: string, reason: string) => void;
+  threadTitleOf?: (threadId: string) => string;
 }) {
   const catalog = config.models ?? [];
   const [pane, setPane] = useState<'models' | string>(focusAgentId ?? 'models');
@@ -206,6 +215,7 @@ export function TeamHub({
   const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
   const [usage, setUsage] = useState<UsageDto | null>(null);
   const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
+  const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -221,6 +231,22 @@ export function TeamHub({
     setEditApiKey('');
     setUsageScope('thread');
   }, [open, focusAgentId, config]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void api
+      .listApprovals()
+      .then((cards) => {
+        if (!cancelled) setApprovals(cards);
+      })
+      .catch(() => {
+        if (!cancelled) setApprovals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, usageRefreshKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -314,6 +340,20 @@ export function TeamHub({
             }`}
           >
             模型目录
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('approvals')}
+            className={`mb-1 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+              pane === 'approvals'
+                ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
+                : 'hover:bg-white/70'
+            }`}
+          >
+            待批
+            {pendingApprovals(approvals).length > 0
+              ? ` ${pendingApprovals(approvals).length}`
+              : ''}
           </button>
           <button
             type="button"
@@ -547,6 +587,63 @@ export function TeamHub({
                     </ul>
                   ) : null}
                 </>
+              )}
+            </section>
+          ) : pane === 'approvals' ? (
+            <section aria-label="待批" className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">待批</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  所有线程还没落地的卡。批准和打回走现有命令,不另开状态机。
+                </p>
+              </div>
+              {pendingApprovals(approvals).length === 0 ? (
+                <p className="text-xs text-[var(--ink-soft)]">没有待批的卡。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pendingApprovals(approvals).map((card) => (
+                    <li
+                      key={card.id}
+                      className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2"
+                    >
+                      <div className="text-sm font-bold">
+                        {threadTitleOf?.(card.threadId) || card.threadId}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
+                        {card.diffStat.split('\n')[0] || card.id}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {onApproveCard ? (
+                          <button
+                            type="button"
+                            className="rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-bold text-white"
+                            onClick={() => onApproveCard(card.id)}
+                          >
+                            批准
+                          </button>
+                        ) : null}
+                        {onRejectCard ? (
+                          <button
+                            type="button"
+                            className="rounded-full bg-white px-3 py-1 text-xs font-bold ring-1 ring-[var(--border)]"
+                            onClick={() => onRejectCard(card.id, 'Hub 打回')}
+                          >
+                            打回
+                          </button>
+                        ) : null}
+                        {onOpenThread ? (
+                          <button
+                            type="button"
+                            className="rounded-full bg-white px-3 py-1 text-xs font-bold ring-1 ring-[var(--border)]"
+                            onClick={() => onOpenThread(card.threadId)}
+                          >
+                            去看
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
           ) : pane === 'capability' ? (

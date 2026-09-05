@@ -410,6 +410,19 @@ export default function Home() {
               .finally(() => setSavingHub(false));
           }}
           onVerifyModel={(preset) => api.verifyModel(preset)}
+          threadTitleOf={(id) => threads.find((t) => t.id === id)?.title ?? id}
+          onOpenThread={(id) => {
+            setHubOpen(false);
+            void openThread(id);
+          }}
+          onApproveCard={(id) => {
+            setHubOpen(false);
+            void send(`#approve ${id}`);
+          }}
+          onRejectCard={(id, reason) => {
+            setHubOpen(false);
+            void send(`#reject ${id} ${reason}`);
+          }}
         />
       ) : null}
     </main>

@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 18 / 分母 31 = 58%**(每次相关改动同轮更新;第 25 行从部分对齐改为已对齐)
+**当前对齐率:已对齐 19 / 分母 31 = 61%**(每次相关改动同轮更新;第 24 行从缺失改为已对齐)
 
 ## 分母(核心清单)
 
@@ -33,7 +33,7 @@
 | 21 | 按风险面选审查官 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [risk-routed-reviewer](features/risk-routed-reviewer.md) | 强制力跟风险走——审查官按 diff 命中的风险面选,任何情况不许自审 |
 | 22 | 验证闸(没证据不算通过) | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [verification-gate](features/verification-gate.md) | 没证据不算通过——闸只管卡上结论和自动落地,不管顶栏文案 |
 | 23 | GitHub PR 自动化 | 已对齐 | [F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md)、[F133](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F133-cicd-tracking.md) | [pr-open](features/pr-open.md)、[approval-void](features/approval-void.md)、[pr-review-reflow](features/pr-review-reflow.md)、[pr-ci-tracking](features/pr-ci-tracking.md)、[pr-conflict](features/pr-conflict.md) | 猫能自己开 PR,合了平台自己停;人写的 review、CI 红灯、合不进去都会流回线程叫醒写手——绿只记、bot 评论不叫人 |
-| 24 | 统一审批中心 | 缺失 | [F246](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F246-approval-hub.md) | | 审批卡散在各条线程里——我缺一个「全局待批」的聚合视图 |
+| 24 | 统一审批中心 | 已对齐 | [F246](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F246-approval-hub.md) | [approval-hub](features/approval-hub.md)、[approval](features/approval.md) | 待批卡聚到 Hub 一页——人不必翻进某条线程才看得见;批准打回仍走现有命令 |
 | 25 | 操作审计流水 | 已对齐 | [F013](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F013-audit-log-v2.md) | [audit-trail](features/audit-trail.md)、[hop-transcript](features/hop-transcript.md) | 追责流水记决定,原始行按跳另存——两层分开,解析错了还能对证 |
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
 | 27 | 额度池看板与预算闸 | 部分对齐(差按猫拆池、热改上限的 Hub 表单) | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md) | 账本能看,花超了拒跑——闸只认报上来的真实花费,没配上限不拦 |
@@ -58,5 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **统一审批中心**(补第 24 行)——把散在各线程的待批卡聚到一页;预计 2–3 刀。
-2. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。
+1. **MCP 进程化**(补第 31 行剩下的半)——独立 stdio 服务器 + 三家 CLI 挂上;预计 3–5 刀。
