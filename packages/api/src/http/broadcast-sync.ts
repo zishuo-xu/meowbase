@@ -128,6 +128,10 @@ export function broadcastThreadSync(store: ThreadStore, emit: SyncEmit): ThreadS
       if (ok) emit(threadId);
       return ok;
     },
+    setSopBoard: async (threadId, board) => {
+      await store.setSopBoard(threadId, board);
+      emit(threadId);
+    },
     clearPendingHopIfSame: async (threadId, hopId) => {
       const cleared = await store.clearPendingHopIfSame(threadId, hopId);
       if (cleared) emit(threadId);

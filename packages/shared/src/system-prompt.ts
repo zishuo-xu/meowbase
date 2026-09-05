@@ -1,4 +1,5 @@
-import type { AgentId, AgentProfile, EvidenceEntry, Skill, ThreadRepo } from './types.js';
+import type { AgentId, AgentProfile, EvidenceEntry, Skill, SopBoard, ThreadRepo } from './types.js';
+import { formatSopBoardPrompt } from './sop-board.js';
 import { DEFAULT_ROSTER, type TeamMember } from './catalog.js';
 import {
   formatEvidenceInjectionLine,
@@ -75,6 +76,7 @@ export function buildSystemPrompt(input: {
   evidenceThreads?: readonly EvidenceScopeThread[];
   workdir?: string;
   repo?: ThreadRepo;
+  sop?: SopBoard;
 }): string | undefined {
   const parts: string[] = [];
   if (input.profile) {
@@ -93,6 +95,9 @@ export function buildSystemPrompt(input: {
   const team = input.team ?? (input.profile ? DEFAULT_ROSTER : undefined);
   if (team && team.length > 0) {
     parts.push(buildA2AProtocol(team, input.profile?.agentId));
+  }
+  if (input.sop) {
+    parts.push(formatSopBoardPrompt(input.sop));
   }
   if (input.skills && input.skills.length > 0) {
     const lines = input.skills.map((s) => `[技能:${s.name}] ${s.prompt}`);

@@ -70,6 +70,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('不能写通过');
   });
 
+  it('有告示牌时提示词含阶段且标明不是命令', () => {
+    const prompt = buildSystemPrompt({
+      profile,
+      evidenceRefs: [],
+      sop: { stage: 'reviewing', holder: 'gemini', note: '审查官在看。' },
+    });
+    expect(prompt).toContain('家规告示牌');
+    expect(prompt).toContain('不是命令');
+    expect(prompt).toContain('阶段:reviewing');
+  });
+
   it('交接条目来自 team.handoff,{to} 填对手名字', () => {
     const prompt = buildSystemPrompt({
       profile,

@@ -19,6 +19,7 @@ export type {
   InboundMessage,
   Thread,
   ThreadRepo,
+  SopBoard,
   TokenUsage,
   ToolActivity,
   ToolActivityStatus,
@@ -67,6 +68,9 @@ export {
 } from './evidence-recall.js';
 export type { EvidenceScopeThread } from './evidence-recall.js';
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
+export { deriveSopBoard, formatSopBoardPrompt, sopBoardLabel } from './sop-board.js';
+export type { SopBoardInput } from './sop-board.js';
+export type { SopStage } from './types.js';
 export { matchSkills } from './skills.js';
 export { classifyTool, sumToolUsage } from './tool-usage.js';
 export type { SkillUsageRow, ToolCategory, ToolUsageRow, ToolUsageSummary } from './tool-usage.js';

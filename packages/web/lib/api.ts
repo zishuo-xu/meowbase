@@ -46,6 +46,7 @@ export interface ThreadDto {
   pendingHop?: { id: string; to: string; from: string; task?: string };
   pendingQueue?: { id: string; to: string; from: string; task?: string }[];
   inboundQueue?: { id: string; content: string }[];
+  sop?: { stage: 'idle' | 'doing' | 'reviewing' | 'waiting' | 'human'; holder?: string; note: string };
   repo?: ThreadRepoDto;
   createdAt: string;
 }

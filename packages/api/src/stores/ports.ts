@@ -11,6 +11,7 @@ import type {
   Message,
   PendingHop,
   Skill,
+  SopBoard,
   SystemKind,
   SystemMeta,
   Thread,
@@ -54,6 +55,8 @@ export interface ThreadStore {
   shiftInbound(threadId: string): Promise<InboundMessage | null>;
   /** 人话队整队清掉。 */
   clearInboundQueue(threadId: string): Promise<void>;
+  /** 写入家规告示牌。 */
+  setSopBoard(threadId: string, board: SopBoard): Promise<void>;
   /** 把指定人话挪到队头。找不到 false。 */
   steerInbound(threadId: string, id: string): Promise<boolean>;
   /** 把指定交棒挪到队头。找不到 false。不碰槽里那一棒。 */

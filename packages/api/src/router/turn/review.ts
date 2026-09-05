@@ -18,10 +18,10 @@ import type {
   TeamMember,
 } from '@meowbase/shared';
 import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js';
+import { overlayProfile, refreshSopBoard } from './context.js';
 import { landApprovedCard } from './land-approval.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runAgentTurn } from './agent-hop.js';
-import { overlayProfile } from './context.js';
 import { MAX_REVIEW_FIX_ROUNDS, type ThreadRuntime, type TurnContext, type WriteQueue } from './types.js';
 
 const RISK_LABEL = { safety: '安全面', contract: '契约面' } as const;
@@ -74,6 +74,7 @@ export async function runReviewFixThenCard(input: {
     const reviewSkill = (await context.stores.skills.list()).find((s: Skill) => s.id === 'review');
     const reviewerStored = (await context.stores.profiles.get(reviewerAgentId)) ?? undefined;
     const reviewerSpec = context.agents?.find((a) => a.id === reviewerAgentId);
+    const sop = await refreshSopBoard(context, threadId, team);
     const reviewerPrompt = buildSystemPrompt({
       profile: overlayProfile(reviewerStored, reviewerSpec),
       team,
@@ -81,6 +82,7 @@ export async function runReviewFixThenCard(input: {
       evidenceRefs: [],
       workdir: thread.workdir,
       repo: thread.repo,
+      sop,
     });
 
     const runReview = async (): Promise<string> => {
@@ -151,6 +153,7 @@ export async function runReviewFixThenCard(input: {
           evidenceThreads: (await context.stores.threads.list()).map(toEvidenceScopeThread),
           workdir: thread.workdir,
           repo: thread.repo,
+          sop: await refreshSopBoard(context, threadId, team),
         }),
         writeQueue,
         undefined,

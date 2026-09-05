@@ -263,6 +263,11 @@ export default function Home() {
                   ).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
+            {activeThread?.sop && activeThread.sop.stage !== 'idle' ? (
+              <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]" aria-label="家规告示牌">
+                {activeThread.sop.note}
+              </p>
+            ) : null}
             {activeId ? (
               <RelayTimeline
                 hops={describeRelayTimeline(headerMessages, sending, (id) => agentName(id, agents))}

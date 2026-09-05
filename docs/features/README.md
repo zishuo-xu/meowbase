@@ -65,3 +65,4 @@
 | [budget-gate.md](budget-gate.md) | 已落地 | 花超了就拒跑 |
 | [skill-usage.md](skill-usage.md) | 已落地 | 技能和工具用过几次 |
 | [queue-steer.md](queue-steer.md) | 已落地 | 排队里提到前面 |
+| [sop-board.md](sop-board.md) | 已落地 | 家规写成告示牌 |

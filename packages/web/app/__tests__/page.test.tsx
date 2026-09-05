@@ -37,6 +37,8 @@ vi.mock('@/lib/api', () => ({
     sendMessage: vi.fn(),
     cancelTurn: vi.fn(),
     fetchUsage: vi.fn(),
+    fetchToolUsage: vi.fn(),
+    steerQueue: vi.fn(),
   },
 }));
 
@@ -103,6 +105,7 @@ const thread = {
   primaryAgentId: 'claude' as const,
   workdir: 'work/t-sync',
   sessions: {},
+  sop: { stage: 'doing' as const, holder: 'claude', note: '写手在干活。做完按家规交下一棒,不要问人要不要继续。' },
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -136,6 +139,11 @@ describe('Home live-sync', () => {
     vi.mocked(api.listThreads).mockClear();
     vi.mocked(api.listEvidence).mockClear();
   }
+
+  it('顶栏展示家规告示牌说明', async () => {
+    await openThread();
+    expect(screen.getByLabelText('家规告示牌').textContent).toContain('写手在干活');
+  });
 
   it('收到 sync 后重拉 messages / approvals / threads', async () => {
     await openThread();

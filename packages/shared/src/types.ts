@@ -8,6 +8,15 @@ export interface InboundMessage {
   content: string;
 }
 
+export type SopStage = 'idle' | 'doing' | 'reviewing' | 'waiting' | 'human';
+
+/** 家规告示牌:平台派生,猫读、人看。不是状态机。 */
+export interface SopBoard {
+  stage: SopStage;
+  holder?: AgentId;
+  note: string;
+}
+
 /** 已交棒、下一跳还没跑。线程内最多一条。 */
 export interface PendingHop {
   /** 这一棒的身份:跑完只清自己,重跑用它认消息 */
@@ -38,6 +47,8 @@ export interface Thread {
   pendingQueue?: PendingHop[];
   /** 猫还在跑时人插的话,FIFO,当前棒跑完再送 */
   inboundQueue?: InboundMessage[];
+  /** 家规告示牌:平台派生,猫读、人看。不是状态机。 */
+  sop?: SopBoard;
   /** 绑了真实仓库时:父仓路径、基准分支、本线程分支 */
   repo?: ThreadRepo;
   createdAt: string;

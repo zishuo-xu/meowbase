@@ -47,6 +47,9 @@ describe('executeTurn', () => {
     expect(final.content).toBe('gemini 干的');
     expect(final.agentId).toBe('gemini');
     expect(final.status).toBe('completed');
+    const after = await stores.threads.get(thread.id);
+    expect(after?.sop?.stage).toBe('human');
+    expect(after?.sop?.note).toContain('球在人手里');
   });
 
   it('句中不要 @闪闪 不并行叫闪闪', async () => {
@@ -75,6 +78,7 @@ describe('executeTurn', () => {
       context: { stores, registry },
     });
     expect(called).toEqual(['claude']);
+    expect((await stores.threads.get(thread.id))?.sop?.stage).toBe('doing');
   });
 
   it('首条用户消息把占位标题换成任务摘要', async () => {

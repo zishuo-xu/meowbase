@@ -68,7 +68,7 @@ import {
   type PrReviewRef,
   type PrSnapshot,
 } from '../../services/pr.js';
-import { isReviewerRole, listHandoffFiles, overlayProfile } from './context.js';
+import { isReviewerRole, listHandoffFiles, overlayProfile, refreshSopBoard } from './context.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
 
 async function recordGitMove(input: {
@@ -447,6 +447,7 @@ export async function runSegment(
     const profile = overlayProfile(stored, spec);
     const matchedSkills = await matchSkills(currentTask, await context.stores.skills.list());
     const evidenceThreads = (await context.stores.threads.list()).map(toEvidenceScopeThread);
+    const sop = await refreshSopBoard(context, thread.id, team);
     const systemPrompt = buildSystemPrompt({
       profile,
       team,
@@ -455,6 +456,7 @@ export async function runSegment(
       evidenceThreads,
       workdir: thread.workdir,
       repo: thread.repo,
+      sop,
     });
     const prompt = fromAgent
       ? formatA2AHandoffPrompt(

@@ -15,6 +15,7 @@ import type {
   Message,
   PendingHop,
   Skill,
+  SopBoard,
   Thread,
   ThreadRepo,
 } from '@meowbase/shared';
@@ -209,6 +210,12 @@ export class InMemoryThreadStore implements ThreadStore {
     if (!steered) return false;
     thread.pendingQueue = steered;
     return true;
+  }
+
+  async setSopBoard(threadId: string, board: SopBoard): Promise<void> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    thread.sop = board;
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

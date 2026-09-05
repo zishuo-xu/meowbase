@@ -15,6 +15,7 @@ import type {
   InboundMessage,
   Message,
   PendingHop,
+  SopBoard,
   Thread,
   ThreadRepo,
 } from '@meowbase/shared';
@@ -155,6 +156,7 @@ export class RedisThreadStore implements ThreadStore {
       ...(raw.inboundQueue
         ? { inboundQueue: JSON.parse(raw.inboundQueue) as InboundMessage[] }
         : {}),
+      ...(raw.sop ? { sop: JSON.parse(raw.sop) as SopBoard } : {}),
       ...(raw.repo ? { repo: JSON.parse(raw.repo) as ThreadRepo } : {}),
       createdAt: raw.createdAt ?? '',
     };
@@ -310,6 +312,12 @@ export class RedisThreadStore implements ThreadStore {
     if (!steered) return false;
     await this.redis.hset(threadKey(threadId), 'pendingQueue', JSON.stringify(steered));
     return true;
+  }
+
+  async setSopBoard(threadId: string, board: SopBoard): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread) throw new Error(`线程不存在: ${threadId}`);
+    await this.redis.hset(threadKey(threadId), 'sop', JSON.stringify(board));
   }
 
   async clearPendingHopIfSame(threadId: string, hopId: string): Promise<boolean> {

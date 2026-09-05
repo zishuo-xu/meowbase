@@ -1,7 +1,9 @@
 import {
   buildMentionCatalog,
   DEFAULT_ROSTER,
+  deriveSopBoard,
   isHumanEscalateToken,
+  type SopBoard,
 } from '@meowbase/shared';
 import type { AgentProfile, MentionCatalog, TeamMember, ThreadRepo } from '@meowbase/shared';
 import type { AgentSpec } from '../../config.js';
@@ -56,6 +58,33 @@ export async function loadRoster(context: TurnContext): Promise<{
 
 export function isReviewerRole(role?: string): boolean {
   return Boolean(role && role.includes('审查'));
+}
+
+export async function refreshSopBoard(
+  context: TurnContext,
+  threadId: string,
+  team: readonly TeamMember[],
+): Promise<SopBoard> {
+  const thread = await context.stores.threads.get(threadId);
+  const messages = await context.stores.messages.list(threadId);
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && m.agentId);
+  const lastSystem = [...messages].reverse().find((m) => m.role === 'system' && m.systemKind);
+  const lastAssistantIsReviewer = lastAssistant
+    ? isReviewerRole(team.find((m) => m.agentId === lastAssistant.agentId)?.role)
+    : undefined;
+  const holding =
+    lastSystem?.systemKind === 'hold' ||
+    Boolean(thread?.pendingHop?.holdCommand) ||
+    lastSystem?.systemKind === 'hold-command-done';
+  const board = deriveSopBoard({
+    pendingHopTo: thread?.pendingHop?.to,
+    holding,
+    lastAssistantId: lastAssistant?.agentId,
+    lastAssistantIsReviewer,
+    lastSystemKind: lastSystem?.systemKind,
+  });
+  await context.stores.threads.setSopBoard(threadId, board);
+  return board;
 }
 
 export async function listHandoffFiles(workdir: string, repo?: ThreadRepo): Promise<string[]> {

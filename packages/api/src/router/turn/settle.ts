@@ -15,6 +15,7 @@ import {
 } from '../../services/pr.js';
 import { clip, turnLog } from '../../services/turn-log.js';
 import { runReviewFixThenCard } from './review.js';
+import { refreshSopBoard } from './context.js';
 import type { SegmentRunResult, ThreadRuntime, TurnContext, WriteQueue } from './types.js';
 
 export async function settleTurn(input: {
@@ -233,5 +234,6 @@ export async function settleTurn(input: {
     }
   }
 
+  await refreshSopBoard(context, threadId, team);
   return lastAssistant;
 }
