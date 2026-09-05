@@ -6,6 +6,7 @@
 |---|---|---|
 | 接手必读 + **协议表(唯一写全)** | 人或 agent | [AGENTS.md](../AGENTS.md) |
 | **开发走到哪、上一个人留下什么、下一刀往哪** | 接手的人或 agent | [PROGRESS.md](PROGRESS.md) |
+| **clowder 对齐总账(对内,不对外)** | 选下一刀前先看 | [ALIGNMENT.md](ALIGNMENT.md) |
 | **是什么 / 难在哪 / 凭什么说它没坏** | 面试 / 简历 | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 人怎么用 | 演示 / 简历 | [README.md](../README.md)、[DEMO.md](DEMO.md) |
 | 猫怎么协作（现行怎么跑） | 人 / 面试深挖 | [A2A.md](A2A.md) |
