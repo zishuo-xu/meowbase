@@ -138,6 +138,20 @@ describe('git 辅助函数', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('中文文件名原样出现在改动列表和审批 diff 里,不转义也不丢 diff', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-git-cjk-'));
+    await gitInit(dir);
+    writeFileSync(join(dir, '01-设计.md'), '# 设计\n');
+    expect(await gitChangedPaths(dir)).toEqual(['01-设计.md']);
+    const diff = await gitDiffHead(dir);
+    expect(diff).not.toBeNull();
+    expect(diff?.files).toEqual(['01-设计.md']);
+    expect(diff?.stat).toContain('01-设计.md');
+    expect(diff?.text).toContain('+# 设计');
+    expect(diff?.text).not.toContain('\\350');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('tsbuildinfo 等缓存文件不进入审批 diff', async () => {
     expect(isApprovalNoisePath('packages/web/tsconfig.tsbuildinfo')).toBe(true);
     expect(isApprovalNoisePath('src/app.ts')).toBe(false);

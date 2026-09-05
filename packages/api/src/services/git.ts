@@ -277,7 +277,8 @@ export async function resolveDiffMarker(dir: string, repo?: ThreadRepo): Promise
 
 export async function gitChangedPaths(dir: string, fromRef = 'HEAD'): Promise<string[]> {
   await gitAddAll(dir);
-  return (await run(dir, ['diff', fromRef, '--name-only', '--', '.']))
+  // quotepath=false:中文名不转成八进制转义,否则列表显示乱码,拿它当 pathspec 也匹配不到文件
+  return (await run(dir, ['-c', 'core.quotepath=false', 'diff', fromRef, '--name-only', '--', '.']))
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -288,15 +289,17 @@ export async function gitDiffHead(
   dir: string,
   fromRef = 'HEAD',
 ): Promise<{ stat: string; text: string; files: string[] } | null> {
-  const names = (await run(dir, ['diff', fromRef, '--name-only', '--', '.']))
+  const names = (
+    await run(dir, ['-c', 'core.quotepath=false', 'diff', fromRef, '--name-only', '--', '.'])
+  )
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .filter((path) => !isApprovalNoisePath(path));
   if (names.length === 0) return null;
-  const text = await run(dir, ['diff', fromRef, '--', ...names]);
+  const text = await run(dir, ['-c', 'core.quotepath=false', 'diff', fromRef, '--', ...names]);
   if (!text.trim()) return null;
-  const stat = await run(dir, ['diff', fromRef, '--stat', '--', ...names]);
+  const stat = await run(dir, ['-c', 'core.quotepath=false', 'diff', fromRef, '--stat', '--', ...names]);
   return { stat: stat.trim(), text: text.slice(0, 20_000), files: names };
 }
 
