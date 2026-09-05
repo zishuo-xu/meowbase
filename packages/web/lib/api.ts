@@ -62,6 +62,7 @@ export interface MessageDto {
   error?: string;
   activities?: ToolActivity[];
   thinking?: string;
+  plan?: string;
   systemKind?: string;
   systemMeta?: {
     from?: string;

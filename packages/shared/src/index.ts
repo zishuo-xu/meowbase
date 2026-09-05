@@ -48,6 +48,8 @@ export {
 } from './mention-targets.js';
 export type { TurnTargetInput } from './mention-targets.js';
 export { isUrgentInbound, moveQueueItem } from './queue-order.js';
+export { splitThoughtLayers } from './thought-layers.js';
+export type { ThoughtLayers } from './thought-layers.js';
 export { formatBudgetGateNote, isOverBudget, mergeTokenUsage, totalTokensOf } from './token-usage.js';
 export {
   generateApprovalId,

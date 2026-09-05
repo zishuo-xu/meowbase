@@ -125,9 +125,13 @@ export function MessageBubble({
             {displayName}
           </div>
         )}
+        {message.plan?.trim() ? (
+          <ThinkingBlock content={message.plan} label="计划" streaming={false} />
+        ) : null}
         {(message.thinking?.trim() ||
           (message.status === 'streaming' &&
             !parsed.text &&
+            !message.plan?.trim() &&
             !(message.activities && message.activities.length > 0))) && (
           <ThinkingBlock content={message.thinking ?? ''} streaming={message.status === 'streaming'} />
         )}

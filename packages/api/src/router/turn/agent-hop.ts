@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import type { AgentId, Message, ToolActivity } from '@meowbase/shared';
+import { splitThoughtLayers } from '@meowbase/shared';
 import type { AgentTurnOutput } from '../../providers/types.js';
 import { finalizeActivities, upsertToolActivity } from '../../providers/tool-activity.js';
 import { sweepStrayFiles } from '../../services/git.js';
@@ -84,6 +85,7 @@ export async function runAgentTurn(
     error: output.error ? clip(output.error, 80) : undefined,
   });
 
+  const layers = splitThoughtLayers(thinking);
   const assistant = await writeQueue(() =>
     context.stores.messages.patch(thread.id, assistantMessage.id, {
       content: output.content || accumulated,
@@ -94,7 +96,8 @@ export async function runAgentTurn(
       ...(activities.length > 0
         ? { activities: finalizeActivities(activities, output.status === 'completed') }
         : {}),
-      ...(thinking ? { thinking } : {}),
+      ...(layers.thinking ? { thinking: layers.thinking } : {}),
+      ...(layers.plan ? { plan: layers.plan } : {}),
     }),
   );
 

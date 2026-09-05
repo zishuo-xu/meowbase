@@ -216,6 +216,30 @@ describe('MessageBubble', () => {
     expect(screen.getByText('已写好 quicksort.ts')).toBeTruthy();
   });
 
+  it('计划与思考分行,不混进正文', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-plan',
+          threadId: 't',
+          role: 'assistant',
+          agentId: 'claude',
+          content: '已写好 add.ts',
+          status: 'completed',
+          createdAt: '',
+          thinking: '先看目录',
+          plan: '1. 写 add.ts',
+        }}
+      />,
+    );
+    expect(screen.getByText('计划')).toBeTruthy();
+    expect(screen.getByText('思考过程')).toBeTruthy();
+    expect(screen.queryByText('1. 写 add.ts')).toBeNull();
+    fireEvent.click(screen.getByText('计划'));
+    expect(screen.getByText('1. 写 add.ts')).toBeTruthy();
+    expect(screen.getByText('已写好 add.ts')).toBeTruthy();
+  });
+
   it('流式思考默认不展开正文', () => {
     render(
       <MessageBubble

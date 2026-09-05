@@ -114,6 +114,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 协作工具 | 只读:`GET /api/collab/messages?q=` 搜正文,`GET /api/collab/threads` 列线程。空查询不扫全库。不改路由。stdio MCP:`pnpm --filter @meowbase/api mcp`;`MEOW_MCP=0` 不挂 CLI |
 | 跨线程传话 | `POST /api/threads/:id/cross-post` 把一句寄到另一条线程,落 `cross-post` 系统消息,写明来自哪条。不叫猫、不参与球权、不落助手气泡。同源或目标不存在拒。同名猫在另一条线程说的话不当本线程自己 |
 | 记忆召回度量 | 跳完成记下塞进提示词的证据 id;猫正文点 `#ev_` 算引用。`GET /api/usage/memory` / Hub「记忆」页。不靠猫自评 |
+| 思考与计划 | 思考原文里行首「计划:」拆成 `plan`,气泡单独一块。不碰对用户说的话 |
 | 预算闸 | 配了 `MEOW_BUDGET_USD` / `budgetUsd` 时,全平台已报真实花费达到上限则普通任务不叫猫,落 `budget`。批准 / 拉闸 / 确认证据仍立刻走。没配不拦。不按价格表估算 |
 | 按猫拆池 | `agentBudgets` 给某只猫单独上限,只拦点名它的那一跳。Hub 账本能改全平台和每只猫上限,保存立刻生效 |
 | 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);自己那根 HEAD 前进 / 自己那根远端跟踪引用变了(含 force)则落 `git-move`(不参与球权)。空沙箱跳过 |

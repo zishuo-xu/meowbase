@@ -312,6 +312,29 @@ describe('executeTurn', () => {
     expect(final.activities?.some((a) => a.name === '思考')).toBeFalsy();
   });
 
+  it('思考里的计划拆开落库,不进正文', async () => {
+    const stores = createMemoryStores();
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          input.onThinking?.('先看目录\n计划:\n1. 写 add.ts');
+          input.onIncrement?.('写好了');
+          return { sessionId: 'sess-claude', content: '写好了', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const final = await executeTurn({
+      threadId: thread.id,
+      content: 'hi',
+      context: { stores, registry },
+    });
+    expect(final.thinking).toBe('先看目录');
+    expect(final.plan).toBe('1. 写 add.ts');
+    expect(final.content).toBe('写好了');
+  });
+
   it('超时后把未完成的工具标成 error', async () => {
     const stores = createMemoryStores();
     const registry = createAgentRegistry([

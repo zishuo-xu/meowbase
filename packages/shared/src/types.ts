@@ -173,6 +173,8 @@ export interface Message {
   activities?: ToolActivity[];
   /** 模型思考过程,与对用户说的话分开 */
   thinking?: string;
+  /** 从思考里拆出的计划,有「计划:」才有 */
+  plan?: string;
   /** 平台系统消息的类型;老消息没有,前端走散文兜底 */
   systemKind?: SystemKind;
   /** 接力等场景的 from/to,用 agentId 不是显示名 */

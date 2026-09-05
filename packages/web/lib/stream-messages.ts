@@ -1,4 +1,5 @@
 import type { MessageDto, ToolActivity } from './api';
+import { splitThoughtLayers } from './thought-layers';
 
 export interface StreamIncrement {
   messageId: string;
@@ -125,14 +126,27 @@ export function applyStreamThinking(
     const current = messages[idx];
     if (!current) return messages;
     const next = [...messages];
+    const combined =
+      (current.thinking ?? '') +
+      (current.plan ? `${current.thinking ? '\n' : ''}计划:\n${current.plan}` : '') +
+      event.delta;
+    const layers = splitThoughtLayers(combined);
     next[idx] = {
       ...current,
       status: current.status === 'completed' ? current.status : 'streaming',
-      thinking: (current.thinking ?? '') + event.delta,
+      ...(layers.thinking ? { thinking: layers.thinking } : { thinking: undefined }),
+      ...(layers.plan ? { plan: layers.plan } : { plan: undefined }),
     };
     return next;
   }
-  return [...messages, assistantShell(event, threadId, { thinking: event.delta })];
+  const layers = splitThoughtLayers(event.delta);
+  return [
+    ...messages,
+    assistantShell(event, threadId, {
+      ...(layers.thinking ? { thinking: layers.thinking } : {}),
+      ...(layers.plan ? { plan: layers.plan } : {}),
+    }),
+  ];
 }
 
 export type PipelinePhase = 'idle' | 'working' | 'reviewing';
@@ -195,16 +209,18 @@ export function mergeCanonicalMessages(
       (s.activities?.length ?? 0) > (m.activities?.length ?? 0) ? s.activities : m.activities;
     const thinking =
       (s.thinking?.length ?? 0) > (m.thinking?.length ?? 0) ? s.thinking : m.thinking;
+    const plan = (s.plan?.length ?? 0) > (m.plan?.length ?? 0) ? s.plan : m.plan;
     if (s.content.length <= m.content.length) {
       return {
         ...m,
         ...(activities ? { activities } : {}),
         ...(thinking ? { thinking } : {}),
+        ...(plan ? { plan } : {}),
       };
     }
     const settled =
       m.status === 'completed' || m.status === 'failed' || m.status === 'terminated';
-    return { ...m, content: s.content, status: settled ? m.status : s.status, activities, thinking };
+    return { ...m, content: s.content, status: settled ? m.status : s.status, activities, thinking, plan };
   });
   const ids = new Set(canonical.map((m) => m.id));
   for (const s of local) {

@@ -4,9 +4,13 @@ import { useState } from 'react';
 export function ThinkingBlock({
   content,
   streaming,
+  label = '思考过程',
+  streamingLabel = '思考中…',
 }: {
   content: string;
   streaming?: boolean;
+  label?: string;
+  streamingLabel?: string;
 }) {
   const text = content.trim();
   const [open, setOpen] = useState(false);
@@ -20,7 +24,7 @@ export function ThinkingBlock({
         onClick={() => setOpen((v) => !v)}
       >
         <span className={`inline-block transition-transform ${open && text ? 'rotate-90' : ''}`}>▸</span>
-        <span>{streaming ? '思考中…' : '思考过程'}</span>
+        <span>{streaming ? streamingLabel : label}</span>
       </button>
       {open && text ? (
         <div className="mt-1 whitespace-pre-wrap break-words px-1 py-0.5 italic">{content}</div>

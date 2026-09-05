@@ -59,6 +59,17 @@ describe('applyStreamThinking', () => {
     expect(next[1]?.thinking).toBe('先看目录再写文件');
     expect(next[1]?.content).toBe('');
   });
+
+  it('思考增量里出现计划标题则拆开', () => {
+    const first = applyStreamThinking(
+      [msg({ id: 'u1', role: 'user', content: 'hi' })],
+      { messageId: 'a1', delta: '先看目录\n计划:\n1. 写 add.ts', agentId: 'claude' },
+      't1',
+    );
+    expect(first[1]?.thinking).toBe('先看目录');
+    expect(first[1]?.plan).toBe('1. 写 add.ts');
+    expect(first[1]?.content).toBe('');
+  });
 });
 
 describe('applyStreamActivity', () => {

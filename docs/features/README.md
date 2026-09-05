@@ -77,3 +77,4 @@
 | [group-mentions.md](group-mentions.md) | 已落地 | 群组 mention 展开 |
 | [queue-reorder.md](queue-reorder.md) | 已落地 | 排队改序与急件置顶 |
 | [budget-pools.md](budget-pools.md) | 已落地 | 按猫拆池与热改上限 |
+| [thought-layers.md](thought-layers.md) | 已落地 | 思考与计划分层 |
