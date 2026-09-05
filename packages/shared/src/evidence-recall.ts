@@ -64,6 +64,17 @@ export function tokenizeEvidenceQuery(text: string): string[] {
   return [...new Set(found.filter((token) => !STOP.has(token)))];
 }
 
+function scoreEvidence(entry: EvidenceEntry, tokens: readonly string[]): number {
+  const hay = `${entry.title} ${entry.content}`.toLowerCase();
+  let score = 0;
+  for (const token of tokens) {
+    if (!hay.includes(token)) continue;
+    score += token.length >= 4 ? 2 : 1;
+    if (entry.title.toLowerCase().includes(token)) score += 2;
+  }
+  return score;
+}
+
 /** 人说「之前/约定」时,从已确认证据里按标题和正文做关键词匹配。不向量、不摘要。 */
 export function matchEvidence(
   query: string,
@@ -76,16 +87,7 @@ export function matchEvidence(
 
   return entries
     .filter((entry) => entry.status === 'confirmed')
-    .map((entry) => {
-      const hay = `${entry.title} ${entry.content}`.toLowerCase();
-      let score = 0;
-      for (const token of tokens) {
-        if (!hay.includes(token)) continue;
-        score += token.length >= 4 ? 2 : 1;
-        if (entry.title.toLowerCase().includes(token)) score += 2;
-      }
-      return { entry, score };
-    })
+    .map((entry) => ({ entry, score: scoreEvidence(entry, tokens) }))
     .filter((row) => row.score > 0)
     .sort((a, b) => b.score - a.score || b.entry.createdAt.localeCompare(a.entry.createdAt))
     .slice(0, limit)
@@ -112,6 +114,42 @@ export function filterEvidenceByRecallScope(
     return entries.filter((entry) => entry.threadId === current.threadId);
   }
   return entries.filter((entry) => sameRepo(repoByThread.get(entry.threadId), currentRepo));
+}
+
+export interface EvidenceSearchHit {
+  entry: EvidenceEntry;
+  source: string;
+  foreign: boolean;
+}
+
+/** 人搜图书馆:不要求「之前/约定」。跨仓命中标 foreign,自动召回仍不灌。 */
+export function searchEvidenceHits(input: {
+  query: string;
+  entries: readonly EvidenceEntry[];
+  threads: readonly EvidenceScopeThread[];
+  current?: { threadId: string; repoPath?: string };
+  limit?: number;
+}): EvidenceSearchHit[] {
+  const tokens = tokenizeEvidenceQuery(input.query);
+  if (tokens.length === 0) return [];
+  const local = input.current
+    ? new Set(
+        filterEvidenceByRecallScope(input.entries, input.current, input.threads).map(
+          (entry) => entry.id,
+        ),
+      )
+    : null;
+  return input.entries
+    .filter((entry) => entry.status === 'confirmed')
+    .map((entry) => ({ entry, score: scoreEvidence(entry, tokens) }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || b.entry.createdAt.localeCompare(a.entry.createdAt))
+    .slice(0, input.limit ?? 20)
+    .map((row) => ({
+      entry: row.entry,
+      source: evidenceSourceLabel(row.entry, input.threads),
+      foreign: local ? !local.has(row.entry.id) : false,
+    }));
 }
 
 export function evidenceSourceLabel(

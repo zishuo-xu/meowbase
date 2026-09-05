@@ -63,6 +63,18 @@ describe('api', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
+        json: async () => [{ id: 'ev_1', foreign: true }],
+      }),
+    );
+    await api.searchEvidence('斑马纹', 't1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/evidence?q='),
+      undefined,
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
         json: async () => ({ ok: true }),
       }),
     );

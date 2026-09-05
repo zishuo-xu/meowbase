@@ -64,6 +64,7 @@ export {
 export {
   evidenceSourceLabel,
   filterEvidenceByRecallScope,
+  searchEvidenceHits,
   formatEvidenceConfirmedAt,
   formatEvidenceInjectionLine,
   formatSessionCapsuleHeading,
@@ -78,6 +79,7 @@ export type {
   EvidenceRecallRow,
   EvidenceRecallSummary,
   EvidenceScopeThread,
+  EvidenceSearchHit,
 } from './evidence-recall.js';
 export { evidenceFileName, formatEvidenceMarkdown, parseEvidenceMarkdown } from './evidence-files.js';
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';

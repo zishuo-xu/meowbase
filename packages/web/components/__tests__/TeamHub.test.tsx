@@ -16,6 +16,7 @@ vi.mock('@/lib/api', () => ({
       total: { injections: 0, citations: 0 },
     }),
     listApprovals: vi.fn().mockResolvedValue([]),
+    searchEvidence: vi.fn().mockResolvedValue([]),
     fetchMcpProvision: vi.fn().mockResolvedValue({
       command: 'node mcp.js',
       apiUrl: 'http://127.0.0.1:3200',
@@ -786,6 +787,41 @@ describe('TeamHub', () => {
     expect(within(board).getByText('ev_aaaaaaaa')).toBeTruthy();
     expect(within(board).getByText(/注入 2/)).toBeTruthy();
     expect(within(board).getByText(/引用 1/)).toBeTruthy();
+  });
+
+  it('记忆页能搜到别的项目并标出处', async () => {
+    vi.mocked(api.searchEvidence).mockResolvedValue([
+      {
+        id: 'ev_foreign',
+        threadId: 't-b',
+        kind: 'decision',
+        title: '仓A斑马纹约定',
+        content: '斑马纹用条纹',
+        status: 'confirmed',
+        createdAt: '2026-09-06T00:00:00.000Z',
+        source: 'repo-a',
+        foreign: true,
+      },
+    ]);
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '记忆' }));
+    const board = await screen.findByRole('region', { name: '记忆' });
+    fireEvent.change(within(board).getByLabelText('搜证据'), { target: { value: '斑马纹' } });
+    await waitFor(() => expect(api.searchEvidence).toHaveBeenCalledWith('斑马纹', 't1'), {
+      timeout: 1500,
+    });
+    expect(within(board).getByText('仓A斑马纹约定')).toBeTruthy();
+    expect(within(board).getByText(/点 #ev_ 才进提示词/)).toBeTruthy();
+    expect(within(board).getByText(/#ev_foreign/)).toBeTruthy();
   });
 
   it('切换当前线程 / 全部会换数据源', async () => {

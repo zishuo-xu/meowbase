@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evidenceSourceLabel,
   filterEvidenceByRecallScope,
+  searchEvidenceHits,
   formatEvidenceConfirmedAt,
   formatEvidenceInjectionLine,
   formatSessionCapsuleHeading,
@@ -126,6 +127,55 @@ describe('filterEvidenceByRecallScope', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('searchEvidenceHits', () => {
+  const own = ev({
+    id: 'ev_own',
+    title: '仓A斑马纹约定',
+    content: '斑马纹用条纹',
+    threadId: 't-cur',
+  });
+  const other = ev({
+    id: 'ev_oth',
+    title: '仓B斑马纹约定',
+    content: '斑马纹用点',
+    threadId: 't-oth',
+  });
+  const draft = ev({
+    id: 'ev_draft',
+    title: '仓A斑马纹草稿',
+    content: '还没确认',
+    threadId: 't-cur',
+    status: 'draft',
+  });
+  const threads = [
+    { id: 't-cur', title: 'A1', repoPath: '/tmp/repo-a' },
+    { id: 't-oth', title: 'B', repoPath: '/tmp/repo-b' },
+  ];
+
+  it('不要求之前约定,跨仓命中标 foreign,草稿不进', () => {
+    const hits = searchEvidenceHits({
+      query: '斑马纹',
+      entries: [own, other, draft],
+      threads,
+      current: { threadId: 't-cur', repoPath: '/tmp/repo-a' },
+    });
+    expect(hits.map((hit) => hit.entry.id)).toEqual(['ev_own', 'ev_oth']);
+    expect(hits[0]?.foreign).toBe(false);
+    expect(hits[0]?.source).toBe('repo-a');
+    expect(hits[1]?.foreign).toBe(true);
+    expect(hits[1]?.source).toBe('repo-b');
+  });
+
+  it('没给当前线程时命中都不标外馆', () => {
+    const hits = searchEvidenceHits({
+      query: '斑马纹',
+      entries: [own, other],
+      threads,
+    });
+    expect(hits.every((hit) => hit.foreign === false)).toBe(true);
   });
 });
 

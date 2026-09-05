@@ -10,6 +10,7 @@ import {
   filterEvidenceByRecallScope,
   formatCrossPostNote,
   formatInboundQueuedNote,
+  searchEvidenceHits,
   toEvidenceScopeThread,
   isAllowedRequestOrigin,
   isRepoPathAllowed,
@@ -518,7 +519,31 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   });
 
   app.get('/api/evidence', async (request) => {
-    const { threadId, scope } = request.query as { threadId?: string; scope?: string };
+    const { threadId, scope, q } = request.query as {
+      threadId?: string;
+      scope?: string;
+      q?: string;
+    };
+    const query = q?.trim();
+    if (query) {
+      const [entries, threads] = await Promise.all([
+        stores.evidence.list(),
+        stores.threads.list(),
+      ]);
+      const current = threadId ? await stores.threads.get(threadId) : null;
+      return searchEvidenceHits({
+        query,
+        entries,
+        threads: threads.map(toEvidenceScopeThread),
+        ...(current
+          ? { current: { threadId: current.id, repoPath: current.repo?.path } }
+          : {}),
+      }).map((hit) => ({
+        ...hit.entry,
+        source: hit.source,
+        foreign: hit.foreign,
+      }));
+    }
     if (scope === 'recall') {
       if (!threadId) return [];
       const current = await stores.threads.get(threadId);

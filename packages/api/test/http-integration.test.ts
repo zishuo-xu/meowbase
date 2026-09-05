@@ -664,6 +664,18 @@ describe('HTTP 集成', () => {
         await fetch(`${baseUrl}/api/evidence?threadId=${threadA.id}&scope=recall`)
       ).json()) as { title: string }[];
       expect(recallA.some((item) => item.title === '仓A斑马纹约定')).toBe(true);
+
+      const searchB = (await (
+        await fetch(
+          `${baseUrl}/api/evidence?threadId=${threadB.id}&q=${encodeURIComponent('斑马纹')}`,
+        )
+      ).json()) as { title: string; foreign?: boolean; source?: string }[];
+      const hit = searchB.find((item) => item.title === '仓A斑马纹约定');
+      expect(hit?.foreign).toBe(true);
+      expect(hit?.source).toBeTruthy();
+      expect(searchB.some((item) => item.foreign === false && item.title === '仓A斑马纹约定')).toBe(
+        false,
+      );
     } finally {
       rmSync(repoA, { recursive: true, force: true });
       rmSync(repoB, { recursive: true, force: true });

@@ -88,6 +88,8 @@ export interface EvidenceDto {
   status: 'draft' | 'confirmed';
   createdAt: string;
   confirmedAt?: string;
+  source?: string;
+  foreign?: boolean;
 }
 
 export interface ApprovalDto {
@@ -244,6 +246,11 @@ export const api = {
     ),
   listEvidence: (threadId: string) =>
     request<EvidenceDto[]>(`/api/evidence?threadId=${threadId}&scope=recall`),
+  searchEvidence: (query: string, threadId?: string) => {
+    const params = new URLSearchParams({ q: query });
+    if (threadId) params.set('threadId', threadId);
+    return request<EvidenceDto[]>(`/api/evidence?${params.toString()}`);
+  },
   deleteThread: (threadId: string) =>
     request<{ ok: boolean }>(`/api/threads/${threadId}`, { method: 'DELETE' }),
   sendMessage: (threadId: string, content: string) =>

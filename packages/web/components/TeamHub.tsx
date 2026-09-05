@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, type AgentConfigDto, type AppConfigDto, type ApprovalDto, type MemoryRecallDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type ApprovalDto, type EvidenceDto, type MemoryRecallDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
 import { pendingApprovals } from '@/lib/approvals';
 import { totalTokensOf } from '@/lib/token-usage';
 import { CatAvatar } from './CatAvatar';
@@ -220,6 +220,8 @@ export function TeamHub({
   const [usage, setUsage] = useState<UsageDto | null>(null);
   const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
   const [memoryRecall, setMemoryRecall] = useState<MemoryRecallDto | null>(null);
+  const [memoryQuery, setMemoryQuery] = useState('');
+  const [memoryHits, setMemoryHits] = useState<EvidenceDto[]>([]);
   const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
   const [mcpSnippet, setMcpSnippet] = useState('');
 
@@ -236,6 +238,8 @@ export function TeamHub({
     setEditingId(null);
     setEditApiKey('');
     setUsageScope('thread');
+    setMemoryQuery('');
+    setMemoryHits([]);
     setBudgetDraft(config.budgetUsd != null ? String(config.budgetUsd) : '');
     setAgentBudgetDraft(
       Object.fromEntries(config.agents.map((agent) => [agent.id, config.agentBudgets?.[agent.id] != null ? String(config.agentBudgets[agent.id]) : ''])),
@@ -311,6 +315,30 @@ export function TeamHub({
       cancelled = true;
     };
   }, [open, usageScope, activeThreadId, usageRefreshKey]);
+
+  useEffect(() => {
+    if (!open || pane !== 'memory') return;
+    const q = memoryQuery.trim();
+    if (!q) {
+      setMemoryHits([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void api
+        .searchEvidence(q, activeThreadId ?? undefined)
+        .then((hits) => {
+          if (!cancelled) setMemoryHits(hits);
+        })
+        .catch(() => {
+          if (!cancelled) setMemoryHits([]);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, pane, memoryQuery, activeThreadId]);
 
   if (!open) return null;
 
@@ -698,8 +726,39 @@ export function TeamHub({
               <div>
                 <div className="text-xs font-bold text-[var(--ink-soft)]">记忆</div>
                 <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                  只算已经跑完的那一跳。注入是塞进提示词,引用是正文点了 #ev_。不靠猫自评。没记录就空着,不写 0。
+                  只算已经跑完的那一跳。注入是塞进提示词,引用是正文点了 #ev_。不靠猫自评。没记录就空着,不写 0。搜得到别的项目,点名才进提示词。
                 </p>
+                <label className="mt-3 block text-xs text-[var(--ink-soft)]">
+                  搜证据
+                  <input
+                    type="search"
+                    value={memoryQuery}
+                    onChange={(event) => setMemoryQuery(event.target.value)}
+                    placeholder="关键词"
+                    className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+                  />
+                </label>
+                {memoryQuery.trim() ? (
+                  memoryHits.length === 0 ? (
+                    <p className="mt-2 text-xs text-[var(--ink-soft)]">没有命中。</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {memoryHits.map((hit) => (
+                        <li
+                          key={hit.id}
+                          className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2 text-sm"
+                        >
+                          <div className="font-bold">{hit.title}</div>
+                          <div className="text-xs text-[var(--ink-soft)]">
+                            #{hit.id}
+                            {hit.source ? ` · ${hit.source}` : ''}
+                            {hit.foreign ? ' · 别的项目 · 点 #ev_ 才进提示词' : ''}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <button
