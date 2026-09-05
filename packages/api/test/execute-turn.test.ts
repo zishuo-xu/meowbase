@@ -692,6 +692,11 @@ describe('executeTurn 技能注入', () => {
     await executeTurn({ threadId: thread.id, content: '继续', context: { stores, registry } });
     expect(prompts[1]).not.toContain('[技能:');
     expect(prompts[1]).toContain('交接规则');
+
+    const messages = await stores.messages.list(thread.id);
+    const assistants = messages.filter((m) => m.role === 'assistant');
+    expect(assistants[0]?.skillIds).toEqual(['review']);
+    expect(assistants[1]?.skillIds).toBeUndefined();
   });
 
   it('多技能命中时全部注入', async () => {

@@ -118,3 +118,27 @@ describe('GET /api/usage', () => {
     await app.close();
   });
 });
+
+describe('GET /api/usage/tools', () => {
+  it('带 threadId 只算这条线程的技能和工具', async () => {
+    await stores.messages.append({
+      threadId: threadA,
+      role: 'assistant',
+      agentId: 'claude',
+      content: '写了',
+      status: 'completed',
+      skillIds: ['review'],
+      activities: [{ id: 't1', name: 'Write', status: 'done' }],
+    });
+    const res = await fetch(`${baseUrl}/api/usage/tools?threadId=${threadA}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      skills: Array<{ id: string; count: number }>;
+      tools: Array<{ name: string; category: string; count: number }>;
+      total: { skillInjections: number; toolCalls: number };
+    };
+    expect(body.skills).toEqual([{ id: 'review', count: 1 }]);
+    expect(body.tools).toEqual([{ name: 'Write', category: 'builtin', count: 1 }]);
+    expect(body.total).toEqual({ skillInjections: 1, toolCalls: 1 });
+  });
+});

@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 14 / 分母 31 = 45%**(每次相关改动同轮更新;第 27 行从缺失改为部分对齐,已对齐数不变)
+**当前对齐率:已对齐 15 / 分母 31 = 48%**(每次相关改动同轮更新;第 19 行从缺失改为已对齐)
 
 ## 分母(核心清单)
 
@@ -28,7 +28,7 @@
 | 16 | 记忆划界、出处与联邦检索 | 部分对齐(差联邦检索、Collection 治理、生命周期) | [F186](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F186-library-memory-architecture.md) | [memory-scope](features/memory-scope.md) | 记忆按仓划界、注入带出处——猫看得出这条约定来自哪个项目、什么时候确认的 |
 | 17 | 记忆召回度量 | 缺失 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | | 我不知道猫召回的记忆用没用上——要量就用真实行为信号,不用自评 |
 | 18 | 技能按需注入 | 已对齐 | [F038](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F038-skills-discovery.md) | [skills](features/skills.md) | 技能是被喊到才出现的说明书——不常驻上下文,省 token 也避免永远用审查口吻写代码 |
-| 19 | 技能/工具使用度量 | 缺失 | [F150](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F150-tool-usage-stats.md) | | 我说不清哪个技能真被用过——这是厚薄表上最薄的一条 |
+| 19 | 技能/工具使用度量 | 已对齐 | [F150](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F150-tool-usage-stats.md) | [skill-usage](features/skill-usage.md) | 技能按注入次数、工具按过程条数——打开再算,不另开计数器;不判断说明书有没有被照着做 |
 | 20 | 跨猫互审与人批落地 | 部分对齐(差云端第二层 review) | [F031](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F031-review-two-layer-process.md) | [approval](features/approval.md)、[review-conclusion](features/review-conclusion.md) | 审查是猫推理、落地是人拍板——互审是内建管线,不是聊天里求人 |
 | 21 | 按风险面选审查官 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [risk-routed-reviewer](features/risk-routed-reviewer.md) | 强制力跟风险走——审查官按 diff 命中的风险面选,任何情况不许自审 |
 | 22 | 验证闸(没证据不算通过) | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md) | [verification-gate](features/verification-gate.md) | 没证据不算通过——闸只管卡上结论和自动落地,不管顶栏文案 |
@@ -58,9 +58,8 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **技能/工具使用度量**(补第 19 行)——计数 + 看板,fake 可测、不花钱;厚薄表唯一「薄」的那条道;预计 2 刀。
-2. **邮箱加厚**(补第 29 行剩下的半)——交棒排队和人插话排队已落地;下一层是优先级 / steer 插队,预计 2–4 刀。
-3. **SOP 外化**(补第 30 行)——AGENTS.md 和踩坑清单是现成素材,把 workflow 共享结构 + 压缩后恢复胶囊做薄;预计 3–4 刀。
-4. **MCP 最小形态**(补第 31 行)——先做协作工具补全一层(搜消息/列线程),配置编排后议;预计 3–5 刀。
-5. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
-6. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。
+1. **邮箱加厚**(补第 29 行剩下的半)——交棒排队和人插话排队已落地;下一层是优先级 / steer 插队,预计 2–4 刀。
+2. **SOP 外化**(补第 30 行)——AGENTS.md 和踩坑清单是现成素材,把 workflow 共享结构 + 压缩后恢复胶囊做薄;预计 3–4 刀。
+3. **MCP 最小形态**(补第 31 行)——先做协作工具补全一层(搜消息/列线程),配置编排后议;预计 3–5 刀。
+4. **记忆写侧加厚**(补第 15 行)——对齐「真相在文件、索引可重建」:确认时物化 .md + 重建脚本;预计 3–4 刀。
+5. **审计取证层**(补第 25 行)——CLI 原始事件按调用分片归档、短保留期,和追责层分开;预计 2 刀。

@@ -144,6 +144,12 @@ export interface UsageDto {
   total: TokenUsageDto;
 }
 
+export interface ToolUsageDto {
+  skills: Array<{ id: string; count: number }>;
+  tools: Array<{ name: string; category: 'builtin' | 'skill' | 'mcp'; count: number }>;
+  total: { skillInjections: number; toolCalls: number };
+}
+
 export interface AgentPatchDto {
   name?: string;
   aliases?: string[];
@@ -235,4 +241,6 @@ export const api = {
     request<{ ok: boolean }>(`/api/threads/${threadId}/cancel`, { method: 'POST' }),
   fetchUsage: (threadId?: string) =>
     request<UsageDto>(threadId ? `/api/usage?threadId=${threadId}` : '/api/usage'),
+  fetchToolUsage: (threadId?: string) =>
+    request<ToolUsageDto>(threadId ? `/api/usage/tools?threadId=${threadId}` : '/api/usage/tools'),
 };

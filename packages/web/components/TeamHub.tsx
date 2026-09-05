@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, type AgentConfigDto, type AppConfigDto, type ModelPresetDto, type TokenUsageDto, type UsageDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
 import { totalTokensOf } from '@/lib/token-usage';
 import { CatAvatar } from './CatAvatar';
 
@@ -205,6 +205,7 @@ export function TeamHub({
   const [draftErrors, setDraftErrors] = useState<{ model?: string; bins?: string }>({});
   const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
   const [usage, setUsage] = useState<UsageDto | null>(null);
+  const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -227,13 +228,26 @@ export function TeamHub({
     const load = async () => {
       try {
         if (usageScope === 'thread' && !activeThreadId) {
-          if (!cancelled) setUsage({ byAgent: {}, total: {} });
+          if (!cancelled) {
+            setUsage({ byAgent: {}, total: {} });
+            setToolUsage({ skills: [], tools: [], total: { skillInjections: 0, toolCalls: 0 } });
+          }
           return;
         }
-        const next = await api.fetchUsage(usageScope === 'all' ? undefined : activeThreadId ?? undefined);
-        if (!cancelled) setUsage(next);
+        const scopeId = usageScope === 'all' ? undefined : activeThreadId ?? undefined;
+        const [next, nextTools] = await Promise.all([
+          api.fetchUsage(scopeId),
+          api.fetchToolUsage(scopeId),
+        ]);
+        if (!cancelled) {
+          setUsage(next);
+          setToolUsage(nextTools);
+        }
       } catch {
-        if (!cancelled) setUsage({ byAgent: {}, total: {} });
+        if (!cancelled) {
+          setUsage({ byAgent: {}, total: {} });
+          setToolUsage({ skills: [], tools: [], total: { skillInjections: 0, toolCalls: 0 } });
+        }
       }
     };
     void load();
@@ -315,13 +329,24 @@ export function TeamHub({
           <button
             type="button"
             onClick={() => setPane('ledger')}
-            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+            className={`mb-1 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
               pane === 'ledger'
                 ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
                 : 'hover:bg-white/70'
             }`}
           >
             账本
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('skills')}
+            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+              pane === 'skills'
+                ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
+                : 'hover:bg-white/70'
+            }`}
+          >
+            技能
           </button>
           <div className="mb-2 px-1 text-[11px] font-bold tracking-wide text-[var(--ink-soft)] uppercase">
             成员
@@ -437,6 +462,92 @@ export function TeamHub({
                   );
                 })}
               </ul>
+            </section>
+          ) : pane === 'skills' ? (
+            <section aria-label="技能" className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">技能</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  只算已经跑完的那一跳。技能按注入次数,工具按过程条数。「思考」不算工具。没记录就空着,不写 0。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'thread'}
+                  onClick={() => setUsageScope('thread')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'thread'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  当前线程
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'all'}
+                  onClick={() => setUsageScope('all')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'all'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  全部
+                </button>
+              </div>
+              {toolUsage && toolUsage.skills.length === 0 && toolUsage.tools.length === 0 ? (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  还没有技能或工具记录。命中触发词的那一跳会记技能,CLI 过程会记工具。
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2">
+                      <div className="text-[var(--ink-soft)]">技能注入</div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {formatTokenCount(toolUsage?.total.skillInjections)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2">
+                      <div className="text-[var(--ink-soft)]">工具调用</div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {formatTokenCount(toolUsage?.total.toolCalls)}
+                      </div>
+                    </div>
+                  </div>
+                  {toolUsage && toolUsage.skills.length > 0 ? (
+                    <ul className="space-y-1">
+                      {toolUsage.skills.map((row) => (
+                        <li
+                          key={row.id}
+                          className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2 text-sm"
+                        >
+                          <span className="font-bold">{row.id}</span>
+                          <span className="text-xs text-[var(--ink-soft)]">{row.count} 次</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {toolUsage && toolUsage.tools.length > 0 ? (
+                    <ul className="space-y-1">
+                      {toolUsage.tools.map((row) => (
+                        <li
+                          key={row.name}
+                          className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2 text-sm"
+                        >
+                          <span>
+                            <span className="font-bold">{row.name}</span>
+                            <span className="ml-2 text-[11px] text-[var(--ink-soft)]">{row.category}</span>
+                          </span>
+                          <span className="text-xs text-[var(--ink-soft)]">{row.count} 次</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              )}
             </section>
           ) : pane === 'capability' ? (
             <section className="space-y-3">

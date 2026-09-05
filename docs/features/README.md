@@ -63,3 +63,4 @@
 | [user-message-queue.md](user-message-queue.md) | 已落地 | 人插话先排队,不打断正在跑的猫 |
 | [queue-panel.md](queue-panel.md) | 已落地 | 顶栏点开就能看见排队 |
 | [budget-gate.md](budget-gate.md) | 已落地 | 花超了就拒跑 |
+| [skill-usage.md](skill-usage.md) | 已落地 | 技能和工具用过几次 |

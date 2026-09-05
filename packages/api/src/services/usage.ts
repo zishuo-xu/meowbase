@@ -1,5 +1,5 @@
-import type { AgentId, Message, TokenUsage } from '@meowbase/shared';
-import { mergeTokenUsage, totalTokensOf } from '@meowbase/shared';
+import type { AgentId, Message, TokenUsage, ToolUsageSummary } from '@meowbase/shared';
+import { mergeTokenUsage, sumToolUsage, totalTokensOf } from '@meowbase/shared';
 import type { AppStores } from '../stores/ports.js';
 
 export interface UsageSummary {
@@ -49,13 +49,25 @@ export async function loadUsage(
   stores: Pick<AppStores, 'threads' | 'messages'>,
   threadId?: string,
 ): Promise<UsageSummary> {
-  if (threadId) {
-    return sumUsage(await stores.messages.list(threadId));
-  }
+  return sumUsage(await listUsageMessages(stores, threadId));
+}
+
+export async function loadToolUsage(
+  stores: Pick<AppStores, 'threads' | 'messages'>,
+  threadId?: string,
+): Promise<ToolUsageSummary> {
+  return sumToolUsage(await listUsageMessages(stores, threadId));
+}
+
+async function listUsageMessages(
+  stores: Pick<AppStores, 'threads' | 'messages'>,
+  threadId?: string,
+): Promise<Message[]> {
+  if (threadId) return stores.messages.list(threadId);
   const threads = await stores.threads.list();
   const bundled: Message[] = [];
   for (const thread of threads) {
     bundled.push(...(await stores.messages.list(thread.id)));
   }
-  return sumUsage(bundled);
+  return bundled;
 }

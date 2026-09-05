@@ -187,4 +187,19 @@ describe('api', () => {
     await api.fetchUsage();
     expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/usage$/), undefined);
   });
+
+  it('fetchToolUsage 打 /api/usage/tools', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ skills: [], tools: [], total: { skillInjections: 0, toolCalls: 0 } }),
+      }),
+    );
+    await api.fetchToolUsage('t1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/usage/tools?threadId=t1'),
+      undefined,
+    );
+  });
 });

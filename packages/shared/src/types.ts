@@ -148,6 +148,8 @@ export interface Message {
   usage?: TokenUsage;
   error?: string;
   createdAt: string;
+  /** 这一跳实际塞进 system prompt 的技能 id */
+  skillIds?: string[];
   /** CLI 工具过程(Read/Write/Bash 等),页面 CLI 块用 */
   activities?: ToolActivity[];
   /** 模型思考过程,与对用户说的话分开 */

@@ -77,6 +77,8 @@ type AppendBase = {
   hopId?: string;
   usage?: Message['usage'];
   error?: string;
+  skillIds?: string[];
+  activities?: Message['activities'];
 };
 
 /** role: system 必须带 kind,避免新写入点忘打标。user/assistant 禁止带 kind。 */

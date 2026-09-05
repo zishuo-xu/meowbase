@@ -47,3 +47,4 @@ manifest 加 `{ id, triggers, prompt 路径 }`。验收：消息含 `tdd` 时 sy
 
 - `skills/manifest.json`、`skills/prompts/`
 - `packages/shared/src/system-prompt.ts`
+- 注入次数看板见 [skill-usage.md](skill-usage.md)

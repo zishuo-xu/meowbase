@@ -524,6 +524,7 @@ export async function runSegment(
       systemPrompt,
       writeQueue,
       resume?.id,
+      matchedSkills.map((skill) => skill.id),
     );
     lastAssistant = hopResult.assistant;
     lastOutput = hopResult.output;
@@ -613,6 +614,8 @@ export async function runSegment(
           }),
           systemPrompt,
           writeQueue,
+          undefined,
+          matchedSkills.map((skill) => skill.id),
         );
         lastAssistant = nudged.assistant;
         lastOutput = nudged.output;

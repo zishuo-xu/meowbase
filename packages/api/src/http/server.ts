@@ -65,7 +65,7 @@ import {
   gitWorktreeRemove,
 } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
-import { loadUsage } from '../services/usage.js';
+import { loadToolUsage, loadUsage } from '../services/usage.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -509,6 +509,11 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/usage', async (request) => {
     const { threadId } = request.query as { threadId?: string };
     return loadUsage(stores, threadId);
+  });
+
+  app.get('/api/usage/tools', async (request) => {
+    const { threadId } = request.query as { threadId?: string };
+    return loadToolUsage(stores, threadId);
   });
 
   app.get('/api/audit', async (request, reply) => {

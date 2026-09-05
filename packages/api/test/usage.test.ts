@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Message } from '@meowbase/shared';
 import { totalTokensOf } from '@meowbase/shared';
 import { createMemoryStores } from '../src/stores/factories.js';
-import { loadUsage, sumUsage } from '../src/services/usage.js';
+import { loadToolUsage, loadUsage, sumUsage } from '../src/services/usage.js';
 
 function msg(partial: Pick<Message, 'role' | 'status'> & Partial<Message>): Message {
   return {
@@ -292,5 +292,42 @@ describe('loadUsage', () => {
     expect(result.byAgent.gemini).toBeUndefined();
     expect(listSpy).toHaveBeenCalledTimes(1);
     expect(listSpy).toHaveBeenCalledWith(a.id);
+  });
+});
+
+describe('loadToolUsage', () => {
+  it('跨线程合计技能注入和工具调用', async () => {
+    const stores = createMemoryStores();
+    const a = await stores.threads.create({ title: 'A', primaryAgentId: 'claude' });
+    const b = await stores.threads.create({ title: 'B', primaryAgentId: 'gemini' });
+    await stores.messages.append({
+      threadId: a.id,
+      role: 'assistant',
+      agentId: 'claude',
+      content: 'a',
+      status: 'completed',
+      skillIds: ['review'],
+      activities: [{ id: 't1', name: 'Write', status: 'done' }],
+    });
+    await stores.messages.append({
+      threadId: b.id,
+      role: 'assistant',
+      agentId: 'gemini',
+      content: 'b',
+      status: 'completed',
+      skillIds: ['review', 'tdd'],
+      activities: [{ id: 't2', name: 'mcp__github__search', status: 'done' }],
+    });
+    const all = await loadToolUsage(stores);
+    expect(all.skills).toEqual([
+      { id: 'review', count: 2 },
+      { id: 'tdd', count: 1 },
+    ]);
+    expect(all.tools.map((row) => row.name).sort()).toEqual(['Write', 'mcp__github__search']);
+    expect(all.total).toEqual({ skillInjections: 3, toolCalls: 2 });
+
+    const one = await loadToolUsage(stores, a.id);
+    expect(one.skills).toEqual([{ id: 'review', count: 1 }]);
+    expect(one.tools).toEqual([{ name: 'Write', category: 'builtin', count: 1 }]);
   });
 });

@@ -6,6 +6,11 @@ import type { AppConfigDto, UsageDto } from '@/lib/api';
 vi.mock('@/lib/api', () => ({
   api: {
     fetchUsage: vi.fn().mockResolvedValue({ byAgent: {}, total: {} }),
+    fetchToolUsage: vi.fn().mockResolvedValue({
+      skills: [],
+      tools: [],
+      total: { skillInjections: 0, toolCalls: 0 },
+    }),
   },
 }));
 
@@ -91,6 +96,12 @@ describe('TeamHub', () => {
   beforeEach(() => {
     vi.mocked(api.fetchUsage).mockReset();
     vi.mocked(api.fetchUsage).mockResolvedValue({ byAgent: {}, total: {} });
+    vi.mocked(api.fetchToolUsage).mockReset();
+    vi.mocked(api.fetchToolUsage).mockResolvedValue({
+      skills: [],
+      tools: [],
+      total: { skillInjections: 0, toolCalls: 0 },
+    });
   });
 
   it('列出三只猫并保存当前猫的改名', () => {
@@ -624,6 +635,34 @@ describe('TeamHub', () => {
     expect(geminiRow?.textContent).toContain('无成本数据');
     expect(geminiRow?.textContent).not.toMatch(/\$0/);
     expect(within(ledger).getByText('估算')).toBeTruthy();
+  });
+
+  it('技能页列出注入次数和工具调用', async () => {
+    vi.mocked(api.fetchToolUsage).mockResolvedValue({
+      skills: [
+        { id: 'review', count: 2 },
+        { id: 'tdd', count: 1 },
+      ],
+      tools: [{ name: 'Write', category: 'builtin', count: 3 }],
+      total: { skillInjections: 3, toolCalls: 3 },
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '技能' }));
+    const board = await screen.findByRole('region', { name: '技能' });
+    expect(within(board).getByText('review')).toBeTruthy();
+    expect(within(board).getByText('tdd')).toBeTruthy();
+    expect(within(board).getByText('Write')).toBeTruthy();
+    expect(within(board).getByText('builtin')).toBeTruthy();
+    expect(within(board).getByText(/技能注入/)).toBeTruthy();
   });
 
   it('切换当前线程 / 全部会换数据源', async () => {

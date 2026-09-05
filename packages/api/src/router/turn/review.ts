@@ -101,6 +101,8 @@ export async function runReviewFixThenCard(input: {
         reviewPrompt(latestDiff, thread.workdir),
         reviewerPrompt,
         writeQueue,
+        undefined,
+        reviewSkill ? [reviewSkill.id] : undefined,
       );
       return reviewHop.content || '(审查无输出)';
     };
@@ -151,6 +153,8 @@ export async function runReviewFixThenCard(input: {
           repo: thread.repo,
         }),
         writeQueue,
+        undefined,
+        fixSkills.map((skill) => skill.id),
       );
       await gitAddAll(thread.workdir);
       const from = await resolveDiffMarker(thread.workdir, thread.repo);
