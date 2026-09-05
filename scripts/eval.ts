@@ -51,6 +51,7 @@ const sameTreeTuanBin = resolve(root, 'scripts/fixtures/fake-same-tree-tuan.mjs'
 const scopeLearnBin = resolve(root, 'scripts/fixtures/fake-scope-learn.mjs');
 const safetyWriterBin = resolve(root, 'scripts/fixtures/fake-safety-writer.mjs');
 const prReviewWriterBin = resolve(root, 'scripts/fixtures/fake-pr-review-writer.mjs');
+const prCiWriterBin = resolve(root, 'scripts/fixtures/fake-pr-ci-writer.mjs');
 
 interface Scenario {
   id: string;
@@ -801,6 +802,68 @@ async function runPrReviewBot(workdirBase: string): Promise<boolean> {
   );
 }
 
+async function runPrCiRed(workdirBase: string): Promise<boolean> {
+  const dump = join(
+    workdirBase,
+    `pr-ci-wake-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+  );
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: prCiWriterBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_CI_FAKE: 'red', FAKE_PROMPT_DUMP: dump },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写 hello.txt');
+      const rows = await waitFor('CI 红了:叫醒那一跳跑完', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const woke = assistantOf(messages, 'claude').some(
+          (m) => m.status === 'completed' && m.content.includes('已处理 CI 红灯'),
+        );
+        return woke ? messages : undefined;
+      });
+      const notes = rows.filter((m) => m.role === 'system' && m.systemKind === 'pr-ci');
+      if (notes.length !== 1) return false;
+      if (!notes[0]?.content.includes('CI 红了')) return false;
+      if (!existsSync(dump)) return false;
+      const prompts = readFileSync(dump, 'utf8');
+      if (!prompts.includes('lint')) return false;
+      const audit = await getAudit(api.baseUrl, bound.threadId);
+      if (!audit.some((item) => item.action === 'pr-ci')) return false;
+      return true;
+    },
+  );
+}
+
+async function runPrCiGreen(workdirBase: string): Promise<boolean> {
+  return withBoundApi(
+    {
+      workdirBase,
+      writerBin: prCiWriterBin,
+      reviewerBin: defaultReviewerBin,
+      extraEnv: { MEOW_PR_CI_FAKE: 'green' },
+    },
+    async (api, bound) => {
+      await postMessage(api.baseUrl, bound.threadId, '@墨墨 写 hello.txt');
+      const rows = await waitFor('CI 绿了:链落定', async () => {
+        const messages = await getMessages(api.baseUrl, bound.threadId);
+        const writerDone = assistantOf(messages, 'claude').filter((m) => m.status === 'completed');
+        const settled =
+          hasKind(messages, 'approval-pending') || hasKind(messages, 'approval-applied');
+        return writerDone.length >= 2 || settled ? messages : undefined;
+      });
+      const notes = rows.filter((m) => m.role === 'system' && m.systemKind === 'pr-ci');
+      if (notes.length !== 1) return false;
+      if (!notes[0]?.content.includes('CI 绿了')) return false;
+      if (assistantOf(rows, 'claude').some((m) => m.content.includes('已处理 CI 红灯'))) return false;
+      const after = await getThread(api.baseUrl, bound.threadId);
+      if (after?.pendingHop) return false;
+      return true;
+    },
+  );
+}
+
 const scenarios: Scenario[] = [
   {
     id: 'forget-at',
@@ -939,6 +1002,20 @@ const scenarios: Scenario[] = [
     expectedCatch: 1,
     expectNote: 'bot 免打扰关:只落 pr-review 消息,不叫醒、链停后无 pending',
     run: runPrReviewBot,
+  },
+  {
+    id: 'pr-ci-red',
+    name: 'PR 上的 CI 红了',
+    expectedCatch: 1,
+    expectNote: 'CI 红关:落 pr-ci、叫醒写手且输入带检查名',
+    run: runPrCiRed,
+  },
+  {
+    id: 'pr-ci-green',
+    name: 'PR 上的 CI 绿了',
+    expectedCatch: 1,
+    expectNote: 'CI 绿关:只落 pr-ci 消息,不叫醒',
+    run: runPrCiGreen,
   },
 ];
 

@@ -63,6 +63,7 @@ export function describeBall(
     if (last.role === 'system' && last.systemKind === 'git-move') continue;
     if (last.role === 'system' && last.systemKind === 'pr-opened') continue;
     if (last.role === 'system' && last.systemKind === 'pr-review') continue;
+    if (last.role === 'system' && last.systemKind === 'pr-ci') continue;
     if (last.role === 'system' && last.systemKind === 'git-overstep') {
       return withQueuedHint({ text: '球在人手里', tone: 'human' }, queuedCount, inboundCount);
     }

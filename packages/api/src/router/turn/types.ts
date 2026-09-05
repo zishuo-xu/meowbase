@@ -6,7 +6,14 @@ import type {
   ToolActivity,
 } from '@meowbase/shared';
 import type { GitOverstep } from '../../services/git.js';
-import type { PrLookup, PrMergeStop, PrReviewList, PrReviewRef } from '../../services/pr.js';
+import type {
+  PrCheckList,
+  PrCheckRef,
+  PrLookup,
+  PrMergeStop,
+  PrReviewList,
+  PrReviewRef,
+} from '../../services/pr.js';
 import type { AgentRegistry, AgentTurnOutput } from '../../providers/types.js';
 import type { AppStores } from '../../stores/ports.js';
 import type { AgentSpec } from '../../config.js';
@@ -57,6 +64,8 @@ export interface TurnContext {
   lookupPr?: PrLookup;
   /** PR 评论只读查询;不传则用默认 gh。测试换成假源。 */
   listPrReviews?: PrReviewList;
+  /** PR CI 只读查询;不传则用默认 gh。测试换成假源。 */
+  listPrChecks?: PrCheckList;
 }
 
 export interface SegmentRunResult {
@@ -68,6 +77,8 @@ export interface SegmentRunResult {
   mergedPr?: PrMergeStop;
   /** 本段各跳投递成功的 PR 新评论(含 bot);settle 只按 User 评论叫醒写手 */
   prReviews?: PrReviewRef[];
+  /** 本段各跳投递成功的 PR 检查;settle 只按红的叫醒写手 */
+  prChecks?: PrCheckRef[];
 }
 
 /** 串行化存储写操作:并行组并发 append/patch 时避免 Redis lost-update */

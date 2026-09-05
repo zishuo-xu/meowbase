@@ -9,6 +9,7 @@ import { gitAddAll, gitDiffHead, resolveDiffMarker } from '../../services/git.js
 import {
   formatApprovalVoidReason,
   formatApprovalVoidedNote,
+  formatPrCiWakeTask,
   formatPrReviewWakeTask,
 } from '../../services/pr.js';
 import { clip, turnLog } from '../../services/turn-log.js';
@@ -125,6 +126,7 @@ export async function settleTurn(input: {
   // 纯持球(holding)是「人开口即取消」,平台不能用叫醒自动取消;
   // 叫醒过就跳过本轮建卡(卡上冻结的不能是处理评论之前的旧 diff)。
   const humanReviews = (lastResult.prReviews ?? []).filter((r) => r.item.authorType === 'User');
+  const redChecks = (lastResult.prChecks ?? []).filter((c) => c.item.conclusion === 'red');
   let wokeForReview = false;
   if (
     lastOutput.status === 'completed' &&
@@ -152,6 +154,32 @@ export async function settleTurn(input: {
     });
     wokeForReview = true;
     turnLog('pr-review wake', { thread: threadId, to: writerAgentId, count: humanReviews.length });
+  } else if (
+    lastOutput.status === 'completed' &&
+    redChecks.length > 0 &&
+    !waiting &&
+    !holding &&
+    !pending?.holdCommand
+  ) {
+    const writerAgentId = chainFirstAgent ?? thread.primaryAgentId;
+    const first = redChecks[0]!;
+    await context.stores.threads.setPendingHop(threadId, {
+      id: randomUUID(),
+      to: writerAgentId,
+      from: writerAgentId,
+      task: formatPrCiWakeTask({
+        checks: redChecks.map((c) => c.item),
+        number: first.prNumber,
+        url: first.prUrl,
+      }),
+      goal: '修 PR 上红了的检查',
+      previousOutput: lastOutput.content ?? '',
+      visited: [writerAgentId],
+      firstAgent: writerAgentId,
+      hop: 0,
+    });
+    wokeForReview = true;
+    turnLog('pr-ci wake', { thread: threadId, to: writerAgentId, count: redChecks.length });
   }
 
   if (lastOutput.status === 'completed' && !waiting && !holding && !wokeForReview) {

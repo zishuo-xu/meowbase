@@ -179,6 +179,13 @@ export class RedisThreadStore implements ThreadStore {
     await this.redis.hset(threadKey(threadId), 'repo', JSON.stringify(thread.repo));
   }
 
+  async setSeenPrCheckIds(threadId: string, ids: string[]): Promise<void> {
+    const thread = await this.hydrate(threadId);
+    if (!thread?.repo) return;
+    thread.repo = { ...thread.repo, seenPrCheckIds: ids };
+    await this.redis.hset(threadKey(threadId), 'repo', JSON.stringify(thread.repo));
+  }
+
   async setSession(threadId: string, agentId: AgentId, sessionId: string): Promise<void> {
     const thread = await this.hydrate(threadId);
     if (!thread) throw new Error(`线程不存在: ${threadId}`);

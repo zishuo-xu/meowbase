@@ -54,6 +54,8 @@ export interface ThreadRepo {
   allowRemote?: boolean;
   /** 已回流过的 PR 评论 id;投成功的才记,投丢下轮再投 */
   seenPrCommentIds?: string[];
+  /** 已回流过的 PR 检查指纹 name:state;投成功的才记 */
+  seenPrCheckIds?: string[];
 }
 
 export type MessageRole = 'user' | 'assistant' | 'system';
@@ -81,6 +83,8 @@ export type SystemKind =
   | 'pr-merged'
   /** PR 评论回流:不参与球权,叫醒靠 pendingHop */
   | 'pr-review'
+  /** PR CI 回流:不参与球权,红了才叫醒写手 */
+  | 'pr-ci'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';

@@ -13,6 +13,7 @@ import { DEFAULT_AGENTS } from '../src/config.js';
 import type { AgentService } from '../src/providers/types.js';
 import type { AgentId } from '@meowbase/shared';
 import {
+  createFixedPrChecks,
   createFixedPrReviewList,
   type PrLookup,
   type PrReviewList,
@@ -326,5 +327,91 @@ describe('PR 评论回流:检测 + 叫醒', () => {
     expect(after?.repo?.seenPrCommentIds).toContain('c9001');
     // 审查那一棒还没跑
     expect(rows.some((m) => m.role === 'assistant' && m.agentId === 'gemini')).toBe(false);
+  });
+});
+
+describe('PR CI 追踪:绿只记,红叫醒', () => {
+  it('CI 红了:落 pr-ci 消息、pendingHop 指回写手、指纹推进、本轮不建卡', async () => {
+    const { stores, thread } = await bindThread();
+    const registry = createAgentRegistry([writerNoHandoff(), stub('gemini', '审查意见:通过')]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: lookupOf(openPr42),
+      listPrReviews: createFixedPrReviewList('bot'),
+      listPrChecks: createFixedPrChecks('red'),
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    const notes = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'system' && m.systemKind === 'pr-ci',
+    );
+    expect(notes.length).toBe(1);
+    expect(notes[0]?.content).toContain('CI 红了');
+    expect(notes[0]?.content).toContain('lint');
+    const after = await stores.threads.get(thread.id);
+    expect(after?.pendingHop?.to).toBe('claude');
+    expect(after?.pendingHop?.task).toContain('lint');
+    expect(after?.repo?.seenPrCheckIds).toContain('lint:FAILURE');
+    expect(await stores.approvals.list(thread.id)).toEqual([]);
+  });
+
+  it('CI 绿了:落 pr-ci 消息不叫醒', async () => {
+    const { stores, thread } = await bindThread();
+    const registry = createAgentRegistry([
+      stub('claude', '好,知道了。'),
+      stub('gemini', '审查意见:通过'),
+    ]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: lookupOf(openPr42),
+      listPrReviews: createFixedPrReviewList('bot'),
+      listPrChecks: createFixedPrChecks('green'),
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 看一眼',
+      context: ctx,
+    });
+    const notes = (await stores.messages.list(thread.id)).filter(
+      (m) => m.role === 'system' && m.systemKind === 'pr-ci',
+    );
+    expect(notes.length).toBe(1);
+    expect(notes[0]?.content).toContain('CI 绿了');
+    expect((await stores.threads.get(thread.id))?.pendingHop).toBeUndefined();
+    expect((await stores.threads.get(thread.id))?.repo?.seenPrCheckIds).toContain('test:SUCCESS');
+  });
+
+  it('本地模式零调用:listPrChecks 一次都不跑', async () => {
+    const { stores, thread } = await bindThread({ allowRemote: false });
+    const registry = createAgentRegistry([writerNoHandoff(), stub('gemini', '审查意见:通过')]);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS,
+      lookupPr: (async () => {
+        throw new Error('本地模式不该查 PR');
+      }) satisfies PrLookup,
+      listPrReviews: (async () => {
+        throw new Error('本地模式不该查评论');
+      }) satisfies PrReviewList,
+      listPrChecks: async () => {
+        throw new Error('本地模式不该查 CI');
+      },
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    const rows = await stores.messages.list(thread.id);
+    expect(rows.some((m) => m.systemKind === 'pr-ci')).toBe(false);
+    expect((await stores.threads.get(thread.id))?.repo?.seenPrCheckIds).toBeUndefined();
   });
 });

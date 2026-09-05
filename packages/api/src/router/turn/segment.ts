@@ -44,14 +44,20 @@ import {
   type GitStateSnapshot,
 } from '../../services/git.js';
 import {
+  formatPrCiNote,
   formatPrLookupFailedNote,
   formatPrMergedNote,
   formatPrOpenedNote,
   formatPrReviewNote,
   isPrMerged,
+  listPrChecks,
   listPrReviews,
   lookupPr,
+  selectUnseenPrChecks,
   selectUnseenPrReviews,
+  type PrCheckItem,
+  type PrCheckListResult,
+  type PrCheckRef,
   type PrMergeStop,
   type PrReviewItem,
   type PrReviewListResult,
@@ -251,6 +257,62 @@ async function syncPrReviews(input: {
   return fresh.filter((i) => delivered.includes(i.id));
 }
 
+async function syncPrChecks(input: {
+  thread: ThreadRuntime;
+  context: TurnContext;
+  writeQueue: WriteQueue;
+  pr: PrSnapshot;
+}): Promise<PrCheckItem[]> {
+  if (input.pr.state !== 'OPEN') return [];
+  const list = input.context.listPrChecks ?? listPrChecks;
+  let result: PrCheckListResult;
+  try {
+    result = await list({ workdir: input.thread.workdir, number: input.pr.number });
+  } catch (err) {
+    result = { ok: false as const, reason: clip(String(err), 80) };
+  }
+  if (!result.ok) {
+    const reason = result.reason;
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrLookupFailedNote(reason),
+        status: 'completed',
+        systemKind: 'notice',
+      }),
+    );
+    return [];
+  }
+  const seen =
+    (await input.context.stores.threads.get(input.thread.id))?.repo?.seenPrCheckIds ?? [];
+  const fresh = selectUnseenPrChecks(result.items, seen);
+  if (fresh.length === 0) return [];
+  const delivered: string[] = [];
+  const persisted = [...seen];
+  for (const item of fresh) {
+    await input.writeQueue(() =>
+      input.context.stores.messages.append({
+        threadId: input.thread.id,
+        role: 'system',
+        content: formatPrCiNote({
+          name: item.name,
+          conclusion: item.conclusion,
+          number: input.pr.number,
+          url: item.link ?? input.pr.url,
+        }),
+        status: 'completed',
+        systemKind: 'pr-ci',
+        systemMeta: { prNumber: input.pr.number, prUrl: input.pr.url },
+      }),
+    );
+    delivered.push(item.id);
+    persisted.push(item.id);
+    await input.context.stores.threads.setSeenPrCheckIds(input.thread.id, [...persisted]);
+  }
+  return fresh.filter((i) => delivered.includes(i.id));
+}
+
 async function rememberHoldCommand(input: {
   thread: { id: string };
   context: TurnContext;
@@ -314,6 +376,7 @@ export async function runSegment(
   const oversteps: GitOverstep[] = [];
   let mergedPr: PrMergeStop | undefined;
   const prReviews: PrReviewRef[] = [];
+  const prChecks: PrCheckRef[] = [];
   if (resume) {
     for (const id of resume.visited) visited.add(id);
   }
@@ -385,6 +448,10 @@ export async function runSegment(
           const delivered = await syncPrReviews({ thread, context, writeQueue, pr });
           for (const item of delivered) {
             prReviews.push({ item, prNumber: pr.number, prUrl: pr.url });
+          }
+          const checks = await syncPrChecks({ thread, context, writeQueue, pr });
+          for (const item of checks) {
+            prChecks.push({ item, prNumber: pr.number, prUrl: pr.url });
           }
         },
       });
@@ -658,5 +725,5 @@ export async function runSegment(
       );
     }
   }
-  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr, prReviews };
+  return { lastAssistant, lastOutput, visited, firstAgent, oversteps, mergedPr, prReviews, prChecks };
 }

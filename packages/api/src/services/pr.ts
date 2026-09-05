@@ -316,6 +316,114 @@ export function createFixedPrReviewList(kind: 'user' | 'bot'): PrReviewList {
   });
 }
 
+export type PrCheckConclusion = 'green' | 'red';
+
+export interface PrCheckItem {
+  id: string;
+  name: string;
+  conclusion: PrCheckConclusion;
+  link?: string;
+}
+
+export interface PrCheckRef {
+  item: PrCheckItem;
+  prNumber: number;
+  prUrl: string;
+}
+
+export type PrCheckListResult =
+  | { ok: true; items: PrCheckItem[] }
+  | { ok: false; reason: string };
+
+export type PrCheckList = (input: { workdir: string; number: number }) => Promise<PrCheckListResult>;
+
+const RED_STATES = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED']);
+
+export function parsePrChecksJson(raw: string): PrCheckItem[] | null {
+  try {
+    const data = JSON.parse(raw) as unknown;
+    if (!Array.isArray(data)) return null;
+    const out: PrCheckItem[] = [];
+    for (const item of data) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.name !== 'string' || typeof row.state !== 'string') continue;
+      const state = row.state.toUpperCase();
+      let conclusion: PrCheckConclusion | null = null;
+      if (state === 'SUCCESS' || state === 'PASS' || state === 'SKIPPED') conclusion = 'green';
+      else if (RED_STATES.has(state)) conclusion = 'red';
+      if (!conclusion) continue;
+      out.push({
+        id: `${row.name}:${state}`,
+        name: row.name,
+        conclusion,
+        ...(typeof row.link === 'string' ? { link: row.link } : {}),
+      });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export function selectUnseenPrChecks(
+  items: readonly PrCheckItem[],
+  seenIds: readonly string[],
+): PrCheckItem[] {
+  const seen = new Set(seenIds);
+  return items.filter((item) => !seen.has(item.id));
+}
+
+export function formatPrCiNote(input: {
+  name: string;
+  conclusion: PrCheckConclusion;
+  number: number;
+  url: string;
+}): string {
+  const tone = input.conclusion === 'green' ? 'CI 绿了' : 'CI 红了';
+  return `${tone}(PR #${input.number} · ${input.name}) ${input.url}`;
+}
+
+export function formatPrCiWakeTask(input: {
+  checks: readonly PrCheckItem[];
+  number: number;
+  url: string;
+}): string {
+  const lines = input.checks.map((c) => `- ${c.name}${c.link ? ` ${c.link}` : ''}`);
+  return `PR #${input.number}(${input.url}) CI 红了,请修这些检查:\n${lines.join('\n')}`;
+}
+
+export function createFixedPrChecks(kind: 'green' | 'red'): PrCheckList {
+  return async () => ({
+    ok: true,
+    items: [
+      kind === 'green'
+        ? { id: 'test:SUCCESS', name: 'test', conclusion: 'green' as const, link: 'https://ci.example/test' }
+        : { id: 'lint:FAILURE', name: 'lint', conclusion: 'red' as const, link: 'https://ci.example/lint' },
+    ],
+  });
+}
+
+export async function listPrChecks(input: {
+  workdir: string;
+  number: number;
+  ghBin?: string;
+}): Promise<PrCheckListResult> {
+  const bin = input.ghBin ?? 'gh';
+  try {
+    const { stdout } = await exec(
+      bin,
+      ['pr', 'checks', String(input.number), '--json', 'name,state,link'],
+      { cwd: input.workdir, timeout: GH_TIMEOUT_MS },
+    );
+    const items = parsePrChecksJson(stdout);
+    if (!items) return { ok: false, reason: '返回不是 JSON' };
+    return { ok: true, items };
+  } catch (err) {
+    return { ok: false, reason: classifyPrLookupError(err) };
+  }
+}
+
 export async function listPrReviews(input: { workdir: string; number: number; ghBin?: string }): Promise<PrReviewListResult> {
   const bin = input.ghBin ?? 'gh';
   try {

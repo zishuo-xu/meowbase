@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { startApp } from '../packages/api/src/app.js';
 import {
+  createFixedPrChecks,
   createFixedPrReviewList,
   createMergedPrLookup,
   createOpenPrLookup,
@@ -20,6 +21,12 @@ try {
       ? {
           lookupPr: createOpenPrLookup(),
           listPrReviews: createFixedPrReviewList(process.env.MEOW_PR_REVIEW_FAKE),
+        }
+      : {}),
+    ...(process.env.MEOW_PR_CI_FAKE === 'green' || process.env.MEOW_PR_CI_FAKE === 'red'
+      ? {
+          lookupPr: createOpenPrLookup(),
+          listPrChecks: createFixedPrChecks(process.env.MEOW_PR_CI_FAKE),
         }
       : {}),
   });

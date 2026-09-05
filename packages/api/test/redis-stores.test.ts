@@ -239,6 +239,18 @@ describe.skipIf(!redis)('Redis 存储', () => {
     await threads.delete(thread.id);
   });
 
+  it('seenPrCheckIds 写入后回读', async () => {
+    const threads = createThreadStore(redis!);
+    const thread = await threads.create({
+      title: `redis-seenci-${Date.now()}`,
+      primaryAgentId: 'claude',
+      repo: { path: '/src/myapp', baseBranch: 'develop', allowRemote: true },
+    });
+    await threads.setSeenPrCheckIds(thread.id, ['lint:FAILURE']);
+    expect((await threads.get(thread.id))?.repo?.seenPrCheckIds).toEqual(['lint:FAILURE']);
+    await threads.delete(thread.id);
+  });
+
   it('消息追加与 patch', async () => {
     const threads = createThreadStore(redis!);
     const messages = createMessageStore(redis!);

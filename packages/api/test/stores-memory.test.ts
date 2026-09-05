@@ -63,6 +63,18 @@ describe('内存存储', () => {
     expect(got?.repo?.allowRemote).toBe(true);
   });
 
+  it('seenPrCheckIds 写入后 get 能 round-trip', async () => {
+    const stores = createMemoryStores();
+    const repoPath = mkdtempSync(join(tmpdir(), 'meow-test-'));
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      repo: { path: repoPath, baseBranch: 'main', allowRemote: true },
+    });
+    await stores.threads.setSeenPrCheckIds(thread.id, ['lint:FAILURE']);
+    expect((await stores.threads.get(thread.id))?.repo?.seenPrCheckIds).toEqual(['lint:FAILURE']);
+  });
+
   it('rename 改标题', async () => {
     const { threads } = createMemoryStores();
     const thread = await threads.create({ title: '8/17 19:28', primaryAgentId: 'claude' });
