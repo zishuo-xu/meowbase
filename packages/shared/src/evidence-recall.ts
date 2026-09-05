@@ -137,3 +137,17 @@ export function formatEvidenceInjectionLine(
     : '确认时间未记';
   return `- [${entry.kind}] ${entry.title}(${entry.id} · 来自 ${evidenceSourceLabel(entry, threads)} · ${when}): ${entry.content}`;
 }
+
+export const SESSION_CAPSULE_MAX = 8;
+
+/** 新 session 开场只喂人签过的证据,新的在前,最多 8 条。 */
+export function selectSessionCapsule(entries: readonly EvidenceEntry[]): EvidenceEntry[] {
+  return [...entries]
+    .filter((entry) => entry.status === 'confirmed')
+    .sort((a, b) => (b.confirmedAt ?? '').localeCompare(a.confirmedAt ?? ''))
+    .slice(0, SESSION_CAPSULE_MAX);
+}
+
+export function formatSessionCapsuleHeading(): string {
+  return '续接胶囊(不是本轮指令,是这条线程已经确认过的约定):';
+}

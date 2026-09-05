@@ -21,6 +21,7 @@ import {
   parseHoldExit,
   shouldNudgeExit,
   toEvidenceScopeThread,
+  selectSessionCapsule,
   authorizeHoldCommand,
   type A2AStopKind,
   type HoldCommandDenyReason,
@@ -448,15 +449,28 @@ export async function runSegment(
     const matchedSkills = await matchSkills(currentTask, await context.stores.skills.list());
     const evidenceThreads = (await context.stores.threads.list()).map(toEvidenceScopeThread);
     const sop = await refreshSopBoard(context, thread.id, team);
+    const freshSession = !thread.sessions[currentAgent];
+    let evidenceRefs = refs;
+    let sessionCapsule = false;
+    if (freshSession) {
+      const all = await context.stores.evidence.list(thread.id);
+      const capsule = selectSessionCapsule(all);
+      if (capsule.length > 0) {
+        const seen = new Set(refs.map((e) => e.id));
+        evidenceRefs = [...refs, ...capsule.filter((e) => !seen.has(e.id))];
+        sessionCapsule = true;
+      }
+    }
     const systemPrompt = buildSystemPrompt({
       profile,
       team,
       skills: matchedSkills,
-      evidenceRefs: refs,
+      evidenceRefs,
       evidenceThreads,
       workdir: thread.workdir,
       repo: thread.repo,
       sop,
+      ...(sessionCapsule ? { sessionCapsule: true } : {}),
     });
     const prompt = fromAgent
       ? formatA2AHandoffPrompt(

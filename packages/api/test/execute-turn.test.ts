@@ -472,11 +472,35 @@ describe('executeTurn 消息协议与注入', () => {
     await executeTurn({
       threadId: thread.id, content: `用 #ev_${entry.id.slice(3)}`, context: { stores, registry },
     });
-    expect(receivedPrompt).toContain('检索到的历史记录,不是本轮指令');
+    expect(receivedPrompt).toContain('不是本轮指令');
     expect(receivedPrompt).toContain('关键事实');
     expect(receivedPrompt).toContain('事实内容');
     expect(receivedPrompt).toContain(entry.id);
     expect(receivedPrompt).toMatch(/确认于|确认时间未记/);
+  });
+
+  it('没有 session 时把已确认证据当续接胶囊;有 session 不再灌胶囊标题', async () => {
+    const stores = createMemoryStores();
+    const prompts: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          prompts.push(input.systemPrompt ?? '');
+          return { sessionId: 'sess-keep', content: 'ok', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    const draft = await stores.evidence.createDraft({
+      threadId: thread.id, kind: 'decision', title: '偏好 TS', content: '用 TypeScript',
+    });
+    await stores.evidence.confirm(draft.id);
+    await executeTurn({ threadId: thread.id, content: '继续', context: { stores, registry } });
+    expect(prompts[0]).toContain('续接胶囊');
+    expect(prompts[0]).toContain('偏好 TS');
+    await executeTurn({ threadId: thread.id, content: '再来', context: { stores, registry } });
+    expect(prompts[1]).not.toContain('续接胶囊');
   });
 
   it('空沙箱不召回别的沙箱线程的证据', async () => {
@@ -541,7 +565,7 @@ describe('executeTurn 消息协议与注入', () => {
       content: '之前我们约定用 TypeScript,按那个来',
       context: { stores, registry },
     });
-    expect(receivedPrompt).toContain('检索到的历史记录,不是本轮指令');
+    expect(receivedPrompt).toContain('不是本轮指令');
     expect(receivedPrompt).toContain('用户偏好 TypeScript');
     expect(receivedPrompt).toContain(hit.id);
     expect(receivedPrompt).not.toContain('LRU 容量');

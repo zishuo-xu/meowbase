@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 19 / 分母 31 = 61%**(每次相关改动同轮更新;第 31 行进程化落地,仍差跨项目同步,已对齐数不变)
+**当前对齐率:已对齐 20 / 分母 31 = 65%**(每次相关改动同轮更新;第 11 行从缺失改为已对齐)
 
 ## 分母(核心清单)
 
@@ -20,7 +20,7 @@
 | 8 | 线程绑仓 worktree 隔离 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md)、[F082](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F082-git-health-panel.md) | [thread-repo-worktree](features/thread-repo-worktree.md) | 隔离不靠提示词靠 git worktree——每条线程一棵树一根分支,主干拿不到 |
 | 9 | 仓根白名单与本机绑定 | 已对齐 | [F074](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F074-mount-directory-support.md) | [repo-root-allowlist](features/repo-root-allowlist.md) | 没有鉴权的 API 我只听本机——想开 LAN 得显式配,绑错路径当场告诉你允许哪些根 |
 | 10 | git 观测与越界拉闸 | 已对齐 | [F082](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F082-git-health-panel.md)、[F140](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F140-github-pr-automation.md) | [git-state-tracking](features/git-state-tracking.md)、[push-boundary](features/push-boundary.md) | 平台看什么动了,不看猫说自己干了什么——每跳比对只读 git 快照,越界就停;我不靠纪律约束猫自觉,闸装在平台上,谁碰基准分支谁停 |
-| 11 | 会话连续性(压缩后恢复) | 缺失 | [F065](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F065-session-continuity.md) | | 重启后捡棒我已经有了,缺的是跨会话的记忆续接——我打算把已确认证据当续接胶囊喂给新 session,不急是因为会话内的接力那条道已经通了 |
+| 11 | 会话连续性(压缩后恢复) | 已对齐 | [F065](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F065-session-continuity.md) | [session-capsule](features/session-capsule.md)、[durable-relay](features/durable-relay.md) | 新 session 开场喂已确认证据胶囊——不让快没上下文的旧猫写总结;有可 resume 的 session 不再灌 |
 | 12 | 每猫独立 CLI 会话 | 已对齐 | [F053](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F053-gemini-resume-session-parity.md) | [providers](features/providers.md)、[a2a](features/a2a.md) | 身份和工具记忆不串台——每只猫自己的 session,下次各自 resume |
 | 13 | 配置可见与运行时修改 | 已对齐 | [F001](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F001-config-visibility.md)、[F004](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F004-runtime-config.md) | [hub-capability](features/hub-capability.md)、[AGENTS.md 常见操作](../AGENTS.md) | Hub 点保存改内存再落盘立即生效——改配置和跑代码不能是两套真相 |
 | 14 | 跨线程传话溯源 | 缺失 | [F052](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F052-cross-thread-identity-isolation.md) | | 跨线程传话我没做——要做就得先解决「同名猫自引用过滤」的身份坑 |
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **会话连续性**(补第 11 行)——压缩后把已确认证据当续接胶囊喂给新 session;预计 2–3 刀。
+1. **跨线程传话溯源**(补第 14 行)——要做就得先解决同名猫自引用过滤;预计 3–4 刀。

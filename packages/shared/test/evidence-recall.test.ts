@@ -7,7 +7,9 @@ import {
   filterEvidenceByRecallScope,
   formatEvidenceConfirmedAt,
   formatEvidenceInjectionLine,
+  formatSessionCapsuleHeading,
   matchEvidence,
+  selectSessionCapsule,
   wantsEvidenceRecall,
 } from '../src/evidence-recall.js';
 import { canonicalizePath } from '../src/repo-path.js';
@@ -168,5 +170,24 @@ describe('evidenceSourceLabel / formatEvidenceConfirmedAt', () => {
   it('没有 confirmedAt 绝不拿别的时间顶', () => {
     expect(formatEvidenceConfirmedAt(undefined)).toBe('确认时间未记');
     expect(formatEvidenceConfirmedAt('')).toBe('确认时间未记');
+  });
+});
+
+describe('selectSessionCapsule', () => {
+  it('只收 confirmed,新的在前,最多 8,draft 丢掉', () => {
+    const many = Array.from({ length: 10 }, (_, i) =>
+      ev({
+        id: `ev_${String(i).padStart(8, '0')}`,
+        title: `t${i}`,
+        content: 'c',
+        confirmedAt: `2026-09-0${i < 9 ? i + 1 : 9}T00:00:00.000Z`,
+      }),
+    );
+    many.push(ev({ id: 'ev_draft001', title: '草稿', content: 'x', status: 'draft' }));
+    const picked = selectSessionCapsule(many);
+    expect(picked).toHaveLength(8);
+    expect(picked[0]?.id).toBe('ev_00000008');
+    expect(picked.some((e) => e.status === 'draft')).toBe(false);
+    expect(formatSessionCapsuleHeading()).toContain('不是本轮指令');
   });
 });
