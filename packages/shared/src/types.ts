@@ -102,6 +102,8 @@ export type SystemKind =
   | 'pr-conflict'
   /** 预算闸:花超了拒跑,不参与球权 */
   | 'budget'
+  /** 跨线程传话:带出处,不参与球权,不当本线程助手 */
+  | 'cross-post'
   | 'routing-hint'
   /** 有系统正文、但不参与球权/时间线的写入(证据回执、空任务、链上限、审查开场等) */
   | 'notice';
@@ -124,6 +126,8 @@ export interface SystemMeta {
   headRefOid?: string;
   /** 审查那条:本轮 diff 命中的风险面(按风险面选审查官) */
   risk?: 'safety' | 'contract' | 'default';
+  /** 跨线程传话:原寄件线程 */
+  fromThreadId?: string;
 }
 
 export interface TokenUsage {

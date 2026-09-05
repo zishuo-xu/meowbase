@@ -7,6 +7,7 @@ import {
   formatA2ARelayNote,
   formatQueuedHandoffNote,
   formatInboundQueuedNote,
+  formatCrossPostNote,
   formatAbortedBallNote,
   formatDroppedBallNote,
   isVoidHandoff,
@@ -317,6 +318,20 @@ describe('formatInboundQueuedNote', () => {
     const note = formatInboundQueuedNote();
     expect(note).toContain('已排队');
     expect(note).toContain('当前棒跑完再送');
+  });
+});
+
+describe('formatCrossPostNote', () => {
+  it('写明来自哪条线程,不当交接、不当自己说的话', () => {
+    const note = formatCrossPostNote({
+      fromTitle: '仓A',
+      fromId: 't_src',
+      body: '斑马纹约定',
+    });
+    expect(note).toContain('来自「仓A」');
+    expect(note).toContain('t_src');
+    expect(note).toContain('斑马纹约定');
+    expect(parseA2AHandoff(note, 'claude')).toBeNull();
   });
 });
 

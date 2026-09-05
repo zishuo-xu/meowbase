@@ -108,6 +108,7 @@ export {
   formatA2ARelayNote,
   formatQueuedHandoffNote,
   formatInboundQueuedNote,
+  formatCrossPostNote,
   formatDroppedBallNote,
   formatEscalatedBallNote,
   formatExitNudgeNote,

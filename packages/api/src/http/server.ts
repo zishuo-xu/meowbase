@@ -8,6 +8,7 @@ import type { AgentId, AuditAction, AuditActor, HoldCommandRule } from '@meowbas
 import {
   defaultAllowedRepoRoots,
   filterEvidenceByRecallScope,
+  formatCrossPostNote,
   formatInboundQueuedNote,
   toEvidenceScopeThread,
   isAllowedRequestOrigin,
@@ -555,6 +556,35 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/threads/:threadId/messages', async (request) => {
     const { threadId } = request.params as { threadId: string };
     return stores.messages.list(threadId);
+  });
+
+  app.post('/api/threads/:threadId/cross-post', async (request, reply) => {
+    const { threadId } = request.params as { threadId: string };
+    const body = request.body as { toThreadId?: string; content?: string } | null;
+    const toThreadId = body?.toThreadId?.trim();
+    const content = body?.content?.trim();
+    if (!toThreadId || !content) {
+      return reply.code(400).send({ error: 'toThreadId 和 content 不能为空' });
+    }
+    if (toThreadId === threadId) {
+      return reply.code(400).send({ error: '不能寄到同一条线程' });
+    }
+    const from = await stores.threads.get(threadId);
+    if (!from) return reply.code(404).send({ error: '线程不存在' });
+    const to = await stores.threads.get(toThreadId);
+    if (!to) return reply.code(404).send({ error: '目标线程不存在' });
+    return stores.messages.append({
+      threadId: toThreadId,
+      role: 'system',
+      content: formatCrossPostNote({
+        fromTitle: from.title,
+        fromId: from.id,
+        body: content,
+      }),
+      status: 'completed',
+      systemKind: 'cross-post',
+      systemMeta: { fromThreadId: from.id },
+    });
   });
 
   app.get('/api/collab/threads', async () => loadCollabThreads(stores));

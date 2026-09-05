@@ -257,6 +257,80 @@ describe('HTTP 集成', () => {
     expect(hangBody.status).toBe('terminated');
   });
 
+  it('POST /api/threads/:id/cross-post 寄到目标线程带出处,不叫猫、不改源线程助手', async () => {
+    const createA = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '仓A', primaryAgentId: 'claude' }),
+    });
+    const createB = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '仓B', primaryAgentId: 'claude' }),
+    });
+    const threadA = (await createA.json()) as { id: string };
+    const threadB = (await createB.json()) as { id: string };
+
+    const empty = await fetch(`${baseUrl}/api/threads/${threadA.id}/cross-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toThreadId: threadB.id, content: '  ' }),
+    });
+    expect(empty.status).toBe(400);
+
+    const same = await fetch(`${baseUrl}/api/threads/${threadA.id}/cross-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toThreadId: threadA.id, content: '斑马纹约定' }),
+    });
+    expect(same.status).toBe(400);
+
+    const missing = await fetch(`${baseUrl}/api/threads/${threadA.id}/cross-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toThreadId: 'no-such-thread', content: '斑马纹约定' }),
+    });
+    expect(missing.status).toBe(404);
+
+    const posted = await fetch(`${baseUrl}/api/threads/${threadA.id}/cross-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toThreadId: threadB.id, content: '斑马纹约定' }),
+    });
+    expect(posted.status).toBe(200);
+    const note = (await posted.json()) as {
+      role: string;
+      agentId?: string;
+      threadId: string;
+      systemKind?: string;
+      systemMeta?: { fromThreadId?: string };
+      content: string;
+    };
+    expect(note.role).toBe('system');
+    expect(note.agentId).toBeUndefined();
+    expect(note.threadId).toBe(threadB.id);
+    expect(note.systemKind).toBe('cross-post');
+    expect(note.systemMeta?.fromThreadId).toBe(threadA.id);
+    expect(note.content).toContain('来自「仓A」');
+    expect(note.content).toContain(threadA.id);
+    expect(note.content).toContain('斑马纹约定');
+
+    const listB = (await (await fetch(`${baseUrl}/api/threads/${threadB.id}/messages`)).json()) as {
+      role: string;
+      agentId?: string;
+      systemKind?: string;
+    }[];
+    expect(listB.some((m) => m.systemKind === 'cross-post' && m.role === 'system' && !m.agentId)).toBe(
+      true,
+    );
+    expect(listB.some((m) => m.role === 'assistant')).toBe(false);
+
+    const listA = (await (await fetch(`${baseUrl}/api/threads/${threadA.id}/messages`)).json()) as {
+      role: string;
+    }[];
+    expect(listA.some((m) => m.role === 'assistant')).toBe(false);
+  });
+
   it('DELETE /api/threads/:id 删线程', async () => {
     const createRes = await fetch(`${baseUrl}/api/threads`, {
       method: 'POST',

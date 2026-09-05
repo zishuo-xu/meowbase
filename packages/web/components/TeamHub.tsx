@@ -687,6 +687,7 @@ export function TeamHub({
                 <ul className="mt-2 space-y-1 text-sm">
                   <li>search_messages · GET /api/collab/messages?q=</li>
                   <li>list_threads · GET /api/collab/threads</li>
+                  <li>cross-post · POST /api/threads/:id/cross-post</li>
                 </ul>
               </div>
             </section>

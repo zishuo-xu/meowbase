@@ -207,6 +207,16 @@ export function formatInboundQueuedNote(): string {
   return '已排队,当前棒跑完再送。';
 }
 
+/** 跨线程传话:贴上原寄件地址,不落成助手气泡。 */
+export function formatCrossPostNote(input: {
+  fromTitle: string;
+  fromId: string;
+  body: string;
+}): string {
+  const title = input.fromTitle.trim() || input.fromId;
+  return `📩 来自「${title}」(${input.fromId}):\n${clipBody(input.body)}`;
+}
+
 /** 有 pending 时:没点名叫别人就续跑下一跳;行首 @人 或点名另一只则不续。 */
 export function shouldResumePending(
   content: string,

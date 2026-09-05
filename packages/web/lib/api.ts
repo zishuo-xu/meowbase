@@ -63,7 +63,12 @@ export interface MessageDto {
   activities?: ToolActivity[];
   thinking?: string;
   systemKind?: string;
-  systemMeta?: { from?: string; to?: string; verdict?: 'pass' | 'revise' | 'incomplete' };
+  systemMeta?: {
+    from?: string;
+    to?: string;
+    verdict?: 'pass' | 'revise' | 'incomplete';
+    fromThreadId?: string;
+  };
 }
 
 export interface ToolActivity {
@@ -250,6 +255,12 @@ export const api = {
     }),
   cancelTurn: (threadId: string) =>
     request<{ ok: boolean }>(`/api/threads/${threadId}/cancel`, { method: 'POST' }),
+  crossPost: (fromThreadId: string, toThreadId: string, content: string) =>
+    request<MessageDto>(`/api/threads/${fromThreadId}/cross-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ toThreadId, content }),
+    }),
   fetchUsage: (threadId?: string) =>
     request<UsageDto>(threadId ? `/api/usage?threadId=${threadId}` : '/api/usage'),
   fetchToolUsage: (threadId?: string) =>

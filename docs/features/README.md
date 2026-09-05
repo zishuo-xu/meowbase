@@ -72,3 +72,4 @@
 | [approval-hub.md](approval-hub.md) | 已落地 | 待批卡聚到一页 |
 | [mcp-stdio.md](mcp-stdio.md) | 已落地 | 协作工具挂上 CLI |
 | [session-capsule.md](session-capsule.md) | 已落地 | 新会话带上已确认证据 |
+| [cross-thread-post.md](cross-thread-post.md) | 已落地 | 跨线程传话带出处 |

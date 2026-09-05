@@ -228,6 +228,23 @@ describe('describeBall', () => {
     ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
   });
 
+  it('cross-post 不改球权,不当本线程助手', () => {
+    expect(
+      describeBall(
+        [
+          { role: 'system', content: '🤝 接力:墨墨 → 闪闪', systemKind: 'relay', systemMeta: { to: 'gemini' } },
+          {
+            role: 'system',
+            content: '📩 来自「仓A」(t_src):\n斑马纹约定',
+            systemKind: 'cross-post',
+          },
+        ],
+        false,
+        nameOf,
+      ),
+    ).toEqual({ text: '球在闪闪手上', tone: 'cat', agentId: 'gemini' });
+  });
+
   it('空线程等人开口', () => {
     expect(describeBall([], false, nameOf)).toEqual({ text: '等人开口', tone: 'human' });
   });

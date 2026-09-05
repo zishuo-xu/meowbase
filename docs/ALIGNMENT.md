@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 20 / 分母 31 = 65%**(每次相关改动同轮更新;第 11 行从缺失改为已对齐)
+**当前对齐率:已对齐 21 / 分母 31 = 68%**(每次相关改动同轮更新;第 14 行从缺失改为已对齐)
 
 ## 分母(核心清单)
 
@@ -23,7 +23,7 @@
 | 11 | 会话连续性(压缩后恢复) | 已对齐 | [F065](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F065-session-continuity.md) | [session-capsule](features/session-capsule.md)、[durable-relay](features/durable-relay.md) | 新 session 开场喂已确认证据胶囊——不让快没上下文的旧猫写总结;有可 resume 的 session 不再灌 |
 | 12 | 每猫独立 CLI 会话 | 已对齐 | [F053](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F053-gemini-resume-session-parity.md) | [providers](features/providers.md)、[a2a](features/a2a.md) | 身份和工具记忆不串台——每只猫自己的 session,下次各自 resume |
 | 13 | 配置可见与运行时修改 | 已对齐 | [F001](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F001-config-visibility.md)、[F004](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F004-runtime-config.md) | [hub-capability](features/hub-capability.md)、[AGENTS.md 常见操作](../AGENTS.md) | Hub 点保存改内存再落盘立即生效——改配置和跑代码不能是两套真相 |
-| 14 | 跨线程传话溯源 | 缺失 | [F052](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F052-cross-thread-identity-isolation.md) | | 跨线程传话我没做——要做就得先解决「同名猫自引用过滤」的身份坑 |
+| 14 | 跨线程传话溯源 | 已对齐 | [F052](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F052-cross-thread-identity-isolation.md) | [cross-thread-post](features/cross-thread-post.md) | 跨线程传话贴上原寄件地址——不落成助手气泡,同名猫在另一条线程说的话不当本线程自己 |
 | 15 | 记忆写入治理 | 已对齐 | [F102](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F102-memory-adapter-refactor.md) | [memory-evidence](features/memory-evidence.md)、[memory-files](features/memory-files.md) | 记忆入库必须人点头,确认后写成 .md——文件是真相,索引可以扔掉再编 |
 | 16 | 记忆划界、出处与联邦检索 | 部分对齐(差联邦检索、Collection 治理、生命周期) | [F186](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F186-library-memory-architecture.md) | [memory-scope](features/memory-scope.md) | 记忆按仓划界、注入带出处——猫看得出这条约定来自哪个项目、什么时候确认的 |
 | 17 | 记忆召回度量 | 缺失 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | | 我不知道猫召回的记忆用没用上——要量就用真实行为信号,不用自评 |
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **跨线程传话溯源**(补第 14 行)——要做就得先解决同名猫自引用过滤;预计 3–4 刀。
+1. **记忆召回度量**(补第 17 行)——要量就用真实行为信号,不用自评。

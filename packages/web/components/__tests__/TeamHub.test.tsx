@@ -190,6 +190,7 @@ describe('TeamHub', () => {
     expect(screen.getByText('协作工具')).toBeTruthy();
     expect(screen.getByText(/search_messages/)).toBeTruthy();
     expect(screen.getByText(/list_threads/)).toBeTruthy();
+    expect(screen.getByText(/cross-post/)).toBeTruthy();
     expect(screen.getByText(/CLI opencode/)).toBeTruthy();
   });
 
