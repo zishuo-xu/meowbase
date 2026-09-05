@@ -12,6 +12,7 @@ import { describeBall, describeRelayTimeline, formatPickupCommand } from '@/lib/
 import { defaultSessionTitle, isPlaceholderTitle, threadRepoHint, titleFromUserMessage } from '@/lib/threads';
 import { pendingThreadIds } from '@/lib/approvals';
 import { RelayTimeline } from '@/components/RelayTimeline';
+import { QueuePanel } from '@/components/QueuePanel';
 import { SYNC_REFRESH_DEBOUNCE_MS, useThreadStream } from '@/lib/use-thread-stream';
 
 const FALLBACK_AGENTS: AgentConfigDto[] = AGENT_ORDER.map((id) => ({
@@ -38,6 +39,7 @@ export default function Home() {
   const [focusSeq, setFocusSeq] = useState(0);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [usageRefreshKey, setUsageRefreshKey] = useState(0);
+  const [queueOpen, setQueueOpen] = useState(false);
 
   const agents = config?.agents?.length ? config.agents : FALLBACK_AGENTS;
   const { lastEvent } = useThreadStream(activeId);
@@ -104,6 +106,7 @@ export default function Home() {
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
+    setQueueOpen(false);
     try {
       const [msgs, ev] = await Promise.all([api.listMessages(id), api.listEvidence(id)]);
       setMessages(msgs);
@@ -257,14 +260,21 @@ export default function Home() {
                     sending,
                     (id) => agentName(id, agents),
                     (id) => agents.find((a) => a.id === id)?.role,
-                    activeThread?.pendingQueue?.length ?? 0,
-                    activeThread?.inboundQueue?.length ?? 0,
                   ).text
                 : `${agents.map((a) => a.name).join(' · ')} 就位 · 不写 @ 续上一只`}
             </p>
             {activeId ? (
               <RelayTimeline
                 hops={describeRelayTimeline(headerMessages, sending, (id) => agentName(id, agents))}
+              />
+            ) : null}
+            {activeId ? (
+              <QueuePanel
+                pendingQueue={activeThread?.pendingQueue ?? []}
+                inboundQueue={activeThread?.inboundQueue ?? []}
+                nameOf={(id) => agentName(id, agents)}
+                open={queueOpen}
+                onToggle={() => setQueueOpen((v) => !v)}
               />
             ) : null}
           </div>

@@ -37,7 +37,7 @@
 ## 不做（本篇）
 
 - 优先级、steer 插队、跨线程
-- 完整 QueuePanel 拖拽
+- 完整 QueuePanel 拖拽（可见列表面板见 [queue-panel.md](queue-panel.md)）
 - 猫寄信却不交棒
 
 ## 入口

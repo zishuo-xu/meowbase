@@ -38,7 +38,7 @@
 
 - 人在猫跑着时再发的话进队（已另篇 [user-message-queue.md](user-message-queue.md)）
 - 优先级、steer 插队、跨线程、猫寄信却不交棒
-- 队列面板 / 展开列表；顶栏一句提示够演示
+- 队列面板 / 展开列表（已另篇 [queue-panel.md](queue-panel.md)）
 
 ## 入口
 
