@@ -94,6 +94,7 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
     holdCommands: config.holdCommands,
     holdCommandEnv: config.holdCommandEnv,
     ...(config.budgetUsd != null ? { budgetUsd: config.budgetUsd } : {}),
+    ...(config.agentBudgets ? { agentBudgets: config.agentBudgets } : {}),
     memoryDir,
     hopTranscriptDir,
     allowedRepoRoots: resolveAllowedRepoRoots(parseAllowedRepoRoots(process.env.ALLOWED_REPO_ROOTS)),

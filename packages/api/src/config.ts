@@ -79,6 +79,8 @@ export interface Config {
   holdCommandEnv: string[];
   /** 全平台真实花费上限(美元);缺省不拦 */
   budgetUsd?: number;
+  /** 按猫真实花费上限;缺省不拦该猫 */
+  agentBudgets?: Partial<Record<AgentId, number>>;
 }
 
 export const DEFAULT_A2A_MAX_DEPTH = 3;
@@ -168,6 +170,7 @@ interface TeamFile {
   holdCommands?: unknown;
   holdCommandEnv?: unknown;
   budgetUsd?: unknown;
+  agentBudgets?: unknown;
 }
 
 function parseA2AMaxDepth(raw: string | number | undefined): number {
@@ -495,6 +498,8 @@ export function writeTeamFile(
     defaultAgentId: AgentId;
     agents: AgentSpec[];
     models?: ModelPreset[];
+    budgetUsd?: number | null;
+    agentBudgets?: Partial<Record<AgentId, number>>;
   },
 ): void {
   const existing = readTeamFile(configPath);
@@ -524,7 +529,20 @@ export function writeTeamFile(
     })),
     ...(existing.holdCommands !== undefined ? { holdCommands: existing.holdCommands } : {}),
     ...(existing.holdCommandEnv !== undefined ? { holdCommandEnv: existing.holdCommandEnv } : {}),
-    ...(existing.budgetUsd !== undefined ? { budgetUsd: existing.budgetUsd } : {}),
+    ...(input.budgetUsd !== undefined
+      ? input.budgetUsd == null
+        ? {}
+        : { budgetUsd: input.budgetUsd }
+      : existing.budgetUsd !== undefined
+        ? { budgetUsd: existing.budgetUsd }
+        : {}),
+    ...(input.agentBudgets !== undefined
+      ? Object.keys(input.agentBudgets).length > 0
+        ? { agentBudgets: input.agentBudgets }
+        : {}
+      : existing.agentBudgets !== undefined
+        ? { agentBudgets: existing.agentBudgets }
+        : {}),
   };
   writeFileSync(configPath, `${JSON.stringify(payload, null, 2)}\n`);
 }
@@ -580,6 +598,8 @@ export function persistTeamConfig(
     defaultAgentId: AgentId;
     agents: AgentSpec[];
     models?: ModelPreset[];
+    budgetUsd?: number | null;
+    agentBudgets?: Partial<Record<AgentId, number>>;
   },
 ): void {
   writeTeamFile(configPath, input);
@@ -745,6 +765,7 @@ export function loadConfig(
   const defaultAgentId =
     (file.defaultAgentId && isAgentId(file.defaultAgentId) && file.defaultAgentId) || 'claude';
   const budgetUsd = parseBudgetUsd(env.MEOW_BUDGET_USD ?? file.budgetUsd);
+  const agentBudgets = parseAgentBudgets(file.agentBudgets);
 
   return {
     port: Number(env.PORT ?? 3200),
@@ -759,13 +780,25 @@ export function loadConfig(
     holdCommands: parseHoldCommandAllowlist(file.holdCommands) ?? [...DEFAULT_HOLD_COMMAND_ALLOWLIST],
     holdCommandEnv: parseHoldCommandEnv(file.holdCommandEnv),
     ...(budgetUsd != null ? { budgetUsd } : {}),
+    ...(agentBudgets ? { agentBudgets } : {}),
   };
 }
 
-function parseBudgetUsd(raw: unknown): number | undefined {
+export function parseBudgetUsd(raw: unknown): number | undefined {
   const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
   if (!Number.isFinite(n) || n <= 0) return undefined;
   return n;
+}
+
+export function parseAgentBudgets(raw: unknown): Partial<Record<AgentId, number>> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const result: Partial<Record<AgentId, number>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isAgentId(key)) continue;
+    const cap = parseBudgetUsd(value);
+    if (cap != null) result[key] = cap;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function parseHoldCommandEnv(raw: unknown): string[] {

@@ -79,5 +79,6 @@ describe('isOverBudget', () => {
   it('拒跑文案带已花和上限', () => {
     expect(formatBudgetGateNote({ spentUsd: 0.001, capUsd: 0.001 })).toContain('已花 $0.0010');
     expect(formatBudgetGateNote({ spentUsd: 0.001, capUsd: 0.001 })).toContain('上限 $0.0010');
+    expect(formatBudgetGateNote({ spentUsd: 1, capUsd: 1, agentName: '墨墨' })).toContain('墨墨的预算用完');
   });
 });

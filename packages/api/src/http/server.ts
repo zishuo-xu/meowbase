@@ -35,6 +35,8 @@ import {
   parseBaseUrl,
   parseModelCatalog,
   parseModelProtocol,
+  parseAgentBudgets,
+  parseBudgetUsd,
   persistTeamConfig,
   publicAgentConfig,
   publicModelPreset,
@@ -107,6 +109,8 @@ export interface ApiDeps {
   lookupPrMergeable?: PrMergeableLookup;
   /** 全平台真实花费上限(美元);缺省不拦 */
   budgetUsd?: number;
+  /** 按猫真实花费上限;缺省不拦该猫 */
+  agentBudgets?: Partial<Record<AgentId, number>>;
   /** 已确认证据的纸本目录;缺省不写文件 */
   memoryDir?: string;
   /** CLI 原始行归档目录;缺省不写 */
@@ -118,6 +122,8 @@ interface LiveConfig {
   defaultAgentId: AgentId;
   agents: AgentSpec[];
   models: ModelPreset[];
+  budgetUsd?: number;
+  agentBudgets?: Partial<Record<AgentId, number>>;
 }
 
 function parseAuditLimit(raw: unknown): { ok: true; limit?: number } | { ok: false } {
@@ -174,6 +180,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ? deps.models
       : normalizeModelCatalog(undefined, deps.agents ?? [])
     ).map(cloneModelPreset),
+    ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
+    ...(deps.agentBudgets ? { agentBudgets: { ...deps.agentBudgets } } : {}),
   };
   live.agents = syncAgentsWithCatalog(live.agents, live.models);
 
@@ -208,7 +216,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       defaultAgentId: live.defaultAgentId,
       models: live.models.map(publicModelPreset),
       agents,
-      ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
+      ...(live.budgetUsd != null ? { budgetUsd: live.budgetUsd } : {}),
+      ...(live.agentBudgets ? { agentBudgets: live.agentBudgets } : {}),
     };
   }
 
@@ -382,6 +391,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       defaultAgentId?: unknown;
       models?: unknown;
       applyModel?: { model?: unknown; agentIds?: unknown; bin?: unknown };
+      budgetUsd?: unknown;
+      agentBudgets?: unknown;
     } | null;
     if (body?.a2aMaxDepth !== undefined) {
       const depth = parsePatchDepth(body.a2aMaxDepth);
@@ -430,6 +441,24 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
         if (next && prev && adapterRuntimeChanged(prev, next)) {
           deps.rebuildAdapter?.(next);
         }
+      }
+    }
+    if (body?.budgetUsd !== undefined) {
+      if (body.budgetUsd === null || body.budgetUsd === '') {
+        delete live.budgetUsd;
+      } else {
+        const cap = parseBudgetUsd(body.budgetUsd);
+        if (cap == null) return reply.code(400).send({ error: 'budgetUsd 须为正数' });
+        live.budgetUsd = cap;
+      }
+    }
+    if (body?.agentBudgets !== undefined) {
+      if (body.agentBudgets === null) {
+        delete live.agentBudgets;
+      } else {
+        const parsed = parseAgentBudgets(body.agentBudgets);
+        if (parsed) live.agentBudgets = parsed;
+        else delete live.agentBudgets;
       }
     }
     persist();
@@ -638,7 +667,8 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
       ...(deps.listPrReviews ? { listPrReviews: deps.listPrReviews } : {}),
       ...(deps.listPrChecks ? { listPrChecks: deps.listPrChecks } : {}),
       ...(deps.lookupPrMergeable ? { lookupPrMergeable: deps.lookupPrMergeable } : {}),
-      ...(deps.budgetUsd != null ? { budgetUsd: deps.budgetUsd } : {}),
+      ...(live.budgetUsd != null ? { budgetUsd: live.budgetUsd } : {}),
+      ...(live.agentBudgets ? { agentBudgets: live.agentBudgets } : {}),
       ...(deps.memoryDir ? { memoryDir: deps.memoryDir } : {}),
       ...(deps.hopTranscriptDir ? { hopTranscriptDir: deps.hopTranscriptDir } : {}),
     };

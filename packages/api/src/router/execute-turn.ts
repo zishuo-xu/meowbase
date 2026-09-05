@@ -172,6 +172,25 @@ export async function executeTurn(input: {
     });
   }
 
+  const usage = await loadUsage(context.stores);
+  for (const target of targets) {
+    const cap = context.agentBudgets?.[target];
+    const spent = usage.byAgent[target]?.costUsd ?? 0;
+    if (!isOverBudget(spent, cap)) continue;
+    turnLog('budget gate', { thread: threadId, agent: target, cap });
+    return context.stores.messages.append({
+      threadId,
+      role: 'system',
+      content: formatBudgetGateNote({
+        spentUsd: spent,
+        capUsd: cap ?? 0,
+        agentName: displayName(target, catalog),
+      }),
+      status: 'completed',
+      systemKind: 'budget',
+    });
+  }
+
   const targetResults: PromiseSettledResult<SegmentRunResult>[] = [];
   let keptHop: PendingHop | null = null;
   for (const target of targets) {

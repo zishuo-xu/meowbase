@@ -34,10 +34,15 @@ export function isOverBudget(spentUsd: number, capUsd: number | undefined): bool
   return spentUsd >= capUsd;
 }
 
-export function formatBudgetGateNote(input: { spentUsd: number; capUsd: number }): string {
+export function formatBudgetGateNote(input: {
+  spentUsd: number;
+  capUsd: number;
+  agentName?: string;
+}): string {
   const spent = input.spentUsd.toFixed(4);
   const cap = input.capUsd.toFixed(4);
-  return `⚠️ 预算用完(已花 $${spent} / 上限 $${cap}),不再叫猫。批准和拉闸仍能走。`;
+  const who = input.agentName ? `${input.agentName}的` : '';
+  return `⚠️ ${who}预算用完(已花 $${spent} / 上限 $${cap}),不再叫猫。批准和拉闸仍能走。`;
 }
 
 /** 上游报了 totalTokens 就用它；否则派生可见字段之和。 */

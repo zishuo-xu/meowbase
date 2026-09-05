@@ -31,9 +31,9 @@
 
 ## 不做（本篇）
 
-- 按猫 / 按线程拆池
+- 按猫 / 按线程拆池(见 [budget-pools.md](budget-pools.md))
 - 按价格表估算 gemini
-- 热改上限的 Hub 表单(配置 / 环境变量够演示)
+- 热改上限的 Hub 表单(见 [budget-pools.md](budget-pools.md))
 
 ## 入口
 

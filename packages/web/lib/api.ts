@@ -133,6 +133,7 @@ export interface AppConfigDto {
   agents: AgentConfigDto[];
   models?: ModelPresetDto[];
   budgetUsd?: number;
+  agentBudgets?: Partial<Record<string, number>>;
 }
 
 export interface TokenUsageDto {
@@ -181,6 +182,8 @@ export const api = {
     defaultAgentId?: string;
     models?: ModelPresetDto[];
     applyModel?: { model: string; agentIds: string[]; bin?: string };
+    budgetUsd?: number | null;
+    agentBudgets?: Partial<Record<string, number>> | null;
   }) =>
     request<AppConfigDto>('/api/config', {
       method: 'PATCH',

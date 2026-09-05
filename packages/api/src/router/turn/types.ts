@@ -72,6 +72,8 @@ export interface TurnContext {
   lookupPrMergeable?: PrMergeableLookup;
   /** 全平台真实花费上限(美元);缺省或 ≤0 不拦 */
   budgetUsd?: number;
+  /** 按猫真实花费上限;缺省不拦该猫 */
+  agentBudgets?: Partial<Record<AgentId, number>>;
   /** 已确认证据的纸本目录;缺省不写文件 */
   memoryDir?: string;
   /** CLI 原始行归档目录;缺省不写 */

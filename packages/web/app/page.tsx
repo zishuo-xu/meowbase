@@ -401,6 +401,14 @@ export default function Home() {
               .catch((err) => setError(err instanceof Error ? err.message : '保存失败'))
               .finally(() => setSavingHub(false));
           }}
+          onSaveBudget={(patch) => {
+            setSavingHub(true);
+            void api
+              .patchConfig(patch)
+              .then((next) => setConfig(next))
+              .catch((err) => setError(err instanceof Error ? err.message : '保存失败'))
+              .finally(() => setSavingHub(false));
+          }}
           onSaveModels={(models) => {
             setSavingHub(true);
             void api

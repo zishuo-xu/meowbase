@@ -145,6 +145,27 @@ describe('applyAgentPatch / writeTeamFile', () => {
     expect(loadConfig({}, { configPath: path }).budgetUsd).toBe(2);
   });
 
+  it('读取按猫上限,Hub 落盘可改全平台和按猫', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-pools-'));
+    const path = join(dir, 'meowbase.config.json');
+    writeFileSync(path, JSON.stringify({ budgetUsd: 2, agentBudgets: { claude: 0.5 } }));
+    expect(loadConfig({}, { configPath: path }).agentBudgets).toEqual({ claude: 0.5 });
+    writeTeamFile(path, {
+      a2aMaxDepth: 3,
+      defaultAgentId: 'claude',
+      agents: DEFAULT_AGENTS.map((a) => ({
+        ...a,
+        aliases: [...a.aliases],
+        expertise: [...a.expertise],
+      })),
+      budgetUsd: 3,
+      agentBudgets: { gemini: 1 },
+    });
+    const cfg = loadConfig({}, { configPath: path });
+    expect(cfg.budgetUsd).toBe(3);
+    expect(cfg.agentBudgets).toEqual({ gemini: 1 });
+  });
+
   it('文件里的 holdCommands 覆盖默认白名单', () => {
     const dir = mkdtempSync(join(tmpdir(), 'meowbase-cfg-hold-'));
     const path = join(dir, 'meowbase.config.json');

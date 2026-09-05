@@ -169,6 +169,7 @@ export function TeamHub({
   onClose,
   onSaveAgent,
   onSaveSettings,
+  onSaveBudget,
   onSaveModels,
   onVerifyModel,
   onOpenThread,
@@ -185,6 +186,7 @@ export function TeamHub({
   onClose: () => void;
   onSaveAgent: (agentId: string, patch: AgentSavePayload) => void;
   onSaveSettings: (patch: SettingsSavePayload) => void;
+  onSaveBudget?: (patch: { budgetUsd?: number | null; agentBudgets?: Partial<Record<string, number>> | null }) => void;
   onSaveModels?: (models: ModelPresetDto[]) => void;
   onVerifyModel?: (preset: VerifyModelPayload) => Promise<VerifyModelResult>;
   onOpenThread?: (threadId: string) => void;
@@ -213,6 +215,8 @@ export function TeamHub({
   const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
   const [draftErrors, setDraftErrors] = useState<{ model?: string; bins?: string }>({});
   const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
+  const [budgetDraft, setBudgetDraft] = useState(config.budgetUsd != null ? String(config.budgetUsd) : '');
+  const [agentBudgetDraft, setAgentBudgetDraft] = useState<Record<string, string>>({});
   const [usage, setUsage] = useState<UsageDto | null>(null);
   const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
   const [memoryRecall, setMemoryRecall] = useState<MemoryRecallDto | null>(null);
@@ -231,6 +235,10 @@ export function TeamHub({
     setEditingId(null);
     setEditApiKey('');
     setUsageScope('thread');
+    setBudgetDraft(config.budgetUsd != null ? String(config.budgetUsd) : '');
+    setAgentBudgetDraft(
+      Object.fromEntries(config.agents.map((agent) => [agent.id, config.agentBudgets?.[agent.id] != null ? String(config.agentBudgets[agent.id]) : ''])),
+    );
   }, [open, focusAgentId, config]);
 
   useEffect(() => {
@@ -457,9 +465,39 @@ export function TeamHub({
                   只算猫已经跑完的用量。模型探测的花费在探测结果里当场显示，不计入。没报成本的格子写「无成本数据」，不估。
                   {config.budgetUsd != null
                     ? ` 上限 $${config.budgetUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}。花超了不再叫猫。`
-                    : ''}
+                    : ' 没配全平台上限则不拦。'}
                 </p>
               </div>
+              {onSaveBudget ? (
+                <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2">
+                  <label className="block text-xs font-bold text-[var(--ink-soft)]">
+                    全平台上限(美元)
+                    <input
+                      aria-label="全平台上限"
+                      value={budgetDraft}
+                      onChange={(e) => setBudgetDraft(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-2 py-1 text-sm"
+                      placeholder="空=不拦"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-bold text-white"
+                    onClick={() => {
+                      const trimmed = budgetDraft.trim();
+                      if (!trimmed) {
+                        onSaveBudget({ budgetUsd: null });
+                        return;
+                      }
+                      const n = Number(trimmed);
+                      if (!Number.isFinite(n) || n <= 0) return;
+                      onSaveBudget({ budgetUsd: n });
+                    }}
+                  >
+                    保存上限
+                  </button>
+                </div>
+              ) : null}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -511,7 +549,40 @@ export function TeamHub({
                           </div>
                           <div className="mt-1 text-xs font-medium text-[var(--ink)]">
                             <CostCell row={row} />
+                            {config.agentBudgets?.[agent.id] != null
+                              ? ` · 上限 $${config.agentBudgets[agent.id]}`
+                              : ''}
                           </div>
+                          {onSaveBudget ? (
+                            <label className="mt-1 block text-[11px] text-[var(--ink-soft)]">
+                              这只猫上限
+                              <input
+                                aria-label={`${agent.name}上限`}
+                                value={agentBudgetDraft[agent.id] ?? ''}
+                                onChange={(e) =>
+                                  setAgentBudgetDraft((prev) => ({ ...prev, [agent.id]: e.target.value }))
+                                }
+                                onBlur={() => {
+                                  const trimmed = (agentBudgetDraft[agent.id] ?? '').trim();
+                                  const next: Record<string, number> = {};
+                                  for (const [id, cap] of Object.entries(config.agentBudgets ?? {})) {
+                                    if (typeof cap === 'number') next[id] = cap;
+                                  }
+                                  if (!trimmed) delete next[agent.id];
+                                  else {
+                                    const n = Number(trimmed);
+                                    if (!Number.isFinite(n) || n <= 0) return;
+                                    next[agent.id] = n;
+                                  }
+                                  onSaveBudget({
+                                    agentBudgets: Object.keys(next).length > 0 ? next : null,
+                                  });
+                                }}
+                                className="ml-2 w-20 rounded-lg border border-[var(--border)] bg-white px-1.5 py-0.5 text-xs"
+                                placeholder="空"
+                              />
+                            </label>
+                          ) : null}
                         </div>
                       </div>
                     </li>

@@ -678,6 +678,29 @@ describe('TeamHub', () => {
     expect(within(ledger).getByText(/\$1/)).toBeTruthy();
   });
 
+  it('账本可改全平台上限和每只猫上限', async () => {
+    const onSaveBudget = vi.fn();
+    vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
+    render(
+      <TeamHub
+        open
+        config={{ ...config, budgetUsd: 1, agentBudgets: { claude: 0.5 } }}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onSaveBudget={onSaveBudget}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '账本' }));
+    const ledger = await screen.findByRole('region', { name: '账本' });
+    expect(within(ledger).getByLabelText('全平台上限')).toBeTruthy();
+    expect(within(ledger).getByLabelText('墨墨上限')).toBeTruthy();
+    fireEvent.change(within(ledger).getByLabelText('全平台上限'), { target: { value: '2' } });
+    fireEvent.click(within(ledger).getByRole('button', { name: '保存上限' }));
+    expect(onSaveBudget).toHaveBeenCalledWith({ budgetUsd: 2 });
+  });
+
   it('没有 costUsd 时显示无成本数据而不是 $0', async () => {
     vi.mocked(api.fetchUsage).mockResolvedValue(threadUsage);
     render(

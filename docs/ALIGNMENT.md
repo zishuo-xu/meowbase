@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 24 / 分母 31 = 77%**(每次相关改动同轮更新;第 29 行从部分对齐改为已对齐)
+**当前对齐率:已对齐 25 / 分母 31 = 81%**(每次相关改动同轮更新;第 27 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -36,7 +36,7 @@
 | 24 | 统一审批中心 | 已对齐 | [F246](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F246-approval-hub.md) | [approval-hub](features/approval-hub.md)、[approval](features/approval.md) | 待批卡聚到 Hub 一页——人不必翻进某条线程才看得见;批准打回仍走现有命令 |
 | 25 | 操作审计流水 | 已对齐 | [F013](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F013-audit-log-v2.md) | [audit-trail](features/audit-trail.md)、[hop-transcript](features/hop-transcript.md) | 追责流水记决定,原始行按跳另存——两层分开,解析错了还能对证 |
 | 26 | token 归一化与按猫账本 | 已对齐 | [F008](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F008-token-budget-observability.md) | [quota-board](features/quota-board.md)、[platform-spend](features/platform-spend.md) | 账本只展示报上来的花费——估出来的数字比没有数字更能骗人 |
-| 27 | 额度池看板与预算闸 | 部分对齐(差按猫拆池、热改上限的 Hub 表单) | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md) | 账本能看,花超了拒跑——闸只认报上来的真实花费,没配上限不拦 |
+| 27 | 额度池看板与预算闸 | 已对齐 | [F051](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F051-real-quota-dashboard.md) | [quota-board](features/quota-board.md)、[budget-gate](features/budget-gate.md)、[budget-pools](features/budget-pools.md) | 账本能看,花超了拒跑——全平台和每只猫都能封顶,Hub 改完立刻拦,闸只认报上来的真实花费 |
 | 28 | 消息分层可观测 | 部分对齐(差 thinking/plan 可观测层、遥测层) | [F045](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F045-ndjson-observability.md) | [system-message-kind](features/system-message-kind.md)、[live-sync](features/live-sync.md) | 平台知道的事件类型我打在消息字段里——改文案再也不会让顶栏静默失灵 |
 | 29 | 邮箱/统一消息队列 | 已对齐 | [F039](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F039-message-queue-delivery.md)、[F122](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F122-unified-dispatch-queue.md)、[F175](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F175-unified-message-queue.md) | [pending-handoff-queue](features/pending-handoff-queue.md)、[user-message-queue](features/user-message-queue.md)、[queue-panel](features/queue-panel.md)、[queue-steer](features/queue-steer.md)、[queue-reorder](features/queue-reorder.md)、[durable-relay](features/durable-relay.md) | 忙就排队、空了再出——交棒和第二句人话都进队,顶栏点开能看见,能上移下移,急件入队置顶;两队仍分开,不旁路打断当前棒 |
 | 30 | SOP 流程守护 | 已对齐 | [SOP](https://github.com/zts212653/clowder-ai/blob/main/docs/SOP.md)、[F073](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F073-sop-auto-guardian.md)、[F083](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F083-design-gate-sop.md) | [sop-board](features/sop-board.md) | 家规写成告示牌——阶段由平台从球权派生,猫每跳能读到、人在顶栏能看见;牌子不是控制器 |
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **额度池看板剩余**(补第 27 行差的那截)——按猫拆池、热改上限的 Hub 表单还没有;花超了拒跑已经有了。
+1. **消息分层可观测剩余**(补第 28 行差的那截)——thinking/plan 可观测层和遥测层还没有;系统消息带类型已经有了。

@@ -670,6 +670,52 @@ describe('executeTurn 消息协议与注入', () => {
     expect(freeze.systemKind).toBe('freeze');
   });
 
+  it('按猫上限只拦点名的那只,没配的仍跑', async () => {
+    const stores = createMemoryStores();
+    const called: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          called.push('claude');
+          return { sessionId: 's1', content: '不该来', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn() {
+          called.push('opencode');
+          return { sessionId: 's2', content: '团团到', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await stores.messages.append({
+      threadId: thread.id,
+      role: 'assistant',
+      agentId: 'claude',
+      content: '上一跳',
+      status: 'completed',
+      usage: { costUsd: 1 },
+    });
+    const blocked = await executeTurn({
+      threadId: thread.id,
+      content: '@claude 再干一票',
+      context: { stores, registry, agentBudgets: { claude: 1 } },
+    });
+    expect(called).toEqual([]);
+    expect(blocked.systemKind).toBe('budget');
+    expect(blocked.content).toContain('墨墨');
+
+    const ok = await executeTurn({
+      threadId: thread.id,
+      content: '@团团 开工',
+      context: { stores, registry, agentBudgets: { claude: 1 } },
+    });
+    expect(called).toEqual(['opencode']);
+    expect(ok.agentId).toBe('opencode');
+  });
+
   it('新会话和 resume 都注入身份与交接规则', async () => {
     const stores = createMemoryStores();
     const prompts: (string | undefined)[] = [];
