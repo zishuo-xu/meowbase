@@ -37,7 +37,8 @@ export async function loadRoster(context: TurnContext): Promise<{
       agentId: a.id,
       name: a.name,
       aliases: a.aliases,
-    })) ?? profiles.map((p) => ({ agentId: p.agentId, name: p.name }));
+      role: a.role,
+    })) ?? profiles.map((p) => ({ agentId: p.agentId, name: p.name, role: p.role }));
   const catalog = buildMentionCatalog(members);
   const team: TeamMember[] =
     context.agents && context.agents.length > 0

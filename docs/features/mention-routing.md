@@ -44,6 +44,7 @@
 
 - 不做意图识别 / 7B 分类来猜该叫谁（他们公开也写了 CJK 不准、成本高）
 - 不把路由改成 MCP `targetCats`（那是他们后来的结构化通道，见 [async-a2a.md](async-a2a.md)）
+- 群组展开见 [group-mentions.md](group-mentions.md)
 
 ## 面试能讲
 

@@ -1,5 +1,10 @@
 import type { AgentId } from './types.js';
-import { DEFAULT_CATALOG, type MentionCatalog, resolveAlias } from './catalog.js';
+import {
+  DEFAULT_CATALOG,
+  expandMentionToken,
+  isGroupMentionToken,
+  type MentionCatalog,
+} from './catalog.js';
 
 /** 没 @ 时回看最近几条用户消息;只扫人说的话,不扫猫。 */
 export const USER_MENTION_LOOKBACK = 5;
@@ -8,21 +13,26 @@ export const USER_MENTION_MAX_AGE_MS = 60 * 60 * 1000;
 /** 行首 @名字,与猫的 A2A 同一条规则(对齐 clowder TIPS)。 */
 const LINE_START = /^\s*@([a-zA-Z][a-zA-Z0-9_-]*|[\u4e00-\u9fa5]+)/;
 
-function lineStartTarget(line: string, catalog: MentionCatalog): AgentId | undefined {
+function lineStartTargets(line: string, catalog: MentionCatalog): AgentId[] {
   const match = line.match(LINE_START);
-  if (!match) return undefined;
-  return resolveAlias(match[1] ?? '', catalog);
+  if (!match) return [];
+  return expandMentionToken(match[1] ?? '', catalog);
 }
 
-/** 提取行首有效 @ 目标(不去 fallback;句中 @ 不算)。 */
+function lineStartTarget(line: string, catalog: MentionCatalog): AgentId | undefined {
+  return lineStartTargets(line, catalog)[0];
+}
+
+/** 提取行首有效 @ 目标(不去 fallback;句中 @ 不算)。群组名展开。 */
 export function extractMentionTargets(
   content: string,
   catalog: MentionCatalog = DEFAULT_CATALOG,
 ): AgentId[] {
   const targets: AgentId[] = [];
   for (const line of content.split('\n')) {
-    const id = lineStartTarget(line, catalog);
-    if (id && !targets.includes(id)) targets.push(id);
+    for (const id of lineStartTargets(line, catalog)) {
+      if (!targets.includes(id)) targets.push(id);
+    }
   }
   return targets;
 }
@@ -64,7 +74,7 @@ export interface TurnTargetInput {
 
 /**
  * 本轮路由:本句行首 @ → 最近 1h 内用户消息的最后一行行首 @
- * → 最后开口的猫 → 线程主猫。不加 @all。
+ * → 最后开口的猫 → 线程主猫。行首 @all/@thread/角色组会展开。
  */
 export function resolveTurnTargets(
   content: string,
@@ -103,7 +113,10 @@ export function stripMentions(
     .map((line) => {
       const match = line.match(/^(\s*)@([a-zA-Z][a-zA-Z0-9_-]*|[\u4e00-\u9fa5]+)(\s*)(.*)$/);
       if (!match) return line;
-      if (!resolveAlias(match[2] ?? '', catalog)) return line;
+      const token = match[2] ?? '';
+      if (expandMentionToken(token, catalog).length === 0 && !isGroupMentionToken(token)) {
+        return line;
+      }
       return `${match[1] ?? ''}${match[4] ?? ''}`;
     })
     .join('\n');

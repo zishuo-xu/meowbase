@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 22 / 分母 31 = 71%**(每次相关改动同轮更新;第 17 行从缺失改为已对齐)
+**当前对齐率:已对齐 23 / 分母 31 = 74%**(每次相关改动同轮更新;第 4 行从部分对齐改为已对齐)
 
 ## 分母(核心清单)
 
@@ -13,7 +13,7 @@
 | 1 | A2A 链式交接 | 已对齐 | [F002](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F002-agent-to-agent.md) | [a2a](features/a2a.md)、[A2A 说明](A2A.md)、[auto-follow-pending](features/auto-follow-pending.md) | 交接包就是下一棒吃的那份 prompt——人点开接力条看到的就是猫看到的,没有第二套管线 |
 | 2 | 漏传出口检查 | 已对齐 | [F064](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F064-a2a-exit-check.md)、[F005](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F005-a2a-follow-up.md) | [exit-nudge](features/exit-nudge.md) | 该交棒没交时我再问同一只一次——提醒寄件人,绝不替它写地址 |
 | 3 | 行首 @ 路由卫生 | 已对齐 | [F046](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F046-anti-drift-protocol.md) | [AGENTS.md 协议表](../AGENTS.md)、[mention-routing](features/mention-routing.md) | 只有行首 @ 才路由——我用一张协议表把「人打的/猫写的/平台自己做的」三种语法彻底分开,句中 @ 不路由 |
-| 4 | 无 @ 回退与群组 mention | 部分对齐(差群组展开 @all/@thread/品种) | [F078](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F078-smart-routing-group-mentions.md) | [mention-routing](features/mention-routing.md)、[AGENTS.md 协议表](../AGENTS.md) | 回退梯级只信人点过的名——猫自己聊出来的 @ 不许劫持路由 |
+| 4 | 无 @ 回退与群组 mention | 已对齐 | [F078](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F078-smart-routing-group-mentions.md) | [mention-routing](features/mention-routing.md)、[group-mentions](features/group-mentions.md)、[AGENTS.md 协议表](../AGENTS.md) | 回退梯级只信人点过的名;行首 @全员 展开成通讯录分组,猫写 @all 不交接 |
 | 5 | A2A 链质量(虚空传球/防环/球权出口) | 部分对齐(差跨轮乒乓熔断账本、final slot 机械校验) | [F167](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F167-a2a-chain-quality.md) | [void-handoff-gate](features/void-handoff-gate.md)、[hold-wait](features/hold-wait.md)、[review-ball-to-human](features/review-ball-to-human.md)、[revise-ball-to-writer](features/revise-ball-to-writer.md) | 空信封不投递——平台只看这一跳有没有留下东西,不判断内容好不好 |
 | 6 | 多 @ 编排 | 部分对齐(差并行 multi-mention 状态机;顺序执行是有意裁剪。第二棒入队已落地) | [F086](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F086-cat-orchestration-multi-mention.md) | [one-hop-per-thread](features/one-hop-per-thread.md)、[pending-handoff-queue](features/pending-handoff-queue.md)、[mention-routing](features/mention-routing.md) | 群发并行没有保护,我把它改成顺序执行——同一棵树同一个 git index,并行提交会张冠李戴;第二棒不再丢掉,排在后面跟 |
 | 7 | 重启自愈与接力续跑 | 已对齐 | [F048](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F048-restart-recovery.md) | [durable-relay](features/durable-relay.md)、[hop-commit-then-clear](features/hop-commit-then-clear.md) | 跑完落库再清那一棒——邮差把信送到才划掉,不是拿到手就划掉 |
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **群组 mention 展开**(补第 4 行差的那截)——`@all` / `@thread` / 品种展开,回退梯级已经有了。
+1. **邮箱剩余**(补第 29 行差的那截)——拖拽改序和 urgent 自动置顶还没有;提到前面已经有了。

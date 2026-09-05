@@ -9,11 +9,20 @@ interface MentionCandidate {
   badge: string;
 }
 
-const DEFAULT_CANDIDATES: MentionCandidate[] = AGENT_ORDER.map((id) => ({
-  id,
-  name: getPersona(id).name,
-  badge: getPersona(id).badge,
-}));
+const GROUP_CANDIDATE: MentionCandidate = {
+  id: 'all',
+  name: '全员',
+  badge: 'var(--ink-soft)',
+};
+
+const DEFAULT_CANDIDATES: MentionCandidate[] = [
+  GROUP_CANDIDATE,
+  ...AGENT_ORDER.map((id) => ({
+    id,
+    name: getPersona(id).name,
+    badge: getPersona(id).badge,
+  })),
+];
 
 export function ChatInput({
   onSend,
@@ -36,7 +45,7 @@ export function ChatInput({
   const [cursor, setCursor] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // 输入法组合状态:compositionstart 置 true,compositionend 置 false。
   // 比依赖 keydown 时的 nativeEvent.isComposing 可靠——部分输入法在
@@ -62,14 +71,17 @@ export function ChatInput({
     const q = getMentionQuery(val, pos);
     setMenuOpen(q !== null);
     setQuery(q?.query ?? '');
-    setActiveIdx(0);
+    setActiveIdx(q?.query ? 0 : 1);
   };
 
-  const candidates: MentionCandidate[] = (agents ?? DEFAULT_CANDIDATES).map((a) => ({
-    id: a.id,
-    name: a.name,
-    badge: getPersona(a.id).badge,
-  }));
+  const candidates: MentionCandidate[] = [
+    GROUP_CANDIDATE,
+    ...(agents ?? DEFAULT_CANDIDATES.filter((c) => c.id !== 'all')).map((a) => ({
+      id: a.id,
+      name: a.name,
+      badge: getPersona(a.id).badge,
+    })),
+  ];
 
   const filtered = query
     ? candidates.filter(

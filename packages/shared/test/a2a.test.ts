@@ -56,6 +56,11 @@ describe('parseA2AHandoff', () => {
     expect(parseA2AHandoff('请 @opencode 帮忙看看', 'claude')).toBeNull();
   });
 
+  it('行首 @all 不交接,必须点名一只', () => {
+    expect(parseA2AHandoff('@all 请大家接着做', 'claude')).toBeNull();
+    expect(parseA2AHandoff('@全员 请审查', 'claude')).toBeNull();
+  });
+
   it('无 mention 返回 null', () => {
     expect(parseA2AHandoff('干完了,没有其他事。', 'claude')).toBeNull();
   });

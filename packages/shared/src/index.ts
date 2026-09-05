@@ -31,6 +31,8 @@ export {
   DEFAULT_ROSTER,
   buildMentionCatalog,
   displayName,
+  expandMentionToken,
+  isGroupMentionToken,
   resolveAlias,
 } from './catalog.js';
 export type { Mention } from './mention.js';

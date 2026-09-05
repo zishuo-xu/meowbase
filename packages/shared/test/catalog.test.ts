@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMentionCatalog,
   displayName,
+  expandMentionToken,
+  isGroupMentionToken,
   resolveAlias,
 } from '../src/catalog.js';
 
@@ -27,5 +29,17 @@ describe('resolveAlias', () => {
     expect(resolveAlias('墨墨', catalog)).toBe('claude');
     expect(resolveAlias('写手墨', catalog)).toBe('claude');
     expect(displayName('claude', catalog)).toBe('小墨');
+  });
+});
+
+describe('expandMentionToken', () => {
+  it('全员组按名册顺序展开,角色组按职责,未知空', () => {
+    expect(expandMentionToken('all')).toEqual(['claude', 'gemini', 'opencode']);
+    expect(expandMentionToken('大家')).toEqual(['claude', 'gemini', 'opencode']);
+    expect(expandMentionToken('审查')).toEqual(['gemini']);
+    expect(expandMentionToken('墨墨')).toEqual(['claude']);
+    expect(expandMentionToken('xyz')).toEqual([]);
+    expect(isGroupMentionToken('all')).toBe(true);
+    expect(isGroupMentionToken('墨墨')).toBe(false);
   });
 });

@@ -1478,6 +1478,45 @@ describe('executeTurn 多角色协作', () => {
     expect(assistants.map((m) => m.agentId).sort()).toEqual(['claude', 'opencode']);
   });
 
+  it('行首 @全员 展开成名册全部,顺序执行', async () => {
+    const stores = createMemoryStores();
+    const seen: string[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn(input) {
+          seen.push(`claude:${input.prompt}`);
+          return { sessionId: 's1', content: '墨墨到', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'gemini',
+        async runTurn(input) {
+          seen.push(`gemini:${input.prompt}`);
+          return { sessionId: 's2', content: '闪闪到', status: 'completed' };
+        },
+      },
+      {
+        agentId: 'opencode',
+        async runTurn(input) {
+          seen.push(`opencode:${input.prompt}`);
+          return { sessionId: 's3', content: '团团到', status: 'completed' };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({ title: 't', primaryAgentId: 'claude' });
+    await executeTurn({
+      threadId: thread.id,
+      content: '@全员 开工',
+      context: { stores, registry },
+    });
+    const agents = seen.map((row) => row.split(':')[0]);
+    expect([...new Set(agents)]).toEqual(['claude', 'gemini', 'opencode']);
+    expect(agents[0]).toBe('claude');
+    expect(agents.indexOf('gemini')).toBeLessThan(agents.indexOf('opencode'));
+    expect(seen.some((row) => row.includes('开工') && !row.includes('@全员'))).toBe(true);
+  });
+
   it('多 @ 顺序执行:第二只开始时第一只已经结束', async () => {
     const stores = createMemoryStores();
     let firstEnded = false;

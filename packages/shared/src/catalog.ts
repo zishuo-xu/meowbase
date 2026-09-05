@@ -6,6 +6,9 @@ export const MENTION_TOKEN_RE = /@([a-zA-Z][a-zA-Z0-9_-]*|[\u4e00-\u9fa5]+)/g;
 export interface MentionCatalog {
   aliases: Record<string, AgentId>;
   names: Record<AgentId, string>;
+  /** 名册顺序,群组展开按这个 */
+  order: AgentId[];
+  roles: Partial<Record<AgentId, string>>;
 }
 
 export interface TeamMember {
@@ -75,19 +78,44 @@ function aliasKey(token: string): string {
   return /^[a-zA-Z]/.test(token) ? token.toLowerCase() : token;
 }
 
+const ALL_GROUP_KEYS = new Set(['all', 'thread', '全员', '大家']);
+const ROLE_GROUP_KEYS = new Map<string, string>([
+  ['架构', '架构'],
+  ['architect', '架构'],
+  ['审查', '审查'],
+  ['reviewer', '审查'],
+  ['执行', '执行'],
+  ['executor', '执行'],
+]);
+
+export function isGroupMentionToken(token: string): boolean {
+  const key = aliasKey(token);
+  return ALL_GROUP_KEYS.has(key) || ROLE_GROUP_KEYS.has(key);
+}
+
 export function buildMentionCatalog(
   members: readonly {
     agentId: AgentId;
     name: string;
     aliases?: readonly string[];
+    role?: string;
   }[] = [],
 ): MentionCatalog {
   const aliases: Record<string, AgentId> = {};
   const names = {} as Record<AgentId, string>;
-  const add = (row: { agentId: AgentId; name: string; aliases?: readonly string[] }) => {
+  const roles: Partial<Record<AgentId, string>> = {};
+  const order: AgentId[] = [];
+  const add = (row: {
+    agentId: AgentId;
+    name: string;
+    aliases?: readonly string[];
+    role?: string;
+  }) => {
     names[row.agentId] = row.name;
     aliases[aliasKey(row.agentId)] = row.agentId;
     aliases[aliasKey(row.name)] = row.agentId;
+    if (row.role) roles[row.agentId] = row.role;
+    if (!order.includes(row.agentId)) order.push(row.agentId);
     for (const extra of row.aliases ?? []) {
       const token = extra.replace(/^@/, '');
       if (token) aliases[aliasKey(token)] = row.agentId;
@@ -95,7 +123,7 @@ export function buildMentionCatalog(
   };
   for (const row of DEFAULT_ROSTER) add(row);
   for (const row of members) add(row);
-  return { aliases, names };
+  return { aliases, names, order, roles };
 }
 
 export const DEFAULT_CATALOG = buildMentionCatalog();
@@ -105,6 +133,21 @@ export function resolveAlias(
   catalog: MentionCatalog = DEFAULT_CATALOG,
 ): AgentId | undefined {
   return catalog.aliases[aliasKey(token)];
+}
+
+/** 行首群组名展开成名册里的猫;不是分组则 0 或 1 只。 */
+export function expandMentionToken(
+  token: string,
+  catalog: MentionCatalog = DEFAULT_CATALOG,
+): AgentId[] {
+  const key = aliasKey(token);
+  if (ALL_GROUP_KEYS.has(key)) return [...catalog.order];
+  const needle = ROLE_GROUP_KEYS.get(key);
+  if (needle) {
+    return catalog.order.filter((id) => catalog.roles[id]?.includes(needle));
+  }
+  const id = catalog.aliases[key];
+  return id ? [id] : [];
 }
 
 export function displayName(

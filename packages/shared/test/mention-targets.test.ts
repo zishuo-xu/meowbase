@@ -39,6 +39,23 @@ describe('parseMentionTargets', () => {
   it('无行首 mention 用 fallback', () => {
     expect(parseMentionTargets('普通消息', 'claude')).toEqual(['claude']);
   });
+
+  it('行首 @all/@全员 展开成名册全部', () => {
+    expect(extractMentionTargets('@all 开工')).toEqual(['claude', 'gemini', 'opencode']);
+    expect(extractMentionTargets('@全员 开工')).toEqual(['claude', 'gemini', 'opencode']);
+    expect(extractMentionTargets('@thread 开工')).toEqual(['claude', 'gemini', 'opencode']);
+  });
+
+  it('行首角色组按职责展开', () => {
+    expect(extractMentionTargets('@架构 开工')).toEqual(['claude']);
+    expect(extractMentionTargets('@审查 开工')).toEqual(['gemini']);
+    expect(extractMentionTargets('@执行 开工')).toEqual(['opencode']);
+  });
+
+  it('句中 @all 不当目标', () => {
+    expect(extractMentionTargets('不要 @all,只写 add.ts')).toEqual([]);
+    expect(parseMentionTargets('不要 @all,只写 add.ts', 'claude')).toEqual(['claude']);
+  });
 });
 
 describe('extractMentionTargets / lastMentionedAgent', () => {
@@ -117,6 +134,11 @@ describe('stripMentions', () => {
 
   it('句中 @ 留给原文', () => {
     expect(stripMentions('@claude 写 @opencode 审')).toBe('写 @opencode 审');
+  });
+
+  it('行首群组名也剥掉', () => {
+    expect(stripMentions('@全员 开工')).toBe('开工');
+    expect(stripMentions('@架构 写方案')).toBe('写方案');
   });
 
   it('剥中文行首名', () => {

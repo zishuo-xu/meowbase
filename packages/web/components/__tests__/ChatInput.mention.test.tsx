@@ -9,6 +9,7 @@ describe('ChatInput 提及补全', () => {
     const input = screen.getByPlaceholderText(/@墨墨/);
 
     fireEvent.change(input, { target: { value: '帮我 @', selectionStart: 4 } });
+    expect(screen.getByText('全员')).toBeTruthy();
     expect(screen.getByText('墨墨')).toBeTruthy();
     expect(screen.getByText('闪闪')).toBeTruthy();
     expect(screen.getByText('团团')).toBeTruthy();
@@ -25,6 +26,16 @@ describe('ChatInput 提及补全', () => {
     fireEvent.change(input, { target: { value: '@墨', selectionStart: 2 } });
     expect(screen.getByText('墨墨')).toBeTruthy();
     expect(screen.queryByText('闪闪')).toBeNull();
+  });
+
+  it('选全员插入 @全员', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/);
+    fireEvent.change(input, { target: { value: '@', selectionStart: 1 } });
+    fireEvent.click(screen.getByText('全员'));
+    expect((input as HTMLTextAreaElement).value).toBe('@全员 ');
+    expect(onSend).not.toHaveBeenCalled();
   });
 
   it('回车选择当前高亮项', () => {
