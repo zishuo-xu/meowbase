@@ -5,6 +5,7 @@ import { spawnEnv } from './base-url.js';
 import { emitParsedLine } from './tool-activity.js';
 import { attachChildKillers } from './child-lifecycle.js';
 import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
+import { mcpCliArgs } from '../mcp/protocol.js';
 
 export class ClaudeAdapter implements AgentService {
   readonly agentId: AgentId;
@@ -33,6 +34,7 @@ export class ClaudeAdapter implements AgentService {
     if (input.systemPrompt && !input.sessionId) {
       args.push('--append-system-prompt', input.systemPrompt);
     }
+    if (this.opts.mcpCommand) args.push(...mcpCliArgs('claude', this.opts.mcpCommand));
     args.push(input.prompt);
 
     const accumulator = new StreamAccumulator();

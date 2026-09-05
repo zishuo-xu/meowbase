@@ -21,12 +21,14 @@ export function createAdapter(spec: AgentSpec, timeoutMs: number): AgentService 
   const kind = cliKindFromBin(spec.bin, spec.id);
   const protocol = spec.protocol ?? inferModelProtocol([spec.bin]);
   const env = envForGateway(protocol, { baseUrl: spec.baseUrl, apiKey: spec.apiKey });
+  const mcpCommand = process.env.MEOW_MCP === '0' ? undefined : process.env.MEOW_MCP_COMMAND;
   const shared = {
     agentId: spec.id,
     bin: spec.bin,
     model: spec.model,
     timeoutMs,
     ...(Object.keys(env).length > 0 ? { env } : {}),
+    ...(mcpCommand ? { mcpCommand } : {}),
   };
   if (kind === 'gemini') return new GeminiAdapter(shared);
   if (kind === 'opencode') return new OpenCodeAdapter(shared);

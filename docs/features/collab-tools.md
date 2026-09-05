@@ -32,7 +32,7 @@
 
 ## 不做（本篇）
 
-- 独立 MCP stdio 服务器、跨项目配置同步
+- 跨项目配置同步(stdio 见 [mcp-stdio.md](mcp-stdio.md))
 - 跨线程发信、任务板
 - 让三家 CLI 真的挂上 MCP
 

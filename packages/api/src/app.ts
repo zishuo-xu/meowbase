@@ -68,6 +68,9 @@ export async function startApp(opts: StartAppOptions): Promise<StartedApp> {
   mkdirSync(memoryDir, { recursive: true });
   const hopTranscriptDir = resolve(opts.repoRoot, process.env.HOP_TRANSCRIPT_DIR ?? 'audit/hops');
   mkdirSync(hopTranscriptDir, { recursive: true });
+  if (process.env.MEOW_MCP !== '0' && !process.env.MEOW_MCP_COMMAND) {
+    process.env.MEOW_MCP_COMMAND = `node ${resolve(opts.repoRoot, 'packages/api/dist/mcp.js')}`;
+  }
 
   const redis = createRedisClient(config.redisUrl);
   await assertStorageReady(redis);

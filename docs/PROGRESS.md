@@ -18,7 +18,7 @@
 
 ## 现在停在哪
 
-上一刀:**待批卡聚到一页**(feat,已落地)。Hub 待批页列出所有还没落地的卡,能批准、打回、跳进线程。下一刀候选从总账建议顺序里挑,每条仍先写薄设计。
+上一刀:**协作工具挂上 CLI**(feat,已落地)。stdio MCP 暴露 search_messages / list_threads;claude 适配器可挂上。e2e 默认关掉以免假 CLI 吃未知参数。下一刀候选从总账建议顺序里挑,每条仍先写薄设计。
 
 **没有在飞的刀。** `features/` 表里没有 `设计中`（`_template.md` 那篇是模板本身，不算）。总账本身已经落地；要开下一刀，从 `ALIGNMENT.md` 的建议顺序里挑，先写一篇薄设计、等人点头。
 
@@ -67,6 +67,14 @@
 ## 增量记录
 
 最新在上。每刀记四样：**动了什么**、**与设计稿的偏离及原因**、**只有人手验过的部分**、**明确留了没做的**。前两样是给「我再接手时知道你改了什么」，后两样是给「别把没验过的当验过了」。
+
+### 2026-09-06 feat: 协作工具挂上 CLI
+
+`mcp-stdio.md`。手写 JSON-RPC stdio:`initialize` / `tools/list` / `tools/call`。工具打现有 HTTP。claude 传 `--mcp-config`;gemini 传允许名单;opencode 本篇不传。`MEOW_MCP=0` 关闭。e2e/eval 默认关。
+
+- **偏离**:没引入 MCP SDK,也没做跨项目同步。
+- **只有人手验过**:没让真 claude CLI 挂上再搜消息(协议和 client 单测盖了 list/call/HTTP)。
+- **留了没做**:SDK、资源模板、跨项目配置、opencode 挂载。
 
 ### 2026-09-06 feat: 待批卡聚到一页
 

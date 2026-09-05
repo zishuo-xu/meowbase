@@ -188,8 +188,8 @@ describe('TeamHub', () => {
     expect(screen.getByText(/CLI claude/)).toBeTruthy();
     expect(screen.getByText(/CLI gemini/)).toBeTruthy();
     expect(screen.getByText('协作工具')).toBeTruthy();
-    expect(screen.getByText(/GET \/api\/collab\/messages/)).toBeTruthy();
-    expect(screen.getByText(/GET \/api\/collab\/threads/)).toBeTruthy();
+    expect(screen.getByText(/search_messages/)).toBeTruthy();
+    expect(screen.getByText(/list_threads/)).toBeTruthy();
     expect(screen.getByText(/CLI opencode/)).toBeTruthy();
   });
 

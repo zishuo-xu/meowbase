@@ -115,6 +115,7 @@ export function harnessEnv(opts: HarnessStartOpts): NodeJS.ProcessEnv {
     OPENCODE_BIN: opts.opencodeBin ?? writerBin,
     AGENT_TIMEOUT_MS: '30000',
     A2A_MAX_DEPTH: '3',
+    MEOW_MCP: '0',
   };
   delete env.FAKE_DELAY_MS;
   delete env.FAKE_WRITER_DELAY_MS;

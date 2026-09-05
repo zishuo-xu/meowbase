@@ -28,6 +28,8 @@ export interface AdapterOpts {
   model?: string;
   timeoutMs?: number;
   env?: Record<string, string>;
+  /** 协作 MCP stdio 命令;缺省或 MEOW_MCP=0 不挂 */
+  mcpCommand?: string;
 }
 
 export interface AgentService {

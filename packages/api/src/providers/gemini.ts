@@ -6,6 +6,7 @@ import { spawnEnv } from './base-url.js';
 import { emitParsedLine } from './tool-activity.js';
 import { attachChildKillers } from './child-lifecycle.js';
 import type { AdapterOpts, AgentService, AgentTurnInput, AgentTurnOutput } from './types.js';
+import { mcpCliArgs } from '../mcp/protocol.js';
 
 export class GeminiAdapter implements AgentService {
   readonly agentId: AgentId;
@@ -35,6 +36,7 @@ export class GeminiAdapter implements AgentService {
     ];
     if (input.sessionId) args.push('-r', input.sessionId);
     if (model) args.push('-m', model);
+    if (this.opts.mcpCommand) args.push(...mcpCliArgs('gemini', this.opts.mcpCommand));
 
     const accumulator = new GeminiAccumulator();
     const child = spawn(bin, args, {
