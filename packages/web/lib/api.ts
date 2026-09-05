@@ -156,6 +156,11 @@ export interface ToolUsageDto {
   total: { skillInjections: number; toolCalls: number };
 }
 
+export interface MemoryRecallDto {
+  items: Array<{ id: string; injections: number; citations: number }>;
+  total: { injections: number; citations: number };
+}
+
 export interface AgentPatchDto {
   name?: string;
   aliases?: string[];
@@ -265,4 +270,6 @@ export const api = {
     request<UsageDto>(threadId ? `/api/usage?threadId=${threadId}` : '/api/usage'),
   fetchToolUsage: (threadId?: string) =>
     request<ToolUsageDto>(threadId ? `/api/usage/tools?threadId=${threadId}` : '/api/usage/tools'),
+  fetchMemoryRecall: (threadId?: string) =>
+    request<MemoryRecallDto>(threadId ? `/api/usage/memory?threadId=${threadId}` : '/api/usage/memory'),
 };

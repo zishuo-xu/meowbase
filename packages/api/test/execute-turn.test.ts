@@ -477,6 +477,8 @@ describe('executeTurn 消息协议与注入', () => {
     expect(receivedPrompt).toContain('事实内容');
     expect(receivedPrompt).toContain(entry.id);
     expect(receivedPrompt).toMatch(/确认于|确认时间未记/);
+    const assistants = (await stores.messages.list(thread.id)).filter((m) => m.role === 'assistant');
+    expect(assistants[0]?.evidenceIds).toEqual([entry.id]);
   });
 
   it('没有 session 时把已确认证据当续接胶囊;有 session 不再灌胶囊标题', async () => {

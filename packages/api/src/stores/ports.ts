@@ -85,6 +85,7 @@ type AppendBase = {
   usage?: Message['usage'];
   error?: string;
   skillIds?: string[];
+  evidenceIds?: string[];
   activities?: Message['activities'];
 };
 

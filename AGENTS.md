@@ -73,7 +73,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 一个 `@` 都不写 | 按顺序兜:最近 1 小时内你点过的那只 → 最后开口的猫 → 线程主猫(`resolveTurnTargets`) |
 | `#learn 标题` | 本轮猫跑完后出证据 draft(仍会叫猫,不是纯系统命令) |
 | `#confirm ev_xxx` | 确认证据,不叫猫(`handleSystemCommand`)。成功后写成 `memory/ev_xxx.md`;索引清空后扫文件能重建 |
-| `#ev_xxx` | 引用已确认证据注入当轮上下文。**不受仓库划界限制** —— 人点名 id 就是显式跨界,想借别的项目那条决定就借得到;划界只管上面那条不用手打的自动召回。某只猫没有可 resume 的 session 时,本线程已确认证据会当续接胶囊自动带上(最多 8 条) |
+| `#ev_xxx` | 引用已确认证据注入当轮上下文。**不受仓库划界限制** —— 人点名 id 就是显式跨界,想借别的项目那条决定就借得到;划界只管上面那条不用手打的自动召回。某只猫没有可 resume 的 session 时,本线程已确认证据会当续接胶囊自动带上(最多 8 条)。Hub「记忆」页看注入/引用次数 |
 | 「之前 / 我们约定 / 讨论过」+ 关键词 | 从已确认证据匹配注入,不必手打 `#ev_`。按仓划界:绑了仓只看同一仓的线程;空沙箱只看本线程自己的 |
 | 整行 `星星罐子` | 停棒拉闸,不调猫(`handleSystemCommand`) |
 | `#approve ap_xxx` / `#reject ap_xxx 理由` | 审批决策,不叫猫 |
@@ -111,6 +111,7 @@ docs/         地图 README + 功能设计(features/)+ A2A 说明 + 旧 specs/pl
 | 待批中心 | Hub「待批」页列出所有还没落地的卡。批准/打回走 `#approve` / `#reject`;去看打开那条线程 |
 | 协作工具 | 只读:`GET /api/collab/messages?q=` 搜正文,`GET /api/collab/threads` 列线程。空查询不扫全库。不改路由。stdio MCP:`pnpm --filter @meowbase/api mcp`;`MEOW_MCP=0` 不挂 CLI |
 | 跨线程传话 | `POST /api/threads/:id/cross-post` 把一句寄到另一条线程,落 `cross-post` 系统消息,写明来自哪条。不叫猫、不参与球权、不落助手气泡。同源或目标不存在拒。同名猫在另一条线程说的话不当本线程自己 |
+| 记忆召回度量 | 跳完成记下塞进提示词的证据 id;猫正文点 `#ev_` 算引用。`GET /api/usage/memory` / Hub「记忆」页。不靠猫自评 |
 | 预算闸 | 配了 `MEOW_BUDGET_USD` / `budgetUsd` 时,全平台已报真实花费达到上限则普通任务不叫猫,落 `budget`。批准 / 拉闸 / 确认证据仍立刻走。没配不拦。不按价格表估算 |
 | 绑仓线程每跳后记录 git 变化 | 有 `thread.repo` 时跳后比对只读快照(不 `fetch`);自己那根 HEAD 前进 / 自己那根远端跟踪引用变了(含 force)则落 `git-move`(不参与球权)。空沙箱跳过 |
 | 越界就停 | 绑仓线程本跳基准分支的远端跟踪引用或本地 `refs/heads/<baseBranch>` 动了(`settleTurn`):落参与球权的 `git-overstep`、清掉 pending、不建审批卡。开了远程时自己那根的提交/推送只落 `git-move`,接力继续;本地模式(`allowRemote` 缺失即 false)下自己那根远端跟踪引用变了也落 `git-overstep`(不该推送) |

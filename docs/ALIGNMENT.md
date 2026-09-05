@@ -4,7 +4,7 @@
 > 策展标准与「有意不做」规则见设计稿 docs/superpowers/specs/2026-09-05-clowder-alignment-ledger-design.md。
 > 对内工作文档,不对外;对外叙事讲「我做了什么、为什么」。
 
-**当前对齐率:已对齐 21 / 分母 31 = 68%**(每次相关改动同轮更新;第 14 行从缺失改为已对齐)
+**当前对齐率:已对齐 22 / 分母 31 = 71%**(每次相关改动同轮更新;第 17 行从缺失改为已对齐)
 
 ## 分母(核心清单)
 
@@ -26,7 +26,7 @@
 | 14 | 跨线程传话溯源 | 已对齐 | [F052](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F052-cross-thread-identity-isolation.md) | [cross-thread-post](features/cross-thread-post.md) | 跨线程传话贴上原寄件地址——不落成助手气泡,同名猫在另一条线程说的话不当本线程自己 |
 | 15 | 记忆写入治理 | 已对齐 | [F102](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F102-memory-adapter-refactor.md) | [memory-evidence](features/memory-evidence.md)、[memory-files](features/memory-files.md) | 记忆入库必须人点头,确认后写成 .md——文件是真相,索引可以扔掉再编 |
 | 16 | 记忆划界、出处与联邦检索 | 部分对齐(差联邦检索、Collection 治理、生命周期) | [F186](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F186-library-memory-architecture.md) | [memory-scope](features/memory-scope.md) | 记忆按仓划界、注入带出处——猫看得出这条约定来自哪个项目、什么时候确认的 |
-| 17 | 记忆召回度量 | 缺失 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | | 我不知道猫召回的记忆用没用上——要量就用真实行为信号,不用自评 |
+| 17 | 记忆召回度量 | 已对齐 | [F200](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F200-memory-recall-eval.md) | [memory-recall](features/memory-recall.md) | 召回只量行为信号——注入是塞进提示词,引用是正文点了 #ev_,不靠猫自评 |
 | 18 | 技能按需注入 | 已对齐 | [F038](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F038-skills-discovery.md) | [skills](features/skills.md) | 技能是被喊到才出现的说明书——不常驻上下文,省 token 也避免永远用审查口吻写代码 |
 | 19 | 技能/工具使用度量 | 已对齐 | [F150](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F150-tool-usage-stats.md) | [skill-usage](features/skill-usage.md) | 技能按注入次数、工具按过程条数——打开再算,不另开计数器;不判断说明书有没有被照着做 |
 | 20 | 跨猫互审与人批落地 | 部分对齐(差云端第二层 review) | [F031](https://github.com/zts212653/clowder-ai/blob/main/docs/features/F031-review-two-layer-process.md) | [approval](features/approval.md)、[review-conclusion](features/review-conclusion.md) | 审查是猫推理、落地是人拍板——互审是内建管线,不是聊天里求人 |
@@ -58,4 +58,4 @@
 
 按「面试叙事价值 × 工程依赖 × 成本(不花钱优先)」排,每条开工前仍先写薄设计、等人点头:
 
-1. **记忆召回度量**(补第 17 行)——要量就用真实行为信号,不用自评。
+1. **群组 mention 展开**(补第 4 行差的那截)——`@all` / `@thread` / 品种展开,回退梯级已经有了。

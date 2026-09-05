@@ -382,6 +382,7 @@ export class RedisMessageStore implements MessageStore {
       usage: input.usage,
       error: input.error,
       ...(input.skillIds && input.skillIds.length > 0 ? { skillIds: input.skillIds } : {}),
+      ...(input.evidenceIds && input.evidenceIds.length > 0 ? { evidenceIds: input.evidenceIds } : {}),
       ...(input.activities && input.activities.length > 0 ? { activities: input.activities } : {}),
       createdAt: new Date().toISOString(),
       ...(input.role === 'system'

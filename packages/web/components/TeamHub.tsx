@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, type AgentConfigDto, type AppConfigDto, type ApprovalDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
+import { api, type AgentConfigDto, type AppConfigDto, type ApprovalDto, type MemoryRecallDto, type ModelPresetDto, type TokenUsageDto, type ToolUsageDto, type UsageDto } from '@/lib/api';
 import { pendingApprovals } from '@/lib/approvals';
 import { totalTokensOf } from '@/lib/token-usage';
 import { CatAvatar } from './CatAvatar';
@@ -215,6 +215,7 @@ export function TeamHub({
   const [usageScope, setUsageScope] = useState<'thread' | 'all'>('thread');
   const [usage, setUsage] = useState<UsageDto | null>(null);
   const [toolUsage, setToolUsage] = useState<ToolUsageDto | null>(null);
+  const [memoryRecall, setMemoryRecall] = useState<MemoryRecallDto | null>(null);
   const [approvals, setApprovals] = useState<ApprovalDto[]>([]);
 
   useEffect(() => {
@@ -257,22 +258,26 @@ export function TeamHub({
           if (!cancelled) {
             setUsage({ byAgent: {}, total: {} });
             setToolUsage({ skills: [], tools: [], total: { skillInjections: 0, toolCalls: 0 } });
+            setMemoryRecall({ items: [], total: { injections: 0, citations: 0 } });
           }
           return;
         }
         const scopeId = usageScope === 'all' ? undefined : activeThreadId ?? undefined;
-        const [next, nextTools] = await Promise.all([
+        const [next, nextTools, nextMemory] = await Promise.all([
           api.fetchUsage(scopeId),
           api.fetchToolUsage(scopeId),
+          api.fetchMemoryRecall(scopeId),
         ]);
         if (!cancelled) {
           setUsage(next);
           setToolUsage(nextTools);
+          setMemoryRecall(nextMemory);
         }
       } catch {
         if (!cancelled) {
           setUsage({ byAgent: {}, total: {} });
           setToolUsage({ skills: [], tools: [], total: { skillInjections: 0, toolCalls: 0 } });
+          setMemoryRecall({ items: [], total: { injections: 0, citations: 0 } });
         }
       }
     };
@@ -380,13 +385,24 @@ export function TeamHub({
           <button
             type="button"
             onClick={() => setPane('skills')}
-            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+            className={`mb-1 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
               pane === 'skills'
                 ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
                 : 'hover:bg-white/70'
             }`}
           >
             技能
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('memory')}
+            className={`mb-3 rounded-2xl px-2 py-2 text-left text-sm font-bold transition ${
+              pane === 'memory'
+                ? 'bg-white shadow-sm ring-1 ring-[var(--accent)]/25'
+                : 'hover:bg-white/70'
+            }`}
+          >
+            记忆
           </button>
           <div className="mb-2 px-1 text-[11px] font-bold tracking-wide text-[var(--ink-soft)] uppercase">
             成员
@@ -582,6 +598,78 @@ export function TeamHub({
                             <span className="ml-2 text-[11px] text-[var(--ink-soft)]">{row.category}</span>
                           </span>
                           <span className="text-xs text-[var(--ink-soft)]">{row.count} 次</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              )}
+            </section>
+          ) : pane === 'memory' ? (
+            <section aria-label="记忆" className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[var(--ink-soft)]">记忆</div>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  只算已经跑完的那一跳。注入是塞进提示词,引用是正文点了 #ev_。不靠猫自评。没记录就空着,不写 0。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'thread'}
+                  onClick={() => setUsageScope('thread')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'thread'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  当前线程
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={usageScope === 'all'}
+                  onClick={() => setUsageScope('all')}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    usageScope === 'all'
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-white ring-1 ring-[var(--border)] hover:bg-[var(--surface)]'
+                  }`}
+                >
+                  全部
+                </button>
+              </div>
+              {memoryRecall && memoryRecall.items.length === 0 ? (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  还没有召回记录。点名或「之前约定」注入的那一跳会记注入,正文写出 #ev_ 会记引用。
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2">
+                      <div className="text-[var(--ink-soft)]">注入</div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {formatTokenCount(memoryRecall?.total.injections)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2">
+                      <div className="text-[var(--ink-soft)]">引用</div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {formatTokenCount(memoryRecall?.total.citations)}
+                      </div>
+                    </div>
+                  </div>
+                  {memoryRecall && memoryRecall.items.length > 0 ? (
+                    <ul className="space-y-1">
+                      {memoryRecall.items.map((row) => (
+                        <li
+                          key={row.id}
+                          className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-white/70 px-3 py-2 text-sm"
+                        >
+                          <span className="font-bold">{row.id}</span>
+                          <span className="text-xs text-[var(--ink-soft)]">
+                            注入 {row.injections} · 引用 {row.citations}
+                          </span>
                         </li>
                       ))}
                     </ul>

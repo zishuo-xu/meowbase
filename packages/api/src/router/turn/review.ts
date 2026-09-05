@@ -159,6 +159,7 @@ export async function runReviewFixThenCard(input: {
         writeQueue,
         randomUUID(),
         fixSkills.map((skill) => skill.id),
+        refs.map((entry) => entry.id),
       );
       await gitAddAll(thread.workdir);
       const from = await resolveDiffMarker(thread.workdir, thread.repo);

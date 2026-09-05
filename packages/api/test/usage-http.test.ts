@@ -119,6 +119,27 @@ describe('GET /api/usage', () => {
   });
 });
 
+describe('GET /api/usage/memory', () => {
+  it('带 threadId 只算这条线程的证据注入和引用', async () => {
+    await stores.messages.append({
+      threadId: threadA,
+      role: 'assistant',
+      agentId: 'claude',
+      content: '按 #ev_aaaaaaaa 做',
+      status: 'completed',
+      evidenceIds: ['ev_aaaaaaaa'],
+    });
+    const res = await fetch(`${baseUrl}/api/usage/memory?threadId=${threadA}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<{ id: string; injections: number; citations: number }>;
+      total: { injections: number; citations: number };
+    };
+    expect(body.items).toEqual([{ id: 'ev_aaaaaaaa', injections: 1, citations: 1 }]);
+    expect(body.total).toEqual({ injections: 1, citations: 1 });
+  });
+});
+
 describe('GET /api/usage/tools', () => {
   it('带 threadId 只算这条线程的技能和工具', async () => {
     await stores.messages.append({

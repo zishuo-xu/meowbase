@@ -1,5 +1,11 @@
-import type { AgentId, Message, TokenUsage, ToolUsageSummary } from '@meowbase/shared';
-import { mergeTokenUsage, sumToolUsage, totalTokensOf } from '@meowbase/shared';
+import type {
+  AgentId,
+  EvidenceRecallSummary,
+  Message,
+  TokenUsage,
+  ToolUsageSummary,
+} from '@meowbase/shared';
+import { mergeTokenUsage, sumEvidenceRecall, sumToolUsage, totalTokensOf } from '@meowbase/shared';
 import type { AppStores } from '../stores/ports.js';
 
 export interface UsageSummary {
@@ -57,6 +63,13 @@ export async function loadToolUsage(
   threadId?: string,
 ): Promise<ToolUsageSummary> {
   return sumToolUsage(await listUsageMessages(stores, threadId));
+}
+
+export async function loadEvidenceRecall(
+  stores: Pick<AppStores, 'threads' | 'messages'>,
+  threadId?: string,
+): Promise<EvidenceRecallSummary> {
+  return sumEvidenceRecall(await listUsageMessages(stores, threadId));
 }
 
 async function listUsageMessages(

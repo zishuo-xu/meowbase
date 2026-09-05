@@ -10,6 +10,7 @@ import {
   formatSessionCapsuleHeading,
   matchEvidence,
   selectSessionCapsule,
+  sumEvidenceRecall,
   wantsEvidenceRecall,
 } from '../src/evidence-recall.js';
 import { canonicalizePath } from '../src/repo-path.js';
@@ -189,5 +190,37 @@ describe('selectSessionCapsule', () => {
     expect(picked[0]?.id).toBe('ev_00000008');
     expect(picked.some((e) => e.status === 'draft')).toBe(false);
     expect(formatSessionCapsuleHeading()).toContain('不是本轮指令');
+  });
+});
+
+describe('sumEvidenceRecall', () => {
+  it('只算完成的助手消息;注入读 evidenceIds,引用读正文 #ev_', () => {
+    const result = sumEvidenceRecall([
+      {
+        role: 'assistant',
+        status: 'completed',
+        agentId: 'claude',
+        content: '按 #ev_aaaaaaaa 做',
+        evidenceIds: ['ev_aaaaaaaa', 'ev_bbbbbbbb'],
+      },
+      {
+        role: 'assistant',
+        status: 'streaming',
+        agentId: 'claude',
+        content: '#ev_cccccccc',
+        evidenceIds: ['ev_cccccccc'],
+      },
+      {
+        role: 'user',
+        status: 'completed',
+        content: '#ev_aaaaaaaa',
+        evidenceIds: ['ev_aaaaaaaa'],
+      },
+    ]);
+    expect(result.items).toEqual([
+      { id: 'ev_aaaaaaaa', injections: 1, citations: 1 },
+      { id: 'ev_bbbbbbbb', injections: 1, citations: 0 },
+    ]);
+    expect(result.total).toEqual({ injections: 2, citations: 1 });
   });
 });

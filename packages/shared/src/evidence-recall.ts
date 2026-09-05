@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import { canonicalizePath } from './repo-path.js';
-import type { EvidenceEntry } from './types.js';
+import { parseEvidenceRefs } from './commands.js';
+import type { AgentId, EvidenceEntry, Message } from './types.js';
 
 /** 召回范围用的线程侧写。只有 id / 仓路径 / 标题,不往证据上加仓库字段。 */
 export interface EvidenceScopeThread {
@@ -150,4 +151,58 @@ export function selectSessionCapsule(entries: readonly EvidenceEntry[]): Evidenc
 
 export function formatSessionCapsuleHeading(): string {
   return '续接胶囊(不是本轮指令,是这条线程已经确认过的约定):';
+}
+
+export interface EvidenceRecallRow {
+  id: string;
+  injections: number;
+  citations: number;
+}
+
+export interface EvidenceRecallSummary {
+  items: EvidenceRecallRow[];
+  total: { injections: number; citations: number };
+}
+
+type Countable = Pick<Message, 'role' | 'status' | 'agentId' | 'content' | 'evidenceIds'>;
+
+function isCountable(message: Countable): message is Countable & { agentId: AgentId } {
+  return message.role === 'assistant' && message.status === 'completed' && message.agentId != null;
+}
+
+/** 只算跑完的助手消息。注入读 evidenceIds,引用读正文 #ev_。 */
+export function sumEvidenceRecall(messages: ReadonlyArray<Countable>): EvidenceRecallSummary {
+  const rows = new Map<string, EvidenceRecallRow>();
+  const touch = (id: string): EvidenceRecallRow => {
+    const current = rows.get(id);
+    if (current) return current;
+    const next = { id, injections: 0, citations: 0 };
+    rows.set(id, next);
+    return next;
+  };
+
+  for (const message of messages) {
+    if (!isCountable(message)) continue;
+    for (const id of message.evidenceIds ?? []) {
+      if (!id) continue;
+      touch(id).injections += 1;
+    }
+    for (const id of parseEvidenceRefs(message.content ?? '')) {
+      touch(id).citations += 1;
+    }
+  }
+
+  const items = [...rows.values()].sort(
+    (a, b) =>
+      b.injections - a.injections ||
+      b.citations - a.citations ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  return {
+    items,
+    total: {
+      injections: items.reduce((sum, row) => sum + row.injections, 0),
+      citations: items.reduce((sum, row) => sum + row.citations, 0),
+    },
+  };
 }

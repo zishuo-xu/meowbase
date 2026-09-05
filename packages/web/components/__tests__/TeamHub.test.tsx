@@ -11,6 +11,10 @@ vi.mock('@/lib/api', () => ({
       tools: [],
       total: { skillInjections: 0, toolCalls: 0 },
     }),
+    fetchMemoryRecall: vi.fn().mockResolvedValue({
+      items: [],
+      total: { injections: 0, citations: 0 },
+    }),
     listApprovals: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -102,6 +106,11 @@ describe('TeamHub', () => {
       skills: [],
       tools: [],
       total: { skillInjections: 0, toolCalls: 0 },
+    });
+    vi.mocked(api.fetchMemoryRecall).mockReset();
+    vi.mocked(api.fetchMemoryRecall).mockResolvedValue({
+      items: [],
+      total: { injections: 0, citations: 0 },
     });
     vi.mocked(api.listApprovals).mockReset();
     vi.mocked(api.listApprovals).mockResolvedValue([]);
@@ -715,6 +724,28 @@ describe('TeamHub', () => {
     expect(within(board).getByText('Write')).toBeTruthy();
     expect(within(board).getByText('builtin')).toBeTruthy();
     expect(within(board).getByText(/技能注入/)).toBeTruthy();
+  });
+
+  it('记忆页列出注入和引用', async () => {
+    vi.mocked(api.fetchMemoryRecall).mockResolvedValue({
+      items: [{ id: 'ev_aaaaaaaa', injections: 2, citations: 1 }],
+      total: { injections: 2, citations: 1 },
+    });
+    render(
+      <TeamHub
+        open
+        config={config}
+        activeThreadId="t1"
+        onClose={() => {}}
+        onSaveAgent={vi.fn()}
+        onSaveSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '记忆' }));
+    const board = await screen.findByRole('region', { name: '记忆' });
+    expect(within(board).getByText('ev_aaaaaaaa')).toBeTruthy();
+    expect(within(board).getByText(/注入 2/)).toBeTruthy();
+    expect(within(board).getByText(/引用 1/)).toBeTruthy();
   });
 
   it('切换当前线程 / 全部会换数据源', async () => {

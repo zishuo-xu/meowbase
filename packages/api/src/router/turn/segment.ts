@@ -541,6 +541,7 @@ export async function runSegment(
       writeQueue,
       resume?.id ?? randomUUID(),
       matchedSkills.map((skill) => skill.id),
+      evidenceRefs.map((entry) => entry.id),
     );
     lastAssistant = hopResult.assistant;
     lastOutput = hopResult.output;
@@ -632,6 +633,7 @@ export async function runSegment(
           writeQueue,
           randomUUID(),
           matchedSkills.map((skill) => skill.id),
+          evidenceRefs.map((entry) => entry.id),
         );
         lastAssistant = nudged.assistant;
         lastOutput = nudged.output;

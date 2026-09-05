@@ -66,7 +66,7 @@ import {
   gitWorktreeRemove,
 } from '../services/git.js';
 import { verifyModelConnection } from '../providers/verify-model.js';
-import { loadToolUsage, loadUsage } from '../services/usage.js';
+import { loadEvidenceRecall, loadToolUsage, loadUsage } from '../services/usage.js';
 import { readHopTranscript } from '../services/hop-transcript.js';
 import { loadCollabMessages, loadCollabThreads } from '../services/collab.js';
 
@@ -521,6 +521,11 @@ export async function buildServer(deps: ApiDeps): Promise<FastifyInstance> {
   app.get('/api/usage/tools', async (request) => {
     const { threadId } = request.query as { threadId?: string };
     return loadToolUsage(stores, threadId);
+  });
+
+  app.get('/api/usage/memory', async (request) => {
+    const { threadId } = request.query as { threadId?: string };
+    return loadEvidenceRecall(stores, threadId);
   });
 
   app.get('/api/audit', async (request, reply) => {

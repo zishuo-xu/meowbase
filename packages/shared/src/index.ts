@@ -64,11 +64,16 @@ export {
   formatSessionCapsuleHeading,
   matchEvidence,
   selectSessionCapsule,
+  sumEvidenceRecall,
   toEvidenceScopeThread,
   tokenizeEvidenceQuery,
   wantsEvidenceRecall,
 } from './evidence-recall.js';
-export type { EvidenceScopeThread } from './evidence-recall.js';
+export type {
+  EvidenceRecallRow,
+  EvidenceRecallSummary,
+  EvidenceScopeThread,
+} from './evidence-recall.js';
 export { evidenceFileName, formatEvidenceMarkdown, parseEvidenceMarkdown } from './evidence-files.js';
 export { buildA2AProtocol, buildSystemPrompt } from './system-prompt.js';
 export { deriveSopBoard, formatSopBoardPrompt, sopBoardLabel } from './sop-board.js';
