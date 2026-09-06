@@ -2282,6 +2282,54 @@ describe('executeTurn 多角色协作', () => {
     rmSync(workdirBase, { recursive: true, force: true });
   });
 
+  it('等跑 npm test 后面跟中文说明:不 spawn,落白名单拒', async () => {
+    const stores = createMemoryStores();
+    const workdirBase = mkdtempSync(join(tmpdir(), 'meowbase-holdcmd-tail-'));
+    const spawned: unknown[] = [];
+    const registry = createAgentRegistry([
+      {
+        agentId: 'claude',
+        async runTurn() {
+          return {
+            sessionId: 's1',
+            content: '先自检。\n等跑 npm test 平台替跑确认 12/12 全绿',
+            status: 'completed',
+          };
+        },
+      },
+    ]);
+    const thread = await stores.threads.create({
+      title: 't',
+      primaryAgentId: 'claude',
+      workdirBase,
+    });
+    mkdirSync(thread.workdir, { recursive: true });
+    await gitInit(thread.workdir);
+    const ctx = {
+      stores,
+      registry,
+      agents: DEFAULT_AGENTS.map(cloneAgentSpec),
+      holdCommandSpawn: ((file: string, args: string[]) => {
+        spawned.push([file, ...args]);
+        throw new Error('不该 spawn');
+      }) as typeof import('node:child_process').spawn,
+    };
+    await executeTurn({
+      threadId: thread.id,
+      content: '@墨墨 写 add.ts',
+      context: ctx,
+    });
+    await followPendingChain({ threadId: thread.id, context: ctx });
+    expect(spawned).toEqual([]);
+    const dropped = (await stores.messages.list(thread.id)).find(
+      (m) => m.role === 'system' && m.systemKind === 'dropped',
+    );
+    expect(dropped?.content).toContain('npm test 平台替跑确认');
+    expect(dropped?.content).toContain('白名单');
+    expect(dropped?.content).toContain('球还在地上');
+    rmSync(workdirBase, { recursive: true, force: true });
+  });
+
   it('简单问答不提示球还在地上', async () => {
     const stores = createMemoryStores();
     let calls = 0;

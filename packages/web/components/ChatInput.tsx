@@ -182,6 +182,10 @@ export function ChatInput({
                   );
                   return;
                 }
+                if (e.key === 'Enter' && e.shiftKey) {
+                  setMenuOpen(false);
+                  return;
+                }
                 if (e.key === 'Enter' || e.key === 'Tab') {
                   e.preventDefault();
                   selectMention(filtered[activeIdx] ?? filtered[0]!);

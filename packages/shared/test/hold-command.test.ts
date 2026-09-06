@@ -47,6 +47,13 @@ describe('authorizeHoldCommand', () => {
     if (decision.ok) expect(decision.argv).toEqual(['npm', 'test', '--', '--grep', 'a b']);
   });
 
+  it('npm test 后面跟中文说明不在白名单,合法 grep 仍过', () => {
+    const junk = authorizeHoldCommand('npm test 平台替跑确认 12/12 全绿');
+    expect(junk.ok).toBe(false);
+    if (!junk.ok) expect(junk.reason).toBe('not-allowlisted');
+    expect(authorizeHoldCommand('npm test -- --grep add').ok).toBe(true);
+  });
+
   it('node -e / python -c / rm -rf / 被拒', () => {
     for (const command of ['node -e "process.stdout.write(1)"', 'python -c "print(1)"', 'rm -rf /']) {
       const decision = authorizeHoldCommand(command);

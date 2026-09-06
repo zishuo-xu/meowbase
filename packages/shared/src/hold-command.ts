@@ -79,6 +79,21 @@ function tokenizeArgv(command: string): string[] | null {
   return argv.length > 0 ? argv : null;
 }
 
+function extrasLookLikeFlags(extras: readonly string[]): boolean {
+  if (extras.some((token) => /[\u4e00-\u9fff]/.test(token))) return false;
+  for (let i = 0; i < extras.length; i++) {
+    const token = extras[i]!;
+    if (token === '--') return extras.slice(i + 1).every((item) => !/[\u4e00-\u9fff]/.test(item));
+    if (token.startsWith('-')) continue;
+    const prev = extras[i - 1];
+    if (prev && prev.startsWith('-') && prev !== '--' && !prev.includes('=')) {
+      if (/^[A-Za-z0-9._/=+-]+$/.test(token)) continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 export function matchesHoldCommandAllowlist(
   argv: readonly string[],
   allowlist: readonly HoldCommandRule[] = DEFAULT_HOLD_COMMAND_ALLOWLIST,
@@ -89,7 +104,8 @@ export function matchesHoldCommandAllowlist(
     if (rule.program !== program) return false;
     const needed = rule.args ?? [];
     if (argv.length - 1 < needed.length) return false;
-    return needed.every((part, index) => part === '*' || argv[index + 1] === part);
+    if (!needed.every((part, index) => part === '*' || argv[index + 1] === part)) return false;
+    return extrasLookLikeFlags(argv.slice(1 + needed.length));
   });
 }
 

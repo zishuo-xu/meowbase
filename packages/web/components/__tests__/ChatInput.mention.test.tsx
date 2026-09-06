@@ -68,4 +68,15 @@ describe('ChatInput 提及补全', () => {
     fireEvent.change(input, { target: { value: '@', selectionStart: 1 } });
     expect(screen.getByText('Enter / Tab 选中 · ↑↓ 移动 · Esc 关闭')).toBeTruthy();
   });
+
+  it('补全开着时 Shift+Enter 换行,不插入候选', () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} />);
+    const input = screen.getByPlaceholderText(/@墨墨/) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: '@墨墨', selectionStart: 3 } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input.value).toBe('@墨墨');
+    expect(screen.queryByText('Enter / Tab 选中 · ↑↓ 移动 · Esc 关闭')).toBeNull();
+  });
 });

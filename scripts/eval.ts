@@ -41,6 +41,7 @@ const revisitBin = resolve(root, 'scripts/fixtures/fake-handoff-revisit.mjs');
 const emptyHandoffBin = resolve(root, 'scripts/fixtures/fake-empty-handoff.mjs');
 const holdDenyBin = resolve(root, 'scripts/fixtures/fake-hold-deny.mjs');
 const holdNodeEvalBin = resolve(root, 'scripts/fixtures/fake-hold-node-eval.mjs');
+const holdTailBin = resolve(root, 'scripts/fixtures/fake-hold-tail.mjs');
 const evalWriterBin = resolve(root, 'scripts/fixtures/fake-claude-eval-writer.mjs');
 const selfCommitBin = resolve(root, 'scripts/fixtures/fake-self-commit.mjs');
 const pushBaseBin = resolve(root, 'scripts/fixtures/fake-push-base.mjs');
@@ -994,6 +995,19 @@ const scenarios: Scenario[] = [
         workdirBase,
         writerBin: holdNodeEvalBin,
         commandFragment: 'node -e',
+        reasonRe: /白名单/,
+      }),
+  },
+  {
+    id: 'hold-deny-tail',
+    name: '等跑后面跟中文说明',
+    expectedCatch: 1,
+    expectNote: '白名单多余参数那道关拒了,没把中文当测试文件名',
+    run: (workdirBase) =>
+      runHoldDeny({
+        workdirBase,
+        writerBin: holdTailBin,
+        commandFragment: 'npm test 平台替跑确认',
         reasonRe: /白名单/,
       }),
   },
